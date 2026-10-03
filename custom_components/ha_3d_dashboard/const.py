@@ -21,3 +21,9 @@ DEFAULT_SIDEBAR_ICON = "mdi:home-floor-3"
 # Gleicher Ordner wie bei der Installation von Hand (/config/www/ha-3d-dashboard/). Fehlt er, zeigt das Panel das
 # eingebaute Demo-Haus mit Hinweis.
 DEFAULT_DATA_URL = "/local/ha-3d-dashboard/"
+
+# Gemeinsames Modell (für alle Benutzer gleich) in .storage/ha_3d_dashboard.model
+STORAGE_KEY = f"{DOMAIN}.model"
+STORAGE_VERSION = 1
+# Signal an Abonnenten (Panels), wenn ein Administrator das Modell gespeichert hat
+SIGNAL_MODEL_SAVED = f"{DOMAIN}_model_saved"
