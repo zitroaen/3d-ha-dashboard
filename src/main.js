@@ -20,6 +20,9 @@ ICON.close = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 1
 const icon = (name) => `<svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="${ICON[name]}"/></svg>`;
 
 const MODULE_BASE = new URL('./', import.meta.url);
+// beim Bauen eingesetzt (scripts/build.mjs); ungebündelt (Tests direkt aus src/) unbekannt
+const VERSION = typeof __HA3D_VERSION__ !== 'undefined' ? __HA3D_VERSION__ : 'dev';
+console.info(`%c 3D-HA-Dashboard %c ${VERSION} `, 'background:#f0b45a;color:#1a1408;font-weight:600', 'background:#12151b;color:#e8e2d8');
 
 const STYLE = `
 :host { display: block; position: relative; width: 100%; height: 100%; background: #07090d; overflow: hidden;
@@ -64,6 +67,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .links.show { display: flex; }
 .links header { display: flex; align-items: center; gap: 8px; padding: 10px 8px 6px 16px; }
 .links header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
+.links header h2 small { display: block; font-size: 11px; font-weight: 400; opacity: 0.55; }
 .links header button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
 .links .summary { padding: 0 16px 8px; font-size: 13px; opacity: 0.7; }
 .links .body { overflow-y: auto; padding: 0 8px 12px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -202,7 +206,7 @@ class Ha3dDashboard extends HTMLElement {
       <button class="edit-toggle" title="Bearbeiten" aria-label="Bearbeiten">${icon('edit')}</button>
       <button class="links-toggle" title="Link-Check" aria-label="Link-Check">${icon('link')}</button>
       <div class="links">
-        <header><h2>Link-Check</h2><button class="links-close" aria-label="Schließen">${icon('close')}</button></header>
+        <header><h2>Link-Check<small class="about"></small></h2><button class="links-close" aria-label="Schließen">${icon('close')}</button></header>
         <div class="summary"></div>
         <div class="body">
           <h3>Geräte im Modell</h3><ul class="devices"></ul>
@@ -317,11 +321,13 @@ class Ha3dDashboard extends HTMLElement {
   async _fetchData() {
     if (this._panel?.config?.demo === true) {
       this._setDemo(true);
+      this._source = 'Demo-Haus';
       return loadDemoData();
     }
     try {
       const data = this.shared ? await loadShared(await this._hassReady, this.dataUrl) : await loadData(this.dataUrl);
       this._shared = this.shared ? { revision: data.revision, fileHash: data.fileHash } : null;
+      this._source = data.source === 'shared' ? 'gespeichertes Modell' : `${MODEL_FILE} aus ${this.dataUrl.pathname}`;
       this._setDemo(false);
       if (this.shared) this._subscribeShared();
       return data;
@@ -331,6 +337,7 @@ class Ha3dDashboard extends HTMLElement {
       if (!(e instanceof DataUnavailableError) || (this.view && !this.demo)) throw e;
       console.warn('ha-3d-dashboard: Daten nicht erreichbar, zeige Demo-Haus –', e.message);
       this._setDemo(true, this._panel?.config?.data_url ? `keine Daten unter ${this._panel.config.data_url}` : 'keine Daten neben dem Modul');
+      this._source = 'Demo-Haus';
       return loadDemoData();
     }
   }
@@ -879,6 +886,8 @@ class Ha3dDashboard extends HTMLElement {
 
   /** Alle Geräte mit ihrem Verknüpfungsstatus und HA-Lichter, die noch keinem Gerät zugeordnet sind. */
   _renderLinks() {
+    // Version und Datenquelle: zeigt, ob der Browser das neue Bundle hat und woher das Modell kommt
+    this.shadowRoot.querySelector('.links .about').textContent = `Version ${VERSION} · ${this._source || ''}`;
     const states = this._hass?.states || {};
     const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const devices = this.view?.furnishingData?.devices || [];
