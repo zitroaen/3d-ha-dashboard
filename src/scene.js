@@ -97,19 +97,21 @@ export class HouseScene {
   }
 
   /**
-   * Ebene zeigen (0 = Erdgeschoss mit Außenbereichen, 1 = 1. OG, -1 = Keller …). Etagen verschiedener Gebäude
-   * mit derselben Ebene erscheinen zusammen; alle anderen werden ausgeblendet.
+   * Ebene zeigen (0 = Erdgeschoss mit Außenbereichen, 1 = 1. OG, -1 = Keller …): Die Etagen dieser Ebene stehen auf
+   * allen darunter (samt Garten), die Ebenen darüber sind ausgeblendet – wie ein Haus, dem man die oberen Geschosse
+   * abnimmt. Sichtbare Etagen (activeFloors) lassen sich antippen; die oberste trifft der Strahl zuerst.
    */
   setLevel(level, { silent = false } = {}) {
     if (!this.levels.includes(level)) return false;
     this._anim?.finish();
     this.level = level;
     this._tops = null;
-    this.activeFloors = this.floors.filter((f) => (f.floor.level ?? 0) === level);
-    // "Haupt"-Etage der Ebene (Titel, Editor-Standard): die erste echte Gebäude-Etage
-    this.activeFloor = this.activeFloors.find((f) => !f.floor.outdoor) || this.activeFloors[0];
+    this.activeFloors = this.floors.filter((f) => (f.floor.level ?? 0) <= level);
+    // Etagen genau dieser Ebene; "Haupt"-Etage (Titel, Editor-Standard): die erste echte Gebäude-Etage
+    this.levelFloors = this.floors.filter((f) => (f.floor.level ?? 0) === level);
+    this.activeFloor = this.levelFloors.find((f) => !f.floor.outdoor) || this.levelFloors[0];
     for (const f of this.floors) f.group.visible = this.activeFloors.includes(f);
-    for (const slab of this.slabs || []) slab.visible = slab.userData.level === level;
+    for (const slab of this.slabs || []) slab.visible = slab.userData.level <= level;
     makeFloorAO(this.activeFloors.flatMap((f) => f.floor.walls));
     if (!silent) {
       this.renderer.shadowMap.needsUpdate = true;
@@ -262,7 +264,8 @@ export class HouseScene {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // Bodenplatte unter jeder Gebäude-Etage (sichtbare Kante); nur auf der eigenen Ebene sichtbar
+    // Bodenplatte unter jeder Gebäude-Etage (sichtbare Kante); über einer anderen Etage desselben Gebäudes reicht
+    // sie bis auf deren Wände (Geschossdecke); sichtbar mit ihrer Etage
     const slabMat = new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.95 });
     this.slabs = [];
     for (const fm of this.floors) {
@@ -270,12 +273,17 @@ export class HouseScene {
       const outline = this._houseOutline(fm);
       if (outline.length < 3) continue;
       const shape = new THREE.Shape(outline.map(([x, z]) => new THREE.Vector2(x, -z)));
-      const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: false }), slabMat);
+      const y0 = fm.group.position.y;
+      const below = this.floors.filter((o) => o !== fm && !o.floor.outdoor && o.floor.building === fm.floor.building && o.group.position.y < y0);
+      const top = below.length ? Math.max(...below.map((o) => o.group.position.y + o.H)) : null;
+      const depth = top != null && y0 - top > 0.01 ? y0 - top : 0.14;
+      const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), slabMat);
       slab.rotation.x = -Math.PI / 2;
-      slab.position.y = fm.group.position.y - 0.141;
+      slab.position.y = y0 - depth - 0.001;
+      slab.castShadow = top != null; // Geschossdecke wirft Schatten in den Garten
       slab.receiveShadow = true;
       slab.userData.level = fm.floor.level ?? 0;
-      slab.visible = slab.userData.level === this.level;
+      slab.visible = slab.userData.level <= this.level;
       this.slabs.push(slab);
       this.scene.add(slab);
     }
@@ -412,7 +420,7 @@ export class HouseScene {
     const inv = cam.matrixWorldInverse;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     const v = new THREE.Vector3();
-    // alle Etagen der gezeigten Ebene samt Außenbereichen (inkl. Wandhöhe)
+    // alle sichtbaren Etagen samt Außenbereichen (inkl. Wandhöhe)
     const pts = this.activeFloors.flatMap((f) => {
       const y0 = f.group.position.y;
       return [...f.floor.walls.flat(), ...f.floor.rooms.flatMap((r) => r.polygon)].flatMap(([x, z]) => [[x, y0, z], [x, y0 + f.H, z]]);

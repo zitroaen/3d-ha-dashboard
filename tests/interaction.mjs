@@ -5,7 +5,7 @@
 import { readFile, mkdir } from 'node:fs/promises';
 import * as yaml from 'js-yaml';
 import { join } from 'node:path';
-import { DATA_DIR, ENTITIES, OUT, IS_DEMO } from './lib/config.mjs';
+import { DATA_DIR, ENTITIES, OUT, IS_DEMO, ENGINE_ROOT } from './lib/config.mjs';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser, guardedPage, toScreen } from './lib/browser.mjs';
 
@@ -111,6 +111,9 @@ try {
   // ---------------- Link-Check ----------------
   await clickShadow('.links-toggle');
   const lc = await page.evaluate(() => window.panel.shadowRoot.querySelector('.links .summary').textContent);
+  const about = await page.evaluate(() => window.panel.shadowRoot.querySelector('.links .about').textContent);
+  const { version } = JSON.parse(await readFile(join(ENGINE_ROOT, 'package.json'), 'utf8'));
+  ok(about.startsWith(`Version ${version} · model.yaml`), `Link-Check zeigt Version und Datenquelle (${about})`, `Version: ${about}`);
   await page.screenshot({ path: join(OUT, 'demo_linkcheck.png') });
   await page.evaluate(() => window.panel.shadowRoot.querySelector('.links-close').click());
   ok(/ 0 fehlende Entities/.test(lc), `Link-Check: ${lc}`);
@@ -158,11 +161,12 @@ try {
     const v = window.panel.view;
     return {
       level: v.level,
-      shown: v.floors.filter((f) => f.group.visible).map((f) => f.floor.id),
+      shown: v.floors.filter((f) => f.group.visible).map((f) => f.floor.id).sort(),
       label: window.panel.shadowRoot.querySelector('.floor').textContent,
     };
   });
-  ok(og.level === 1 && og.shown.join() === 'haus/og' && og.label === 'Obergeschoss', `Ebene 1. OG zeigt nur das Obergeschoss (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
+  ok(og.level === 1 && og.shown.join() === '__aussen,garage/eg,haus/eg,haus/og' && og.label === 'Obergeschoss',
+    `Ebene 1. OG steht auf dem Erdgeschoss, Garten bleibt sichtbar (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
   await page.evaluate(() => (window.mockHass.calls.length = 0));
   await steady(page);
   pt = await toScreen(page, [1.5, 2.85, 2.0]);
@@ -173,7 +177,7 @@ try {
     `Studio: ${studio} (angetippt bei ${JSON.stringify(pt)}, Ebene ${await page.evaluate(() => window.panel.view.level)})`);
   await clickShadow('.levels button[data-level="0"]');
   const eg = await page.evaluate(() => window.panel.view.floors.filter((f) => f.group.visible).map((f) => f.floor.id).sort());
-  ok(eg.join() === '__aussen,garage/eg,haus/eg', `Ebene EG zeigt Wohnhaus, Garage und Außenbereiche (${eg})`, `Ebene EG: ${eg}`);
+  ok(eg.join() === '__aussen,garage/eg,haus/eg', `Ebene EG blendet das Obergeschoss aus (${eg})`, `Ebene EG: ${eg}`);
 
   // ---------------- Editiermodus ----------------
   await page.reload();
