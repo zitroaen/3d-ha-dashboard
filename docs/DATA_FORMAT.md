@@ -107,7 +107,7 @@ Leuchten-Modelle (`LAMPS`): `chandelier_tulip`, `chandelier_candles`, `floor_spo
 
 Im Panel: Leuchte antippen schaltet, **lange drücken** (½ s) öffnet den HA-Dialog der Entity (bei mehreren die erste).
 Verknüpfen geht am bequemsten im Panel: Stift → Leuchte antippen → **Verknüpfen** (Liste aller Entities, die HA gerade
-kennt, vorgefiltert auf den HA-Bereich des Raums).
+kennt, vorgefiltert auf den HA-Bereich des Raums; Filter Licht, Steckdosen oder Alle).
 
 ## HA-Export für Link-Check und Vorschau (optional)
 
