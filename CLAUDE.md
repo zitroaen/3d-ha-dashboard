@@ -5,7 +5,9 @@ vollständig, bevor du etwas änderst, und halte sie aktuell (Entscheidungslog u
 
 ## Was das ist
 
-Ein interaktiver 3D-Grundriss als Home-Assistant-Panel (`panel_custom`, Custom Element `<ha-3d-dashboard>`; Installation über HACS, Kategorie Dashboard):
+Ein interaktiver 3D-Grundriss als Home-Assistant-Panel (Custom Element `<ha-3d-dashboard>`; Installation über HACS,
+Kategorie Integration – die Integration `custom_components/ha_3d_dashboard` trägt das Panel ohne YAML in die Seitenleiste
+ein; alternativ `panel_custom` von Hand):
 three.js, ein JS-Bundle, offline, touch-tauglich. Das Panel lädt die Hausdaten zur Laufzeit aus seinem Ordner
 (`house.json`, `furniture.yaml`, `devices.yaml`, `textures/`) bzw. aus `panel_custom → config → data_url`.
 
@@ -49,6 +51,8 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run serve` | Vorschau mit Demo-Haus: http://127.0.0.1:8123/tests/harness.html |
 | `npm test` | Datenschutz-Check, Datenprüfung, Unit-Tests, Link-Check, Build, Screenshots, Bedien-Tests |
 | `npm run test:demo` | Demo-Modus und Fallback (Teil von `npm test`) |
+| `npm run package` | `dist/ha_3d_dashboard.zip` (Integration + Bundle, für HACS; nach `npm run build`) |
+| `bash tests/ha/install.sh && python -m pytest tests/ha` | Tests der HA-Integration (Python ≥ 3.13) |
 | `npm run demo` | Demo-Haus aus `examples/demo/build-house.mjs` neu erzeugen |
 | `python scripts/extract_plan.py <pdf> --out <ordner>/house.json [--config plan.json] [--debug]` | Magicplan-Import |
 
@@ -69,6 +73,8 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
   (Demo-IDs), `validate-data.mjs`, `link-check.mjs`, `store.test.mjs`, `privacy-guard.mjs`, `lib/`
+- `custom_components/ha_3d_dashboard/` HA-Integration: Config-Flow (ein Klick), liefert `frontend/ha-3d-dashboard.js`
+  aus (nur im Release-Zip) und registriert das Panel `/haus-3d`; Optionen Titel, Symbol, `data_url`
 - `scripts/` Build, Magicplan-Import, `house_fixes.py`, Platzhalter-Leuchten, Deploy, `init-instance.mjs`
 
 ## Lichtmodell
@@ -87,9 +93,12 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Weiterentwicklung.
 - Drehwinkel aus der Quaternion lesen (nicht `rotation.y`, das ist über 90° gespiegelt).
 - YAML-Patch erhält das Zeilenende (CRLF-Dateien unter Windows).
-- HACS (Kategorie Dashboard): `hacs.json` im Root, das Release-Asset `ha-3d-dashboard.js` kommt aus
-  `.github/workflows/release.yml` (Tag `v*` oder Actions → Release → Run workflow mit Version = `package.json`).
-  `dist/` bleibt gitignored. Eine HACS-Validierung (hacs/action) fehlt bewusst: sie scheitert vor dem ersten Release
+- HACS (Kategorie Integration, seit 0.3.0; vorher Dashboard): Eine Dashboard-Ressource kann kein Seitenleisten-Panel
+  anlegen, nur `panel_custom` in der YAML oder eine Integration – daher `custom_components/ha_3d_dashboard` mit
+  Config-Flow und `panel_custom.async_register_panel`. `hacs.json` mit `zip_release`; das Zip (Integration + Bundle)
+  und `ha-3d-dashboard.js` baut `.github/workflows/release.yml` (Tag `v*` oder Actions → Release → Run workflow mit
+  Version = `package.json` = `manifest.json`). `dist/` und `custom_components/ha_3d_dashboard/frontend/` bleiben
+  gitignored. Panel-Adresse `/haus-3d`, Domain `ha_3d_dashboard` nicht ändern. Eine HACS-Validierung (hacs/action) fehlt bewusst: sie scheitert vor dem ersten Release
   und braucht Repo-Beschreibung/Topics in den GitHub-Einstellungen.
 - Demo-Modus: Das Demo-Haus steckt als Text im Bundle (esbuild-Plugin `demo-data`, ~15 kB). Aktiv per
   `config.demo: true` oder als Fallback, wenn die Daten unerreichbar sind (`DataUnavailableError`, nur ohne
