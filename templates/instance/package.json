@@ -1,0 +1,20 @@
+{
+  "name": "ha-3d-dashboard-instance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "git submodule update --init --recursive && npm --prefix engine ci",
+    "update-engine": "git submodule update --remote engine && npm --prefix engine ci",
+    "serve": "node engine/tests/devserver.mjs",
+    "validate": "node engine/tests/validate-data.mjs",
+    "link-check": "node engine/tests/link-check.mjs",
+    "build": "npm --prefix engine run build",
+    "screens": "node engine/tests/screenshots.mjs",
+    "test": "npm run validate && npm run link-check && npm run build && npm run screens",
+    "import-plan": "python engine/scripts/extract_plan.py reference/plan.pdf --out data/house.json --config plan.json --debug",
+    "fix-house": "python engine/scripts/house_fixes.py data/house.json",
+    "placeholders": "node engine/scripts/default_devices.mjs",
+    "deploy": "bash engine/scripts/deploy.sh",
+    "deploy:data": "bash engine/scripts/deploy.sh --data"
+  }
+}

@@ -1,0 +1,7 @@
+node_modules/
+tests/output/
+*.log
+.env
+# Fotos des Hauses nie committen (auch nicht im privaten Repo, wenn es irgendwo gehostet wird)
+reference/photos/
+Fotos/

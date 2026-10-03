@@ -1,0 +1,7 @@
+node_modules/
+dist/
+tests/output/
+*.log
+.env
+# lokale Liste privater Begriffe für den Datenschutz-Check (nie committen)
+.privacy-terms

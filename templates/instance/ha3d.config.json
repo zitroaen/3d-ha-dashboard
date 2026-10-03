@@ -1,0 +1,10 @@
+{
+  "data": "data",
+  "entities": "reference/entities.txt",
+  "views": "views.json",
+  "out": "tests/output",
+  "ha": {
+    "ssh": "",
+    "config": "/config"
+  }
+}

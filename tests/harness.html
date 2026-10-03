@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:,">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D-HA-Dashboard – Test-Harness</title>
+  <style>html, body { margin: 0; height: 100%; background: #000; } ha-3d-dashboard { position: fixed; inset: 0; }</style>
+</head>
+<body>
+  <ha-3d-dashboard></ha-3d-dashboard>
+  <script type="module">
+    import '../dist/ha-3d-dashboard.js';
+    import { createMockHass, statesFromDevices } from './mock-hass.js';
+    import { load as parseYaml } from '../node_modules/js-yaml/dist/js-yaml.mjs';
+
+    const el = document.querySelector('ha-3d-dashboard');
+    // Daten direkt aus dem Repo laden: Änderungen in data/ sind nach einem Neuladen sichtbar, ohne Build
+    // save_url: der Dev-Server (npm run serve) schreibt Editor-Änderungen direkt nach data/
+    el.panel = { config: { data_url: '/data/', save_url: '/__save/' } };
+
+    // Simuliertes HA wie die echte Installation: alle Entities aus dem HA-Export (reference/entities.txt) mit
+    // Bereich (wie hass.states + Entity-/Bereichs-Registry) plus jede in devices.yaml verknüpfte Entity –
+    // alles aus, Nacht als Ausgangszustand
+    const devices = parseYaml(await (await fetch('/data/devices.yaml')).text()).devices || [];
+    const exported = {}, entities = {}, areas = {};
+    try {
+      let area = null;
+      const slug = (n) => n.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '_');
+      const exportText = await (await fetch('/reference/entities.txt')).text();
+      for (const line of exportText.split(/\r?\n/)) {
+        if (line.startsWith('## ')) {
+          const name = line.slice(3).trim();
+          area = name === 'Ohne Bereich' ? null : slug(name);
+          if (area) areas[area] = { area_id: area, name };
+          continue;
+        }
+        const [id, name] = line.split('|').map((s) => s?.trim());
+        if (!id || !/^[a-z_]+\.[a-z0-9_]+$/.test(id)) continue;
+        const dom = id.split('.')[0];
+        exported[id] = { entity_id: id, state: ['light', 'switch', 'binary_sensor'].includes(dom) ? 'off' : 'unknown', attributes: { friendly_name: name } };
+        entities[id] = { entity_id: id, area_id: area };
+      }
+    } catch { /* ohne Export geht es auch */ }
+    const hass = createMockHass({
+      ...exported,
+      ...statesFromDevices(devices),
+      'sun.sun': { state: 'below_horizon', attributes: { azimuth: 330, elevation: -25, friendly_name: 'Sun' } },
+    }, (h) => { el.hass = h; });
+    Object.assign(hass, { entities, areas, devices: {} });
+    el.hass = hass;
+    el.narrow = matchMedia('(max-width: 870px)').matches;
+    window.panel = el;
+    window.mockHass = hass;
+    el.whenReady().then(() => { window.panelReady = true; });
+  </script>
+</body>
+</html>

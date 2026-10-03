@@ -1,0 +1,33 @@
+{
+  "name": "ha-3d-dashboard",
+  "description": "Interaktiver 3D-Grundriss als Home-Assistant-Panel (three.js, offline, touch)",
+  "license": "MIT",
+  "repository": "github:zitroaen/3d-ha-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "serve": "node tests/devserver.mjs",
+    "demo": "node examples/demo/build-house.mjs",
+    "validate": "node tests/validate-data.mjs",
+    "link-check": "node tests/link-check.mjs",
+    "test:unit": "node tests/store.test.mjs",
+    "test:screens": "node tests/screenshots.mjs",
+    "test:interaction": "node tests/interaction.mjs",
+    "privacy": "node tests/privacy-guard.mjs",
+    "test": "npm run privacy && npm run validate && npm run test:unit && npm run link-check && npm run build && npm run test:screens && npm run test:interaction"
+  },
+  "dependencies": {
+    "three": "^0.186.1",
+    "js-yaml": "^5.4.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.63.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

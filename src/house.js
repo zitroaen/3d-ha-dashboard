@@ -1,0 +1,212 @@
+// Bauwerk einer Etage aus house.json: Böden, Wände, Fensterbrüstungen/-stürze, Glas, Türen.
+// Enthält bewusst keine Einrichtung und keine Geräte (siehe furnishing.js) – das Haus ändert sich nie.
+import * as THREE from 'three';
+import { Builder, pointInPoly } from './geometry.js';
+import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
+import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture } from './textures.js';
+import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
+
+const DOOR_HEIGHT = 2.05;
+// Jeder Raumboden liegt minimal höher als der vorige: Raumpolygone überlappen in den Türöffnungen,
+// ohne Versatz flackern die Böden dort (Z-Fighting).
+const FLOOR_STEP = 0.0008;
+
+export class FloorModel {
+  /**
+   * @param floor          Etagen-Objekt aus house.json
+   * @param roomIndexBase  Raum-Indizes dieser Etage beginnen hier (global über alle Etagen)
+   */
+  constructor(floor, roomIndexBase, shared) {
+    this.floor = floor;
+    this.group = new THREE.Group();
+    this.group.name = `floor-${floor.id}`;
+    this.group.position.y = floor.elevation || 0;
+    this.rooms = new Map(); // id -> { idx, room, hitMesh }
+    this.shared = shared;
+
+    floor.rooms.forEach((room, i) => {
+      this.rooms.set(room.id, { idx: roomIndexBase + i + 1, room, order: i });
+    });
+
+    this.H = floor.ceiling;
+    this._build();
+  }
+
+  roomAt(p) {
+    for (const r of this.rooms.values()) if (pointInPoly(p, r.room.polygon)) return r.idx;
+    return 0;
+  }
+
+  /** Raum neben einer Fläche: in Richtung der Normalen nachsehen. */
+  roomBeside(mid, n) {
+    for (const d of [0.12, 0.3, 0.5]) {
+      const idx = this.roomAt([mid[0] + n[0] * d, mid[1] + n[1] * d]);
+      if (idx) return idx;
+    }
+    return 0;
+  }
+
+  _build() {
+    const { floor, H } = this;
+    const walls = new Builder();   // Wandseiten (innen + außen)
+    const caps = new Builder();    // Schnittflächen oben auf den Wänden
+    const floors = {}; // Bodenbelag -> Builder
+    // Fenster und Türen
+    const B = { glass: new Builder(), pvc: new Builder(), board: new Builder(), door: new Builder(), doorDark: new Builder(), metal: new Builder() };
+
+    // --- Böden pro Raum (Hit-Meshes zum Antippen + gemeinsame Geometrie je Bodenbelag)
+    for (const r of this.rooms.values()) {
+      const y = r.order * FLOOR_STEP;
+      const kind = this.shared.mat[r.room.floor] ? r.room.floor : 'parkett';
+      const fb = (floors[kind] ??= new Builder());
+      const uvStart = fb.uv.length;
+      fb.polyH(r.room.polygon, y, r.idx);
+      // floor_rot: Verlegerichtung des Bodens in Grad (z. B. 45 für diagonal verlegtes Würfelparkett)
+      if (r.room.floor_rot) {
+        const a = (r.room.floor_rot * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+        for (let i = uvStart; i < fb.uv.length; i += 2) {
+          const u = fb.uv[i], v = fb.uv[i + 1];
+          fb.uv[i] = c * u - s * v;
+          fb.uv[i + 1] = s * u + c * v;
+        }
+      }
+      const hit = new Builder();
+      hit.polyH(r.room.polygon, 0.01, r.idx);
+      const mesh = new THREE.Mesh(hit.geometry(), this.shared.hitMaterial); // Material unsichtbar, Mesh raycastbar
+      mesh.userData.roomId = r.room.id;
+      r.hitMesh = mesh;
+      this.group.add(mesh);
+    }
+
+    // --- Prismen (Wände, Brüstungen, Stürze): Seitenflächen bekommen den Raum, in den sie zeigen
+    const prism = (poly, y0, y1, capRoom = 0) => {
+      for (let i = 0; i < poly.length; i++) {
+        let a = poly[i], b = poly[(i + 1) % poly.length];
+        const dx = b[0] - a[0], dz = b[1] - a[1];
+        const len = Math.hypot(dx, dz);
+        if (len < 1e-4) continue;
+        let n = [-dz / len, dx / len];
+        const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        if (pointInPoly([mid[0] + n[0] * 0.01, mid[1] + n[1] * 0.01], poly)) {
+          [a, b] = [b, a];
+          n = [-n[0], -n[1]];
+        }
+        walls.quadV(a, b, y0, y1, this.roomBeside(mid, n));
+      }
+      // Oben auf Wandhöhe: dunkle Schnittfläche; darunter (Fensterbank): Wandmaterial
+      if (y1 >= H - 0.01) caps.polyH(poly, y1, 0);
+      else walls.polyH(poly, y1, capRoom);
+    };
+
+    for (const w of floor.walls) prism(w, 0, H);
+
+    // --- Fenster: Brüstung und Sturz in voller Wanddicke, dazu Rahmen, Flügel, Glas, Fensterbank
+    for (const win of floor.windows) {
+      const [x0, y0, x1, y1] = win.rect;
+      const rect = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+      const sill = win.sill ?? 0.9, top = win.top ?? 2.1;
+      const roomIdx = win.room ? this.rooms.get(win.room)?.idx || 0 : 0;
+      // Brüstung endet unter der Fensterbank (sonst liegen zwei Flächen aufeinander und flackern)
+      if (sill > 0.01) prism(rect, 0, hasBoard(win) ? sill - BOARD : sill, roomIdx);
+      if (top < H - 0.01) prism(rect, top, H);
+      buildWindow(this, win, B);
+    }
+
+    // --- Türen: Sturz über der Öffnung (volle Laibungstiefe); Außentüren bekommen ein Türblatt
+    for (const d of floor.doors) {
+      const [hx, hy] = d.hinge, [ex, ey] = d.end;
+      const len = Math.hypot(ex - hx, ey - hy);
+      const nx = -(ey - hy) / len, ny = (ex - hx) / len;
+      const [j0, j1] = d.jamb;
+      const off = (p, t) => [p[0] + nx * t, p[1] + ny * t];
+      const rect = [off(d.hinge, j0), off(d.end, j0), off(d.end, j1), off(d.hinge, j1)];
+      const top = Math.max(d.height || 0, DOOR_HEIGHT);
+      if (top < H - 0.01) prism(rect, top, H);
+      buildDoor(this, d, B);
+    }
+
+    const S = this.shared;
+    const add = (b, mat, opts = {}) => {
+      if (b.empty) return null;
+      const m = new THREE.Mesh(b.geometry(), mat);
+      m.receiveShadow = opts.receive ?? true;
+      m.castShadow = opts.cast ?? false;
+      if (opts.order != null) m.renderOrder = opts.order;
+      this.group.add(m);
+      return m;
+    };
+    for (const [kind, b] of Object.entries(floors)) add(b, S.mat[kind]);
+    add(walls, S.mat.wall, { cast: true });
+    add(caps, S.mat.cap, { cast: true });
+    add(B.pvc, S.mat.pvc, { cast: true });
+    add(B.board, S.mat.board, { cast: true });
+    add(B.door, S.mat.door, { cast: true });
+    add(B.doorDark, S.mat.doorDark, { cast: true });
+    add(B.metal, S.mat.metal);
+    add(B.glass, S.mat.glass, { receive: false, order: 2 });
+  }
+
+  /** Weiche Abdunklung des Bodens an Wänden (Ambient Occlusion), einmal als Canvas berechnet. */
+  makeFloorAO(pxPerMeter = 48) {
+    const pts = this.floor.walls.flat();
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const pad = 1;
+    const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+    const w = Math.max(...xs) - x0 + pad, h = Math.max(...ys) - y0 + pad;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(w * pxPerMeter);
+    c.height = Math.ceil(h * pxPerMeter);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, c.width, c.height);
+    g.filter = `blur(${Math.round(pxPerMeter * 0.22)}px)`;
+    g.fillStyle = '#000';
+    for (const wall of this.floor.walls) {
+      g.beginPath();
+      wall.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo']((x - x0) * pxPerMeter, (y - y0) * pxPerMeter));
+      g.closePath();
+      g.fill();
+    }
+    g.filter = 'none';
+    const tex = new THREE.CanvasTexture(c);
+    tex.flipY = false;
+    lightUniforms.uFloorAO.value = tex;
+    lightUniforms.uFloorAOBox.value.set(x0, y0, w, h);
+    return tex;
+  }
+}
+
+/** Materialien und Texturen, einmal pro Szene. */
+export function createSharedMaterials() {
+  const parquet = parquetTexture();
+  parquet.repeat.set(1 / parquet.userData.metersPerRepeat, 1 / parquet.userData.metersPerRepeat);
+  const tiles = tileTexture();
+  tiles.repeat.set(1 / tiles.userData.metersPerRepeat, 1 / tiles.userData.metersPerRepeat);
+  const cubes = cubeParquetTexture();
+  cubes.repeat.set(1 / cubes.userData.metersPerRepeat, 1 / cubes.userData.metersPerRepeat);
+  const lit = (params, opts = {}) => withRoomLight(new THREE.MeshStandardMaterial(params), opts);
+
+  const mat = {
+    parkett: withRoomLight(new THREE.MeshStandardMaterial({ map: parquet, roughness: 0.55, metalness: 0 }), { floorAO: true }),
+    fliesen: withRoomLight(new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.35, metalness: 0 }), { floorAO: true }),
+    // Würfelparkett: 35-cm-Quadrate aus je 4 Eichenstäben, Richtung wechselt
+    parkett_wuerfel: lit({ map: cubes, roughness: 0.42, metalness: 0 }, { floorAO: true }),
+    pvc: lit({ color: 0xf1f0eb, roughness: 0.45 }),
+    board: lit({ color: 0xb48650, roughness: 0.5 }),
+    doorDark: lit({ color: 0x3a2a1e, roughness: 0.7 }),
+    metal: lit({ color: 0xb9b9b6, roughness: 0.3, metalness: 0.8 }),
+    wall: withRoomLight(new THREE.MeshStandardMaterial({ color: 0xd8d2c8, roughness: 0.92 }), { wallAO: 0 }),
+    cap: new THREE.MeshStandardMaterial({ color: 0x1c1b1a, roughness: 0.9 }),
+    door: lit({ color: 0xe8e0cb, roughness: 0.55 }), // cremeweiße Füllungstüren und Zargen
+    glass: withRoomLight(
+      new THREE.MeshStandardMaterial({
+        color: 0x90a4b4, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false,
+      }),
+      { glow: 0.5 }
+    ),
+    pool: lampMaterial({ map: glowTexture(), strength: 0.12, additive: true }),
+  };
+  const hitMaterial = new THREE.MeshBasicMaterial({ visible: false });
+  const lampHitGeometry = new THREE.SphereGeometry(0.35, 8, 6);
+  return { mat, hitMaterial, lampHitGeometry };
+}

@@ -1,0 +1,108 @@
+# Geräte im Haus: Ort + Home-Assistant-Entity. Ändert sich ein Ort, nur hier anpassen –
+# das Hausmodell (house.json) bleibt unberührt. Format: siehe docs/DATA_FORMAT.md.
+#
+#   id          eindeutig, stabil (wird von Tests und später von Automationen referenziert)
+#   type        light (weitere folgen: door_sensor, radiator, sensor, …)
+#   kind        bei light: ceiling | pendant | floor | table | wall | spot
+#   model       Aussehen (src/models.js, LAMPS); ohne model: Scheibe (Decke) bzw. Box (Wand)
+#   floor/room  Etage und Raum-ID aus house.json; room: aussen = außerhalb des Hauses
+#   pos         [x, y] in Metern, Plan-Koordinaten
+#   rot         Drehung in Grad im Uhrzeigersinn (wie in furniture.yaml), z. B. für Wandleuchten
+#   height      Höhe der Lichtquelle über dem Boden der Etage (m)
+#   color       Standard-Lichtfarbe, solange HA keine liefert (z. B. "#ffcc88")
+#   range       Reichweite des Lichts (m)
+#   entity      HA-Entity, z. B. light.wohnzimmer_decke, oder Liste [light.a, light.b] für Leuchten mit
+#               mehreren Birnen (an, sobald eine an ist; Antippen schaltet alle). null = nicht verknüpft
+#
+# Optional: Zuordnung Raum -> HA-Bereich (area_id), wo der Name nicht übereinstimmt:
+#   areas:
+#     eg/bad: badezimmer
+
+devices:
+  - id: eg_wohnen_stehlampe
+    type: light
+    kind: floor
+    model: floor_spots
+    name: Stehlampe
+    floor: eg
+    room: wohnen
+    pos: [0.65, 0.7]
+    height: 1.45
+    range: 2.8
+    entity: [light.demo_stehlampe_1, light.demo_stehlampe_2, light.demo_stehlampe_3]
+  - id: eg_wohnen_kronleuchter
+    type: light
+    kind: pendant
+    model: chandelier_tulip
+    name: Kronleuchter
+    floor: eg
+    room: wohnen
+    pos: [2.2, 3.0]
+    height: 1.85
+    range: 4.0
+    entity: null
+  - id: eg_wohnen_wandleuchte
+    type: light
+    kind: wall
+    model: sconce
+    name: Wandleuchte
+    floor: eg
+    room: wohnen
+    pos: [4.2, 0.32]
+    rot: 0
+    height: 1.75
+    range: 2.2
+    entity: light.demo_wandleuchte
+  - id: eg_wohnen_kugel
+    type: light
+    kind: floor
+    model: ball
+    name: Leuchtkugel
+    floor: eg
+    room: wohnen
+    pos: [5.6, 6.9]
+    height: 0.14
+    range: 1.6
+    color: '#3aa0ff'
+    entity: null
+  - id: eg_kueche_decke
+    type: light
+    kind: ceiling
+    name: Decke Küche
+    floor: eg
+    room: kueche
+    pos: [7.9, 1.9]
+    height: 2.3
+    range: 4.5
+    entity: light.demo_kueche
+  - id: eg_schlafen_decke
+    type: light
+    kind: ceiling
+    name: Decke Schlafzimmer
+    floor: eg
+    room: schlafen
+    pos: [7.0, 5.6]
+    height: 2.3
+    range: 4.5
+    entity: null
+  - id: eg_bad_decke
+    type: light
+    kind: ceiling
+    name: Decke Bad
+    floor: eg
+    room: bad
+    pos: [8.9, 5.6]
+    height: 2.3
+    range: 4.5
+    entity: light.demo_bad
+  - id: eg_aussen_terrasse
+    type: light
+    kind: wall
+    name: Terrassenleuchte
+    floor: eg
+    room: aussen
+    pos: [1.7, 8.06]
+    height: 2.1
+    range: 3.5
+    facing: [0, 1]
+    entity: light.demo_terrasse
