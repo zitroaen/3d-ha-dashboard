@@ -21,6 +21,16 @@ const errors = [];
 const ok = (cond, msg, fail) => (cond ? console.log(`✔ ${msg}`) : errors.push(fail ?? msg));
 // Auf einen Zustand warten statt fester Pausen: Software-WebGL in der CI ist deutlich langsamer als lokal.
 const settle = (page, fn, arg) => page.waitForFunction(fn, arg, { timeout: 15000, polling: 50 }).catch(() => {});
+// Kamera steht still (kein Bild mehr angefordert, Lage unverändert über mehrere Abfragen) – erst dann Punkte in
+// Bildschirmkoordinaten umrechnen und antippen (Nachlauf der Steuerung, Animationen, langsame CI-Grafik)
+const steady = (page) => page.waitForFunction(() => {
+  const v = window.panel.view;
+  const key = [...v.camera.position.toArray(), v.camera.zoom, ...v.controls.target.toArray()].map((x) => x.toFixed(4)).join();
+  const same = key === window.__camKey && !v._raf;
+  window.__camKey = key;
+  window.__camSteady = same ? (window.__camSteady || 0) + 1 : 0;
+  return window.__camSteady >= 3;
+}, null, { timeout: 15000, polling: 100 }).catch(() => {});
 const until = async (cond, ms = 15000) => { const t = Date.now(); while (!cond() && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 50)); };
 
 try {
@@ -154,11 +164,13 @@ try {
   });
   ok(og.level === 1 && og.shown.join() === 'haus/og' && og.label === 'Obergeschoss', `Ebene 1. OG zeigt nur das Obergeschoss (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
   await page.evaluate(() => (window.mockHass.calls.length = 0));
+  await steady(page);
   pt = await toScreen(page, [1.5, 2.85, 2.0]);
   await page.mouse.click(pt.x, pt.y);
   await settle(page, () => window.mockHass.calls.some((c) => c.domain));
   const studio = await page.evaluate(() => window.mockHass.calls.filter((c) => c.domain).map((c) => `${c.domain}.${c.service}:${[].concat(c.data.entity_id)}`));
-  ok(studio.join() === 'light.turn_on:light.demo_studio', 'Raum im Obergeschoss antippen schaltet dessen Licht über HA', `Studio: ${studio}`);
+  ok(studio.join() === 'light.turn_on:light.demo_studio', 'Raum im Obergeschoss antippen schaltet dessen Licht über HA',
+    `Studio: ${studio} (angetippt bei ${JSON.stringify(pt)}, Ebene ${await page.evaluate(() => window.panel.view.level)})`);
   await clickShadow('.levels button[data-level="0"]');
   const eg = await page.evaluate(() => window.panel.view.floors.filter((f) => f.group.visible).map((f) => f.floor.id).sort());
   ok(eg.join() === '__aussen,garage/eg,haus/eg', `Ebene EG zeigt Wohnhaus, Garage und Außenbereiche (${eg})`, `Ebene EG: ${eg}`);
@@ -168,6 +180,7 @@ try {
   await page.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
   await clickShadow('.edit-toggle');
   // Sideboard-Front knapp über dem Boden antippen (darüber hängt der Fernseher)
+  await steady(page);
   pt = await toScreen(page, [5.46, 0.08, 3.4]);
   await page.mouse.click(pt.x, pt.y);
   await settle(page, () => !!window.panel.editor.sel);
@@ -326,6 +339,7 @@ try {
   });
   ok(badge?.text === '42 min' && badge.on && !badge.hidden && badge.inView, `Zustandsanzeige über der Waschmaschine: ${badge?.text}`, `Zustandsanzeige: ${JSON.stringify(badge)}`);
   await page.screenshot({ path: join(OUT, 'demo_zustand.png') });
+  await steady(page);
   const wmTop = await page.evaluate((ref) => window.panel.view.objectTop(ref).toArray(), WM);
   const wmPt = await toScreen(page, [wmTop[0], wmTop[1] - 0.4, wmTop[2]]);
   const wmTap = await (async () => {
