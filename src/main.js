@@ -6,7 +6,7 @@ import { HouseScene } from './scene.js';
 import { loadData, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
-import { LayoutStore, applyOverrides, patchYamlText, layoutValues, download } from './store.js';
+import { LayoutStore, DEMO_USER_DATA_KEY, applyOverrides, patchYamlText, layoutValues, download } from './store.js';
 import { entitiesOf, lampLight, callForEntities } from './ha.js';
 import { EntityPicker, areaForRoom } from './picker.js';
 
@@ -65,7 +65,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .links li.ok .dot { background: #6cc28a; } .links li.bad .dot { background: #e0624f; } .links li.warn .dot { background: #e0b04f; }
 .links li.free .dot { background: transparent; border: 1.5px solid #9aa; }
 /* Entity-Auswahl (Editor): Seitenleiste rechts, große Zeilen für Touch */
-.picker { position: absolute; top: 10px; right: 80px; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 100px)); display: none; flex-direction: column;
+.picker { position: absolute; top: 10px; right: 80px; bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 100px)); display: none; flex-direction: column;
   border-radius: 16px; background: #12151bf5; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
 .picker.show { display: flex; }
 .picker header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
@@ -90,13 +90,17 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .picker .list .mark { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 20px; text-align: center; color: #f0b45a; }
 .picker .more { padding: 10px; font-size: 13px; opacity: 0.6; text-align: center; }
 :host([editing]) .edit-toggle { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
-.editbar { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 8px;
-  max-width: calc(100% - 24px); }
+/* volle Breite (mit left: 50% stünde nur die halbe Breite zur Verfügung und die Knöpfe brächen zu früh um);
+   die leeren Ränder lassen Taps zur 3D-Ansicht durch */
+.editbar { position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: none; flex-direction: column; align-items: center; gap: 8px;
+  pointer-events: none; }
+.editbar > * { pointer-events: auto; }
 :host([editing]) .editbar { display: flex; }
-:host([editing]) .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+:host([editing]) .toast { bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); }
 .editinfo { padding: 7px 14px; border-radius: 14px; background: #12151be6; font-size: 14px; text-align: center; max-width: 100%; }
 .editinfo b { color: #f0b45a; font-weight: 600; }
-.tools { display: flex; gap: 6px; padding: 6px; border-radius: 18px; background: #12151be6; backdrop-filter: blur(8px); overflow-x: auto; max-width: 100%; }
+.tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 6px; border-radius: 18px; background: #12151be6;
+  backdrop-filter: blur(8px); max-width: 100%; } /* schmale Bildschirme: zweite Zeile statt abgeschnittener Knöpfe */
 .tools button { min-width: 64px; height: 60px; padding: 4px 8px; border: 0; border-radius: 12px; background: transparent; color: #e8e2d8;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 11px; cursor: pointer; }
 .tools button:active { background: #ffffff1a; }
@@ -181,6 +185,9 @@ class Ha3dDashboard extends HTMLElement {
       const act = e.target.closest('button')?.dataset.act;
       if (act) this._editAction(act);
     });
+    // Höhe der Werkzeugleiste (1 oder 2 Zeilen) für Lampenauswahl und Meldungen darüber
+    new ResizeObserver(([e]) => e.contentRect.height && this.style.setProperty('--ha3d-editbar-h', `${Math.round(e.contentRect.height)}px`))
+      .observe(this.shadowRoot.querySelector('.editbar'));
     this._ready = new Promise((res) => (this._resolveReady = res));
   }
 
@@ -262,8 +269,9 @@ class Ha3dDashboard extends HTMLElement {
     this._loading = (async () => {
       try {
         const data = await this._fetchData();
-        // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen (nie auf das Demo-Haus)
-        if (!this.demo) applyOverrides(data, await this.store.loadOverrides());
+        // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen
+        // (Demo-Haus: aus eigenen Demo-Benutzerdaten, siehe store)
+        applyOverrides(data, await this.store.loadOverrides());
         const old = this._dataText;
         this._dataText = data.text;
         this._showError(null);
@@ -288,6 +296,8 @@ class Ha3dDashboard extends HTMLElement {
   }
 
   get store() {
+    // Demo-Haus: nie in Dateien, nur in eigene Benutzerdaten – die Daten des eigenen Hauses bleiben unberührt
+    if (this.demo) return new LayoutStore({ hass: this._hass, key: DEMO_USER_DATA_KEY });
     return new LayoutStore({ saveUrl: this._panel?.config?.save_url || null, hass: this._hass });
   }
 
@@ -355,13 +365,13 @@ class Ha3dDashboard extends HTMLElement {
     else if (act === 'undo') ed.undo();
     else if (act === 'done') this.setEditing(false);
     else if (act === 'save') {
-      if (this.demo) return this._toast('Demo-Haus: Änderungen werden nicht gespeichert');
       try {
         const texts = await this.store.save(ed.changes, { furniture: this._dataText.furniture, devices: this._dataText.devices });
         this._dataText = { ...this._dataText, ...texts };
         ed.changes.clear();
         ed._emit();
-        this._toast(this.store.mode === 'files' ? 'Gespeichert (furniture.yaml / devices.yaml)' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Dateien');
+        this._toast(this.demo ? 'Gespeichert – Demo-Haus, für diesen HA-Benutzer'
+          : this.store.mode === 'files' ? 'Gespeichert (furniture.yaml / devices.yaml)' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Dateien');
       } catch (e) {
         console.error('ha-3d-dashboard:', e);
         this._toast(`Speichern fehlgeschlagen: ${e.message}`);
@@ -408,7 +418,7 @@ class Ha3dDashboard extends HTMLElement {
       if (act === 'undo') b.disabled = !info.canUndo;
       if (act === 'save') b.classList.toggle('dirty', info.dirty);
       if (act === 'export') b.hidden = this.demo || this.store.mode === 'files';
-      if (act === 'save') b.hidden = this.demo;
+      if (act === 'save') b.hidden = this.demo && !this._hass; // Demo ohne HA (Vorschau): nirgends zu speichern
       if (act === 'link') {
         b.hidden = info.selection?.type !== 'lamp';
         b.classList.toggle('active', !!this.picker?.isOpen);
@@ -417,7 +427,7 @@ class Ha3dDashboard extends HTMLElement {
     const s = info.selection;
     const FACE = { back: 'Rückseite', front: 'Vorderseite', left: 'linke Seite', right: 'rechte Seite', bottom: 'Unterseite' };
     let text;
-    if (!s) text = this.demo ? 'Möbel oder Leuchte antippen (Demo: wird nicht gespeichert)' : 'Möbel oder Leuchte antippen';
+    if (!s) text = this.demo ? 'Möbel oder Leuchte antippen (Demo-Haus)' : 'Möbel oder Leuchte antippen';
     else {
       const y = s.height ?? s.elevation;
       text = `<b>${s.name}</b> · x ${s.pos[0].toFixed(2)} · y ${s.pos[1].toFixed(2)}${y != null ? ` · Höhe ${y.toFixed(2)}` : ''} · ${(s.rot || 0).toFixed(0)}°`;

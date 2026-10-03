@@ -149,7 +149,7 @@ sie setzt `data_url`, voreingestellt `/local/ha-3d-dashboard/`. Bei `panel_custo
 | Feld | Bedeutung |
 |---|---|
 | `data_url` | Ordner mit `house.json`, `furniture.yaml`, `devices.yaml`, `textures/` (z. B. `/local/ha-3d-dashboard/`). Ohne Angabe: neben dem Modul. |
-| `demo` | `true`: eingebettetes Demo-Haus statt eigener Daten (lokales Schalten, kein Speichern). |
+| `demo` | `true`: eingebettetes Demo-Haus statt eigener Daten (unverknüpft, lokales Schalten; Speichern nur in eigene Demo-Benutzerdaten). |
 | `save_url` | nur Entwicklung: Dev-Server-Endpunkt zum Speichern des Editors. |
 
 Sind die Daten nicht erreichbar (HTTP-Fehler), zeigt das Panel das Demo-Haus mit Hinweis.
