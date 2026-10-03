@@ -65,6 +65,21 @@ async function checkDemo(label, query, allowConsole, noteRe) {
   });
   ok(sun.day && sun.sconce, `${label}: Sonne kommt aus hass, Lampen bleiben lokal`, `${label}: Sonne ${JSON.stringify(sun)}`);
 
+  // Das Demo-Haus ist unverknüpft; eine (im Editor) mit einer echten Entity verknüpfte Leuchte schaltet über HA
+  const real = await page.evaluate(async () => {
+    const v = window.panel.view;
+    const unlinked = [...v.lamps.values()].every((s) => s.lamp.entity == null);
+    const s = v.lamps.get('eg_wohnen_wandleuchte');
+    s.lamp.entity = 'light.demo_wandleuchte'; // existiert im simulierten HA wie eine echte Lampe
+    window.mockHass.calls.length = 0;
+    await window.panel._onLampTap('eg_wohnen_wandleuchte');
+    const call = window.mockHass.calls.find((c) => c.domain);
+    s.lamp.entity = null;
+    return { unlinked, call: call && `${call.domain}.${call.service}:${call.data.entity_id}` };
+  });
+  ok(real.unlinked && real.call === 'light.turn_off:light.demo_wandleuchte',
+    `${label}: Demo-Leuchten unverknüpft, echte Verknüpfung schaltet über HA`, `${label}: echte Entity ${JSON.stringify(real)}`);
+
   // Editor: Speichern/Export ausgeblendet, Änderungen werden nirgends hingeschrieben
   await page.evaluate(() => window.panel.setEditing(true));
   await page.evaluate(() => {
@@ -120,20 +135,27 @@ try {
   ok(h >= 48, `Telefon: Demo-Hinweis (${h}px)`);
   await p3.close();
 
-  // Einbettung wie in HA ab 2026.9: Container ohne Höhe – das Panel muss trotzdem den Bildschirm füllen
-  for (const [label, viewport] of [['desktop', { width: 1400, height: 900 }], ['phone', { width: 390, height: 844 }]]) {
+  // Einbettung wie in HA ab 2026.9: Container ohne Höhe – das Panel muss trotzdem bis zum unteren Rand reichen.
+  // iphone: Panel beginnt 47 px tiefer (iOS-App, unter der Statusleiste) – die Werkzeugleiste darf nicht abgeschnitten sein
+  for (const [label, viewport, top] of [['desktop', { width: 1400, height: 900 }, 0], ['phone', { width: 390, height: 844 }, 0],
+    ['iphone', { width: 390, height: 844 }, 47]]) {
     const p4 = await newPage(browser, { viewport });
     p4.on('pageerror', (e) => errors.push(`ha-${label}: ${e.message}`));
-    await p4.goto(`${base}/tests/harness.html?demo=1&ha=1`);
+    await p4.goto(`${base}/tests/harness.html?demo=1&ha=1${top ? `&top=${top}` : ''}`);
     await p4.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
+    await p4.evaluate(() => window.panel.setEditing(true));
+    await p4.waitForTimeout(300);
     const size = await p4.evaluate(() => {
       const r = window.panel.getBoundingClientRect();
-      const c = window.panel.view.renderer.domElement;
-      return { h: Math.round(r.height), canvas: c.clientHeight };
+      const bar = window.panel.shadowRoot.querySelector('.editbar').getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), canvas: window.panel.view.renderer.domElement.clientHeight,
+        barBottom: Math.round(bar.bottom), barH: Math.round(bar.height) };
     });
     await p4.screenshot({ path: join(OUT, `demo_ha-einbettung_${label}.png`) });
-    ok(size.h === viewport.height && size.canvas === viewport.height,
-      `HA-Einbettung (${label}): Panel füllt den Bildschirm trotz Container ohne Höhe (${size.h}px)`, `HA-Einbettung ${label}: ${JSON.stringify(size)}`);
+    ok(size.top === top && size.bottom === viewport.height && size.canvas === viewport.height - top &&
+      size.barH > 0 && size.barBottom <= viewport.height,
+      `HA-Einbettung (${label}): Panel reicht bis zum unteren Rand, Werkzeugleiste sichtbar (${size.top}–${size.bottom}px)`,
+      `HA-Einbettung ${label}: ${JSON.stringify(size)}`);
     await p4.close();
   }
 } finally {

@@ -17,11 +17,12 @@ export class HouseScene {
    * @param furnishing   { devices, items } aus data/devices.yaml und data/furniture.yaml
    */
   /** assetBase: Ordner der Daten (für Texturen wie textures/…), wie data_url */
-  constructor(container, house, furnishing, { onRoomTap, onLampTap, onViewChange, assetBase = null } = {}) {
+  constructor(container, house, furnishing, { onRoomTap, onLampTap, onLampHold, onViewChange, assetBase = null } = {}) {
     this.container = container;
     this.house = house;
     this.onRoomTap = onRoomTap;
     this.onLampTap = onLampTap;
+    this.onLampHold = onLampHold;
     this.onViewChange = onViewChange;
     this.lamps = new Map(); // lampId -> { idx, lamp, room, roomIdx, floor, on, color, brightness }
     this.furnishing = [];
@@ -464,31 +465,56 @@ export class HouseScene {
   _bindPointer() {
     const el = this.renderer.domElement;
     const ray = new THREE.Raycaster();
+    const HOLD_MS = 500; // so lange ruhig drücken = langes Drücken (HA-Dialog der Leuchte)
     let down = null;
     let pointers = 0;
+    let holdTimer = 0;
+    const cancelHold = () => clearTimeout(holdTimer);
+    const rayAt = (x, y) => {
+      const rect = el.getBoundingClientRect();
+      ray.setFromCamera(new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1), this.camera);
+      return ray;
+    };
+    // getroffene Leuchte unter dem zuletzt gesetzten Strahl
+    const lampAt = () => ray.intersectObjects(this.activeLayer?.lampHits || [], false)[0]?.object.userData.lampId;
     el.addEventListener('pointerdown', (e) => {
       pointers++;
+      cancelHold();
       // nur ein Finger zählt als Antippen; ein zweiter Finger macht daraus eine Geste
       down = pointers === 1 ? { x: e.clientX, y: e.clientY, t: performance.now(), touch: e.pointerType !== 'mouse' } : null;
+      // langes Drücken nur auf eine Leuchte, nur mit der Haupttaste und nicht im Editiermodus
+      if (!down || e.button !== 0 || this.tapHandler || !this.onLampHold) return;
+      const start = down;
+      holdTimer = setTimeout(() => {
+        if (down !== start) return;
+        rayAt(start.x, start.y);
+        const lampId = lampAt();
+        if (!lampId) return;
+        down = null; // das Loslassen ist dann kein Antippen mehr
+        this.onLampHold(lampId);
+      }, HOLD_MS);
     });
-    el.addEventListener('pointercancel', () => { pointers = Math.max(0, pointers - 1); down = null; });
+    el.addEventListener('pointermove', (e) => {
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > (down.touch ? 14 : 6)) cancelHold();
+    });
+    el.addEventListener('pointercancel', () => { pointers = Math.max(0, pointers - 1); down = null; cancelHold(); });
+    // iOS/Android: kein Kontextmenü beim langen Drücken
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('pointerup', (e) => {
       pointers = Math.max(0, pointers - 1);
+      cancelHold();
       if (!down) return;
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       const dt = performance.now() - down.t;
       const tol = down.touch ? 14 : 6; // Finger sind ungenauer als die Maus
       down = null;
       if (moved > tol || dt > 700 || this.suppressTap) return;
-      const rect = el.getBoundingClientRect();
-      const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-      ray.setFromCamera(ndc, this.camera);
+      rayAt(e.clientX, e.clientY);
       // Im Editiermodus entscheidet der Editor, was ein Antippen bedeutet
       if (this.tapHandler?.(ray)) return;
       // Lampen haben Vorrang vor Räumen
-      const layer = this.activeLayer;
-      const lampHit = ray.intersectObjects(layer?.lampHits || [], false)[0];
-      if (lampHit) return this.onLampTap?.(lampHit.object.userData.lampId);
+      const lampId = lampAt();
+      if (lampId) return this.onLampTap?.(lampId);
       const targets = [...this.activeFloor.rooms.values()].map((r) => r.hitMesh);
       const hit = ray.intersectObjects(targets, false)[0];
       if (hit) this.onRoomTap?.(hit.object.userData.roomId);

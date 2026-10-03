@@ -92,8 +92,9 @@ nicht in `engine/` der Instanz ändern.
 4. Updates kommen über HACS (danach HA neu starten); die Integration hängt ihre Version an die Bundle-Adresse, der
    Browser lädt das neue Bundle also von selbst.
 
-Solange im Datenordner nichts liegt, zeigt das Panel das eingebaute **Demo-Haus** mit Hinweis: Raum/Leuchte schaltet
-lokal (die Demo-Entities existieren in HA nicht), Sonne/Mond kommen aus `sun.sun`, der Editor speichert nichts.
+Solange im Datenordner nichts liegt, zeigt das Panel das eingebaute **Demo-Haus** mit Hinweis: Seine Leuchten sind
+unverknüpft und schalten lokal; im Editor mit einer echten Lampe verknüpfte schalten über HA (nicht gespeichert).
+Sonne/Mond kommen aus `sun.sun`, der Editor speichert nichts.
 Kaputte eigene Daten zeigen dagegen eine Fehlermeldung und werden nie durch das Demo-Haus ersetzt.
 
 **Variante Selbst bauen (Instanz mit Submodul, mit `panel_custom` in der YAML):**

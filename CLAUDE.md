@@ -107,9 +107,15 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   und braucht Repo-Beschreibung/Topics in den GitHub-Einstellungen.
 - Demo-Modus: Das Demo-Haus steckt als Text im Bundle (esbuild-Plugin `demo-data`, ~15 kB). Aktiv per
   `config.demo: true` oder als Fallback, wenn die Daten unerreichbar sind (`DataUnavailableError`, nur ohne
-  vorhandene Ansicht). Dann: lokal schalten statt HA-Dienste, Sonne weiter aus `sun.sun`, kein Speichern/Export, keine
+  vorhandene Ansicht). Die erfundenen Entities werden beim Laden entfernt (`src/demo.js`; `examples/demo` behält sie
+  für die Tests). Dann: unverknüpfte Leuchten lokal schalten, im Editor mit einer in HA vorhandenen Entity
+  verknüpfte über HA (`_liveEntities`), Sonne weiter aus `sun.sun`, kein Speichern/Export, keine
   Benutzerdaten-Overrides – eigene Daten werden nie überschrieben, kaputte eigene Daten nie durch die Demo ersetzt.
 - `data_url` wird als Ordner behandelt (fehlender `/` wird ergänzt).
+- Langes Drücken (500 ms ruhig) auf eine Leuchte: `hass-more-info` mit der (ersten) Entity – HA öffnet seinen Dialog
+  (Farbe, Helligkeit). Nicht im Editiermodus; Kontextmenü/iOS-Callout unterdrückt.
 - Panel-Höhe nicht vom Container erben: ab HA 2026.9 ist `partial-panel-resolver` inline und `ha-panel-custom` ohne
-  Höhe, `height: 100%` ergibt 0 (weiße Seite). Daher `min-height: 100dvh` am `:host`; `tests/harness.html?ha=1` bildet
-  diese Einbettung nach (`tests/demo.mjs`).
+  Höhe, `height: 100%` ergibt 0 (weiße Seite). `100dvh` reicht nicht: In der iOS-App beginnt das Panel unter der
+  Statusleiste und ragte unten hinaus. Daher misst `_fitHeight()` den Abstand vom oberen Panelrand bis zum unteren
+  Bildschirmrand (`--ha3d-fit-height`, bei resize/visualViewport neu); untere Leisten mit `env(safe-area-inset-bottom)`.
+  `tests/harness.html?ha=1&top=47` bildet das nach (`tests/demo.mjs`, `tests/webkit.mjs`).

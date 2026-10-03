@@ -68,6 +68,27 @@ try {
   ok(!st.lamp && st.sconce && st.other && st.last?.service === 'turn_off' && st.last.data.entity_id.length === 3,
     'Leuchte antippen schaltet nur diese Leuchte (alle 3 Spots) über HA', `Leuchte antippen: ${JSON.stringify(st)}`);
 
+  // Leuchte lange drücken -> HA-Dialog (more-info) der Entity, ohne zu schalten
+  const hold = await (async () => {
+    await page.evaluate(() => {
+      window.moreInfo = [];
+      window.addEventListener('hass-more-info', (e) => window.moreInfo.push(e.detail.entityId), { once: true });
+      window.callsBefore = window.mockHass.calls.length;
+    });
+    await page.mouse.move(pt.x, pt.y);
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+    return page.evaluate((id) => ({
+      moreInfo: window.moreInfo,
+      on: window.panel.view.lamps.get(id).on,
+      calls: window.mockHass.calls.length - window.callsBefore,
+    }), lampId);
+  })();
+  ok(hold.moreInfo[0] === 'light.demo_stehlampe_1' && !hold.on && hold.calls === 0,
+    'Leuchte lange drücken öffnet den HA-Dialog der Entity, ohne zu schalten', `Lange drücken: ${JSON.stringify(hold)}`);
+
   // Farbe aus HA: ein Spot rot mit halber Helligkeit -> Leuchte rot, Helligkeit 1/3 * 0.5
   const col = await page.evaluate(async (id) => {
     await window.mockHass.callService('light', 'turn_on', { entity_id: 'light.demo_stehlampe_1', rgb_color: [255, 0, 0], brightness: 128 });

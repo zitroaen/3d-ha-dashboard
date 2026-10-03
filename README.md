@@ -15,8 +15,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 - **three.js, ein JS-Bundle, offline:** keine CDNs, keine externen Requests, keine Tokens – das Panel nutzt die
   angemeldete HA-Sitzung.
 - **Ohne YAML:** HACS-Integration, die das Panel selbst in die Seitenleiste einträgt.
-- **Licht:** Raum antippen schaltet alle Lichter des Raums, Leuchte antippen nur diese. Farbe und Helligkeit kommen
-  aus HA. Das Licht wirkt nur im eigenen Raum (kein Durchscheinen durch Wände) und ist mobil-tauglich.
+- **Licht:** Raum antippen schaltet alle Lichter des Raums, Leuchte antippen nur diese, Leuchte **lange drücken**
+  öffnet den HA-Dialog der Lampe (Farbe, Helligkeit, Farbtemperatur). Farbe und Helligkeit kommen aus HA. Das Licht wirkt nur im eigenen Raum (kein Durchscheinen durch Wände) und ist mobil-tauglich.
 - **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden.
 - **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,
@@ -35,9 +35,10 @@ Ohne Build, ohne YAML und ohne eigene Hausdaten – das Panel bringt das erfunde
 3. **Einstellungen → Geräte & Dienste → Integration hinzufügen → 3D-HA-Dashboard → OK** – oder direkt:
    [![Integration hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ha_3d_dashboard)
 
-In der Seitenleiste erscheint **Haus 3D**. Ohne eigene Daten zeigt es das Demo-Haus: Raum oder Leuchte antippen
-schaltet **lokal** (die Demo-Entities gibt es in deiner HA nicht), Sonne und Mond folgen `sun.sun`, der Editor
-funktioniert, speichert aber nichts.
+In der Seitenleiste erscheint **Haus 3D**. Ohne eigene Daten zeigt es das Demo-Haus: Seine Leuchten sind mit nichts
+verknüpft und schalten **lokal**; Sonne und Mond folgen `sun.sun`. Zum Ausprobieren mit echten Lampen: Stift → Leuchte
+antippen → **Verknüpfen** → eigene Lampe wählen – dann schaltet sie über HA, und langes Drücken öffnet ihren HA-Dialog.
+Im Demo-Haus wird nichts gespeichert.
 
 **Eigenes Haus:** `house.json`, `furniture.yaml`, `devices.yaml` und `textures/` nach `/config/www/ha-3d-dashboard/`
 legen – das Panel findet sie dort automatisch (Seite neu laden). Titel, Symbol und Datenordner lassen sich unter

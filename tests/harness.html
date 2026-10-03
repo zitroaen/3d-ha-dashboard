@@ -22,6 +22,8 @@
     // Varianten für die Demo-Tests: ?demo=1 (config.demo) bzw. ?nodata=1 (Daten nicht erreichbar -> Demo-Fallback)
     const q = new URLSearchParams(location.search);
     document.body.classList.toggle('ha', q.has('ha'));
+    // ?top=47: Panel beginnt tiefer, wie in der iOS-App unter der Statusleiste
+    if (q.has('top')) document.body.style.paddingTop = `${q.get('top')}px`;
     el.panel = { config: q.has('demo') ? { demo: true } : q.has('nodata') ? { data_url: '/fehlt' } : { data_url: '/data/', save_url: '/__save/' } };
 
     // Simuliertes HA wie die echte Installation: alle Entities aus dem HA-Export (reference/entities.txt) mit

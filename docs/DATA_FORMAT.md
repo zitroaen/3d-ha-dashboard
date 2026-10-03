@@ -105,6 +105,7 @@ devices:
 Leuchten-Modelle (`LAMPS`): `chandelier_tulip`, `chandelier_candles`, `floor_spots`, `sconce`, `ball`, `disc`,
 `wall_box`. Außenleuchten (`room: aussen`, `kind: wall`) werfen einen Lichtschein auf den Boden in Richtung `facing`.
 
+Im Panel: Leuchte antippen schaltet, **lange drücken** (½ s) öffnet den HA-Dialog der Entity (bei mehreren die erste).
 Verknüpfen geht am bequemsten im Panel: Stift → Leuchte antippen → **Verknüpfen** (Liste aller Entities, die HA gerade
 kennt, vorgefiltert auf den HA-Bereich des Raums).
 
