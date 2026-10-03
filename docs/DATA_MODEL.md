@@ -1,0 +1,443 @@
+# Datenmodell (Version 2)
+
+Diese Spezifikation beschreibt vollständig, wie ein Zuhause für das 3D-Dashboard beschrieben wird – so, dass ein
+Mensch oder ein KI-Agent ein gültiges Modell erstellen kann. Maschinenlesbar: [`schema/model.schema.json`](../schema/model.schema.json)
+(JSON Schema 2020-12). Prüfen: `npm run validate` (Schema + inhaltliche Prüfungen, siehe unten).
+
+## Überblick
+
+Ein Modell ist **ein Dokument** (JSON bzw. YAML als Datei `model.yaml`). Es hat drei Ebenen, die sich unterschiedlich oft
+ändern:
+
+| Ebene | Abschnitt | Inhalt | ändert sich |
+|---|---|---|---|
+| Grundstück und Bauwerk | `site`, `buildings`, `outdoor` | Gelände, Gebäude, Etagen, Räume, Wände, Fenster, Türen, Außenbereiche | selten |
+| Objekte | `objects` | alles, was dort steht: Möbel, Leuchten, Geräte, Sensoren | gelegentlich |
+| Verbindungen | `connections` | (reserviert) Energie- und Datenflüsse zwischen Objekten | selten |
+
+```yaml
+schema: ha3d
+version: 2
+site: { ... }        # Grundstück: Name, Nordrichtung, Boden
+buildings: [ ... ]   # Wohnhaus, Garage, Gartenhaus … mit Etagen und Räumen
+outdoor: [ ... ]     # Außenbereiche („Gartenräume“): Terrasse, Rasen, Einfahrt …
+objects: [ ... ]     # Möbel, Leuchten, Geräte – mit Verknüpfung zu Home Assistant
+```
+
+## Grundregeln
+
+- **Einheiten:** Meter und Grad. Zahlen ohne Einheit.
+- **Ein Koordinatensystem für alles:** Plan-Koordinaten `[x, y]` des Grundstücks – x nach rechts, y nach unten, wie ein
+  Lageplan auf Papier. Der Ursprung ist frei wählbar (üblich: linke obere Ecke des Wohnhauses). Alle Gebäude, Räume,
+  Außenbereiche und Objekte verwenden dieselben Koordinaten.
+- **Höhen** (`elevation`) in Metern über dem Nullpunkt; üblich: 0 = Fußboden Erdgeschoss.
+- **Drehung** `rot`: Grad **im Uhrzeigersinn**, von oben gesehen. Bei `rot: 0` zeigt die Vorderseite eines Objekts
+  (Sitzfläche, Bildschirm, Tür eines Geräts) nach Plan-unten (+y); 90 = nach links, 180 = nach oben, 270 = nach rechts.
+- **Polygone:** Liste von Punkten `[[x, y], …]`, mindestens 3, nicht geschlossen (letzter Punkt ≠ erster), ohne
+  Selbstüberschneidung. Umlaufsinn beliebig.
+- **IDs:** Kleinbuchstaben, Ziffern, Unterstrich (`^[a-z0-9_]+$`), stabil (nicht umbenennen – Verknüpfungen hängen
+  daran). Eindeutigkeit:
+  - Gebäude: im Modell
+  - Etagen: im Gebäude
+  - **Bereiche** (Räume aller Gebäude und Außenbereiche zusammen): im Modell
+  - Objekte: im Modell
+- **Unbekannte Felder** sind nicht erlaubt (das Schema lehnt sie ab) – Tippfehler fallen so sofort auf. Ausnahme:
+  `params` eines Objekts (modellabhängig, siehe Katalog).
+- **Optionale Felder** haben Standardwerte (in den Tabellen genannt).
+
+## Kopf
+
+| Feld | Pflicht | Bedeutung |
+|---|---|---|
+| `schema` | ja | immer `ha3d` |
+| `version` | ja | Formatversion, hier `2` (siehe [Versionen und Migration](#versionen-und-migration)) |
+
+## `site` – Grundstück
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `name` | ja | | Anzeigename (oben links im Panel) |
+| `north_deg` | nein | 0 | Richtung Norden im Plan, Grad im Uhrzeigersinn von Plan-oben (Sonne, Mond, Kompass). Beispiel: Norden zeigt im Plan nach rechts → 90 |
+| `ground` | nein | `{ surface: lawn }` | Boden außerhalb aller Außenbereiche: `{ surface }` |
+
+## `buildings` – Gebäude
+
+Wohnhaus, Garage, Gartenhaus, Carport … jeweils mit Etagen.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `id` | ja | | z. B. `haus`, `garage`, `gartenhaus` |
+| `name` | ja | | Anzeigename |
+| `kind` | nein | `house` | `house`, `garage`, `garden_house`, `carport`, `other` (nur Information) |
+| `floors` | ja | | Etagen, mindestens eine |
+
+### Etage (`buildings[].floors[]`)
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `id` | ja | | z. B. `eg`, `og`, `kg` |
+| `name` | ja | | z. B. „Erdgeschoss“ |
+| `level` | ja | | **Ebene** als ganze Zahl: 0 = Erdgeschoss, 1 = 1. OG, −1 = Keller. Das Panel zeigt jeweils eine Ebene; Etagen verschiedener Gebäude mit gleichem `level` erscheinen zusammen (Wohnhaus-EG mit Garage und Gartenhaus) |
+| `elevation` | nein | 0 | Höhe des Fußbodens |
+| `height` | ja | | Wandhöhe (Schnitthöhe der Darstellung, Raumhöhe für Licht) |
+| `ha_floor` | nein | | `floor_id` der HA-Etage |
+| `rooms` | ja | | Räume |
+| `walls` | ja | | Wandstücke |
+| `windows` | nein | `[]` | Fenster |
+| `doors` | nein | `[]` | Türen |
+
+**Raum** (`rooms[]`):
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `id` | ja | | Bereichs-ID, im ganzen Modell eindeutig (z. B. `wohnen`, `garage`) |
+| `name` | ja | | Anzeigename; dient auch zum Finden des HA-Bereichs |
+| `polygon` | ja | | Grundfläche (Innenmaß) |
+| `surface` | nein | `parquet` | Bodenbelag, siehe [Oberflächen](#oberflächen) |
+| `surface_rot` | nein | 0 | Verlegerichtung des Bodens in Grad |
+| `height` | nein | Etage | abweichende Raumhöhe |
+| `ha_area` | nein | nach Name | `area_id` des HA-Bereichs (sonst über Name oder ID gefunden) |
+
+**Wand** (`walls[]`): `{ polygon }` – ein Wandstück als Grundriss-Polygon, Öffnungen (Fenster, Türen) ausgespart.
+Höhe = Etagenhöhe.
+
+**Fenster** (`windows[]`):
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `rect` | ja | | Öffnung in voller Wanddicke `[x0, y0, x1, y1]` |
+| `room` | nein | | Raum, zu dem das Fenster gehört (Licht) |
+| `sill` | nein | 0.9 | Brüstungshöhe |
+| `top` | nein | 2.1 | Oberkante |
+| `sashes` | nein | ca. 50 cm je Flügel | Anzahl Flügel |
+| `transom` | nein | | Kämpfer: Anteil der Glashöhe für die Querteilung |
+
+**Tür** (`doors[]`):
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `hinge`, `end` | ja | | Scharnier und Spitze des geschlossenen Türblatts (Wandmitte) |
+| `swing` | ja | | Aufschlagseite: +1/−1 entlang n = (−uy, ux) mit u = Richtung hinge→end |
+| `jamb` | ja | | Laibung relativ zur Linie hinge→end entlang n: `[innen, außen]`, z. B. `[-0.06, 0.06]` |
+| `type` | nein | `interior` | `interior` oder `exterior` |
+| `leaf` | nein | `glass` | nur `exterior`: `glass` oder `solid` |
+| `rooms` | nein | | angrenzende Räume |
+| `height` | nein | 2.05 | Durchgangshöhe |
+| `open_deg` | nein | 85 | Öffnungswinkel (Innentüren) |
+
+## `outdoor` – Außenbereiche („Gartenräume“)
+
+Flächen außerhalb der Gebäude: Terrasse, Rasen, Beet, Einfahrt, Teich … Sie werden auf Ebene 0 gezeigt und sind
+Bereiche wie Räume: Objekte können darin stehen, Außenleuchten beleuchten sie.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `id` | ja | | Bereichs-ID (eindeutig zusammen mit allen Räumen) |
+| `name` | ja | | Anzeigename |
+| `polygon` | ja | | Fläche |
+| `surface` | nein | `lawn` | Oberfläche |
+| `elevation` | nein | 0 | Höhe der Fläche (Terrasse auf Fußbodenhöhe, Garten tiefer) |
+| `ha_area` | nein | nach Name | HA-Bereich |
+
+Reserviert für später: `site.terrain` (Geländehöhen als Stützpunkte `[x, y, z]`, zwischen ihnen wird trianguliert).
+
+## `objects` – Objekte
+
+Alles, was in einem Bereich steht oder hängt. **Ein Schema für alle Arten**: Was ein Objekt kann (z. B. leuchten),
+legt sein Modell im [Katalog](#katalog) fest.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `id` | ja | | eindeutig |
+| `name` | nein | Modellname | Anzeigename (Editor, Meldungen) |
+| `model` | ja | | Modell aus dem Katalog |
+| `space` | nein | | Bereich (Raum oder Außenbereich), in dem das Objekt steht. Ohne `space`: freies Gelände. Bestimmt Etage, Höhenbezug und Licht |
+| `pos` | ja | | Position `[x, y]` (Mittelpunkt bzw. Befestigungspunkt, siehe Katalog) |
+| `rot` | nein | 0 | Drehung |
+| `elevation` | nein | 0 | Unterkante über dem Boden des Bereichs (Bilder, TV, Heizkörper, Wandgeräte) |
+| `size` | nein | Modell | `[Breite, Tiefe, Höhe]` bzw. `[Breite, Tiefe]` bei flachen Modellen |
+| `params` | nein | `{}` | modellabhängige Parameter (Katalog) |
+| `light` | bei Fähigkeit `light` | | Lichtquelle, siehe unten |
+| `ha` | nein | | Verknüpfung mit Home Assistant, siehe unten |
+
+**Höhenbezug:** `elevation` und `light.height` zählen ab dem Boden des Bereichs: Raum → `elevation` der Etage;
+Außenbereich → dessen `elevation`; ohne `space` → 0.
+
+### `light` – Lichtquelle (Modelle mit Fähigkeit `light`)
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `mount` | nein | Modell | Montage: `ceiling`, `pendant`, `floor`, `table`, `wall`, `spot` (Helligkeit, Standardmodell) |
+| `height` | ja | | Höhe der Lichtquelle über dem Boden des Bereichs |
+| `range` | ja | | Reichweite in Metern |
+| `color` | nein | warmweiß | Lichtfarbe `#rrggbb`, solange HA keine liefert |
+| `facing` | nein | | Außen-Wandleuchte: Richtung des Lichtscheins auf den Boden `[dx, dy]` |
+
+Licht wirkt nur im eigenen Bereich (kein Licht durch Wände). Leuchten in Außenbereichen oder ohne `space` beleuchten
+das Gelände.
+
+### `ha` – Verknüpfung mit Home Assistant
+
+```yaml
+ha:
+  entities:
+    power: [light.spot_1, light.spot_2]   # Rolle -> eine Entity oder eine Liste
+    info: sensor.stehlampe_leistung
+  tap: toggle
+  double_tap: none
+  hold: more-info
+```
+
+| Feld | Standard | Bedeutung |
+|---|---|---|
+| `entities` | `{}` | Entities nach **Rolle** (Tabelle unten) |
+| `tap` | siehe Standards | Aktion beim Antippen |
+| `double_tap` | `none` | Aktion beim Doppeltippen |
+| `hold` | `more-info` | Aktion beim langen Drücken (½ s) |
+
+**Rollen:**
+
+| Rolle | Bedeutung | typische Domains |
+|---|---|---|
+| `power` | Ein/Aus und – bei Leuchten – Farbe und Helligkeit. Mehrere Entities: an, sobald eine an ist; Schalten betrifft alle | `light`, `switch`, `fan`, `input_boolean`, `climate`, `media_player` |
+| `info` | Werte zur Anzeige (Zustand, Leistung, Restzeit …) | `sensor`, `binary_sensor`, beliebige |
+
+Reserviert für spätere Versionen: `speed` (Drehzahl), `flow` (Leistung für Energiefluss), `progress` (Fortschritt).
+
+**Aktionen** (`tap`, `double_tap`, `hold`) – Kurzform als Text oder ausführlich als Objekt:
+
+| Aktion | Kurzform | ausführlich | Wirkung |
+|---|---|---|---|
+| Umschalten | `toggle` | `{ action: toggle }` | `power`-Entities umschalten (`homeassistant.toggle`; Leuchten und Schalter gemeinsam an bzw. aus) |
+| HA-Dialog | `more-info` | `{ action: more-info, entity: sensor.x }` | HA-eigenen Dialog öffnen (ohne `entity`: erste `power`-, sonst erste `info`-Entity) |
+| Dienst | – | `{ action: service, service: script.kamin_an, data: { … } }` | HA-Dienst aufrufen; ohne `entity_id` in `data` gelten die `power`-Entities |
+| Seite | – | `{ action: navigate, path: /lovelace/energie }` | HA-Seite öffnen |
+| nichts | `none` | `{ action: none }` | – |
+
+Jede ausführliche Aktion kann `confirm: "Text der Rückfrage"` haben.
+
+**Standards:** `tap` = `toggle`, wenn `power` verknüpft ist, sonst `more-info`, wenn irgendeine Entity verknüpft ist,
+sonst `none`. `hold` = `more-info`. `double_tap` = `none`. Ein Objekt ohne `ha` ist reine Einrichtung.
+
+**Räume** schalten beim Antippen alle `power`-Entities der Leuchten im Raum (alle an bzw. alle aus).
+
+## Oberflächen
+
+`surface` von Räumen, Außenbereichen und `site.ground`:
+
+| Wert | Darstellung |
+|---|---|
+| `parquet` | Fischgrätparkett |
+| `parquet_cube` | Würfelparkett |
+| `tiles` | Fliesen |
+| `concrete` | Beton/Estrich |
+| `lawn` | Rasen |
+| `paving` | Pflaster/Platten |
+| `gravel` | Kies |
+| `soil` | Erde/Beet |
+| `wood` | Holzdeck |
+| `water` | Wasser |
+
+## Katalog
+
+Modelle für `objects[].model`. **Fähigkeit** `light` = das Objekt ist eine Leuchte und braucht `light`. Maße als
+Standard `[B, T, H]` in Metern. Parameter gehören nach `params`. Farben (`params.color`) sind Materialien der Palette
+(`PALETTE` in `src/models.js`): `fabric_grey`, `fabric_dark`, `fabric_chair`, `cushion_green`, `cushion_light`, `oak_light`,
+`teak`, `wood_dark`, `white`, `plaster`, `black_gloss`, `black_matte`, `slate`, `brass`, `steel_dark`, `rug_red`,
+`rug_navy`, `curtain_green`, `curtain_grey`, `teal`, `book_brown`, `book_mix`, `frame_dark`, `canvas_art`, `screen`,
+`glass_fire`, `bin_clear`, `toy_red`, `toy_yellow`, `toy_blue`.
+
+Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` prüft, dass beide übereinstimmen).
+
+<!-- katalog:start -->
+| Modell | Art | Fähigkeiten | Standardmaß | Parameter |
+|---|---|---|---|---|
+| `armchair` | Möbel | | 0.66 × 0.78 | `color` |
+| `bookshelf` | Möbel | | 2.0 × 0.3 × 2.0 | |
+| `box` | Gerät | | 0.6 × 0.6 × 0.85 | `color` |
+| `chair` | Möbel | | | `guitar` |
+| `chest_table` | Möbel | | 0.8 × 0.6 × 0.48 | |
+| `curtain` | Möbel | | | `color` |
+| `grand_piano` | Möbel | | 1.48 × 1.6 | |
+| `hearth` | Möbel | | | |
+| `marker` | Gerät | | 0.12 | `color` |
+| `picture` | Möbel | | | `frame`, `mat`, `color`, `texture` |
+| `radiator` | Möbel | | | |
+| `rug` | Möbel | | 2.0 × 3.0 | `color` |
+| `sideboard` | Möbel | | 1.2 × 0.45 × 0.6 | |
+| `sofa_u` | Möbel | | 3.5 × 2.4 × 0.82 | `seat_depth`, `left`, `right`, `color` |
+| `speaker` | Möbel | | 0.22 × 0.3 × 1.0 | |
+| `storage_cube` | Möbel | | | |
+| `stove` | Möbel | | | |
+| `toy_storage` | Möbel | | | `columns` |
+| `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
+| `ball` | Leuchte | `light` | | `radius` |
+| `chandelier_candles` | Leuchte | `light` | | `arms` |
+| `chandelier_tulip` | Leuchte | `light` | | `arms` |
+| `disc` | Leuchte | `light` | | |
+| `floor_spots` | Leuchte | `light` | | |
+| `sconce` | Leuchte | `light` | | |
+| `wall_box` | Leuchte | `light` | | |
+<!-- katalog:end -->
+
+Hinweise:
+- `box` ist der allgemeine Platzhalter für Geräte ohne eigenes Modell (Waschmaschine, Wärmepumpe …): ein Quader in
+  `size` und `params.color`. `marker` ist ein kleiner Punkt (Sensoren, Taster).
+- `picture.params.texture`: Bilddatei relativ zum Datenordner, z. B. `textures/gemaelde.jpg`.
+- Wandmodelle (`sconce`, `wall_box`, `picture`, `tv`, `radiator`, `curtain`): `pos` liegt an der Wand, `rot` zeigt in
+  den Raum.
+
+## Versionen und Migration
+
+- `version` ist eine ganze Zahl. Jede **inkompatible** Änderung am Format erhöht sie.
+- Für jede neue Version gibt es eine Migration in `src/model/migrate.js` (`MIGRATIONS[n]` wandelt Version n−1 in n
+  um). Beim Laden wendet das Panel alle nötigen Migrationen nacheinander an; das nächste Speichern schreibt die
+  aktuelle Version. Werkzeuge (`npm run validate`, Import) tun dasselbe.
+- Ein Dokument mit einer **neueren** Version als der Code kennt, wird nicht geladen (Meldung: Engine aktualisieren).
+- Version 1 (getrennte Dateien `house.json`, `furniture.yaml`, `devices.yaml`) wird nicht migriert.
+- **Kompatible** Erweiterungen (neue optionale Felder, neue Modelle, neue Werte) brauchen keine neue Version; sie
+  werden hier und im Schema ergänzt.
+- Zu jeder Version steht unten ein Eintrag unter [Änderungen](#änderungen).
+
+## Prüfung
+
+`npm run validate` (bzw. `DATA_DIR=… npm run validate`) prüft:
+1. das Schema (`schema/model.schema.json`),
+2. eindeutige IDs (Gebäude, Etagen je Gebäude, Bereiche, Objekte),
+3. Verweise: `space`, `windows[].room`, `doors[].rooms`, Modelle aus dem Katalog, `light` genau bei Leuchten,
+4. Lage: jedes Objekt mit `space` liegt in dessen Polygon; Leuchten unter der Raumhöhe,
+5. Entity-IDs syntaktisch gültig, Texturen vorhanden.
+
+Mit HA-Export (`ENTITIES`) prüft `npm run link-check` zusätzlich, ob die verknüpften Entities existieren.
+
+## Vollständiges Beispiel
+
+```yaml
+schema: ha3d
+version: 2
+site:
+  name: Musterhaus
+  north_deg: 90
+  ground: { surface: lawn }
+buildings:
+  - id: haus
+    name: Wohnhaus
+    floors:
+      - id: eg
+        name: Erdgeschoss
+        level: 0
+        elevation: 0
+        height: 2.6
+        rooms:
+          - { id: wohnen, name: Wohnzimmer, polygon: [[0.3, 0.3], [5.7, 0.3], [5.7, 4.7], [0.3, 4.7]], surface: parquet }
+        walls:
+          - { polygon: [[0, 0], [6, 0], [6, 0.3], [0, 0.3]] }
+          - { polygon: [[0, 4.7], [6, 4.7], [6, 5], [0, 5]] }
+          - { polygon: [[0, 0.3], [0.3, 0.3], [0.3, 4.7], [0, 4.7]] }
+          - { polygon: [[5.7, 0.3], [6, 0.3], [6, 4.7], [5.7, 4.7]] }
+        windows:
+          - { rect: [2, 4.7, 3.5, 5], room: wohnen }
+  - id: garage
+    name: Garage
+    kind: garage
+    floors:
+      - id: eg
+        name: Garage
+        level: 0
+        height: 2.4
+        rooms:
+          - { id: garage, name: Garage, polygon: [[8.2, 0.2], [11.3, 0.2], [11.3, 5.8], [8.2, 5.8]], surface: concrete }
+        walls:
+          - { polygon: [[8, 0], [11.5, 0], [11.5, 0.2], [8, 0.2]] }
+outdoor:
+  - { id: terrasse, name: Terrasse, polygon: [[0, 5], [6, 5], [6, 8], [0, 8]], surface: paving }
+objects:
+  - { id: sofa, model: sofa_u, space: wohnen, pos: [1.6, 2.5], rot: 270, size: [3.0, 2.2, 0.82] }
+  - id: wohnen_decke
+    name: Deckenleuchte
+    model: disc
+    space: wohnen
+    pos: [3, 2.5]
+    light: { mount: ceiling, height: 2.5, range: 4.5 }
+    ha:
+      entities: { power: light.wohnzimmer }
+  - id: waschmaschine
+    name: Waschmaschine
+    model: box
+    space: garage
+    pos: [10.9, 5.4]
+    rot: 180
+    size: [0.6, 0.6, 0.85]
+    params: { color: white }
+    ha:
+      entities: { power: switch.waschmaschine, info: [sensor.waschmaschine_restzeit] }
+      tap: more-info
+  - id: terrassenleuchte
+    model: wall_box
+    space: terrasse
+    pos: [3, 5.05]
+    light: { mount: wall, height: 2.0, range: 3, facing: [0, 1] }
+    ha: { entities: { power: light.terrasse } }
+```
+
+## Anleitung für Agenten
+
+1. **Bauwerk:** aus einem Magicplan-PDF (`scripts/extract_plan.py`) oder per Skript nach dem Vorbild
+   `examples/demo/build-house.mjs`. Mehrere Gebäude (Garage, Gartenhaus) in dieselben Grundstückskoordinaten legen.
+2. **Nordrichtung** beim Besitzer erfragen (welcher Raum liegt wo?), `site.north_deg` setzen.
+3. **Etagen:** `level` je Stockwerk; gleiche Ebene in mehreren Gebäuden ist erlaubt und erwünscht.
+4. **Außenbereiche** für Terrasse, Garten, Einfahrt anlegen (Polygone, `surface`).
+5. **Objekte:** zuerst Leuchten (Fähigkeit `light`), dann Möbel und Geräte. Unbekannte Geräte: `box`.
+6. **Verknüpfen:** HA-Export lesen, `ha.entities.power` bzw. `info` setzen; Aktionen nur angeben, wenn sie vom Standard
+   abweichen.
+7. `npm run validate` muss fehlerfrei sein, dann `npm test` und die Screenshots ansehen.
+
+## Anhang: HA-Export für Link-Check und Vorschau (optional)
+
+In Home Assistant unter *Entwicklerwerkzeuge → Template* ausführen und das Ergebnis als `reference/entities.txt` der
+Instanz speichern. Der Link-Check in den Tests und die lokale Vorschau nutzen ihn, das Panel selbst braucht ihn nicht.
+
+```jinja
+{%- for area in areas() %}
+## {{ area_name(area) }}
+{%- for e in area_entities(area) | select('match', '^(light|switch|binary_sensor|sensor|climate|cover|vacuum|lawn_mower|media_player)\.') %}
+{{ e }} | {{ state_attr(e, 'friendly_name') }}
+{%- endfor %}
+{%- endfor %}
+
+## Ohne Bereich
+{%- for s in states | selectattr('domain', 'in', ['light','switch','binary_sensor','climate','cover','media_player']) %}
+{%- if not area_id(s.entity_id) %}
+{{ s.entity_id }} | {{ s.name }}
+{%- endif %}
+{%- endfor %}
+```
+
+## Anhang: views.json (Instanz, optional)
+
+Zusätzliche Screenshot-Ansichten für `npm test` der Instanz:
+
+```json
+{ "wohnzimmer-abend": { "rooms": ["wohnzimmer"], "outdoor": true, "view": { "at": [3.0, 7.5], "zoom": 1.9, "az": 0 } } }
+```
+
+`rooms`: Bereichs-IDs oder `"all"`, `level`: Ebene (Standard 0), `sun`: `{ "azimuth": 215, "elevation": 38 }` (sonst Nacht), `view.at`: Plan-Punkt,
+`zoom`, `az`: Schwenk um die Hochachse in Grad.
+
+## Anhang: Panel-Konfiguration (`panel_custom` → `config`)
+
+Mit der HACS-Integration stellt man das in der Oberfläche ein (Geräte & Dienste → 3D-HA-Dashboard → Konfigurieren);
+sie setzt `data_url`, voreingestellt `/local/ha-3d-dashboard/`. Bei `panel_custom` von Hand sind alle Felder optional:
+
+| Feld | Bedeutung |
+|---|---|
+| `data_url` | Ordner mit `model.yaml` und `textures/` (z. B. `/local/ha-3d-dashboard/`). Ohne Angabe: neben dem Modul. |
+| `demo` | `true`: eingebettetes Demo-Haus statt eigener Daten (unverknüpft, lokales Schalten; Speichern nur in eigene Demo-Benutzerdaten). |
+| `save_url` | nur Entwicklung: Dev-Server-Endpunkt zum Speichern des Editors. |
+
+Sind die Daten nicht erreichbar (HTTP-Fehler), zeigt das Panel das Demo-Haus mit Hinweis.
+
+## Änderungen
+
+- **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
+  Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
