@@ -1,9 +1,11 @@
 // Custom Panel <ha-3d-dashboard> für Home Assistant (panel_custom).
 // HA setzt die Properties hass, narrow, route und panel. Keine Tokens, keine externen Requests.
 // Die Daten (house.json, furniture.yaml, devices.yaml) werden zur Laufzeit geladen – standardmäßig aus
-// demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url.
+// demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url. Mit config → demo: true (oder wenn
+// dort nichts ladbar ist) zeigt das Panel das eingebaute Demo-Haus.
 import { HouseScene } from './scene.js';
-import { loadData } from './data.js';
+import { loadData, resolveDataUrl } from './data.js';
+import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
 import { LayoutStore, applyOverrides, patchYamlText, layoutValues, download } from './store.js';
 import { entitiesOf, lampLight, callForEntities } from './ha.js';
@@ -100,6 +102,12 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .tools button.dirty { color: #f0b45a; }
 .tools button[hidden] { display: none; }
 :host([narrow]) button.menu { display: inline-flex; align-items: center; justify-content: center; }
+.demo-note { position: absolute; top: 48px; left: 12px; max-width: calc(100% - 92px); min-height: 48px; padding: 6px 16px;
+  display: none; align-items: center; border: 1px solid #ffffff22; border-radius: 24px; background: #12151bcc; color: #e8e2d8;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer; backdrop-filter: blur(6px); }
+:host([demo]) .demo-note:not([hidden]) { display: flex; }
+/* Demo-Entities gibt es in HA nicht: Link-Check ergibt dort keinen Sinn */
+:host([demo]) .links-toggle, :host([demo]) .links { display: none; }
 .toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 14px; border-radius: 16px;
   background: #1a1c20d9; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
 .toast.show { opacity: 1; }
@@ -154,11 +162,13 @@ class Ha3dDashboard extends HTMLElement {
           <button data-act="done">${icon('done')}Fertig</button>
         </div>
       </div>
+      <button class="demo-note" hidden title="Hinweis ausblenden"></button>
       <div class="toast"></div>
       <div class="error"></div>`;
     this.shadowRoot.querySelector('button.menu').addEventListener('click', () => {
       this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
     });
+    this.shadowRoot.querySelector('.demo-note').addEventListener('click', (e) => (e.currentTarget.hidden = true));
     this.shadowRoot.querySelector('.compass').addEventListener('click', () => this.view?.faceNorth());
     this.shadowRoot.querySelector('.edit-toggle').addEventListener('click', () => this.setEditing(!this.hasAttribute('editing')));
     this.shadowRoot.querySelector('.links-toggle').addEventListener('click', () => this._toggleLinks());
@@ -188,8 +198,24 @@ class Ha3dDashboard extends HTMLElement {
   }
 
   get dataUrl() {
-    const configured = this._panel?.config?.data_url;
-    return configured ? new URL(configured, location.href) : MODULE_BASE;
+    return resolveDataUrl(this._panel?.config?.data_url, location.href, MODULE_BASE);
+  }
+
+  /** Demo-Modus: Demo-Haus statt eigener Daten – lokal schalten, nichts speichern. */
+  get demo() {
+    return this.hasAttribute('demo');
+  }
+
+  /** Demo-Haus laden. fallback = eigene Daten waren nicht ladbar (statt explizit per config → demo). */
+  _demoData(fallback) {
+    const note = this.shadowRoot.querySelector('.demo-note');
+    if (!this.demo) {
+      // nur beim Einschalten zeigen – ein weggetippter Hinweis kommt beim Neuladen nicht wieder
+      note.textContent = fallback ? 'Demo-Haus – eigene Daten: siehe Anleitung' : 'Demo-Haus';
+      note.hidden = false;
+    }
+    this.toggleAttribute('demo', true);
+    return loadDemoData();
   }
 
   /**
@@ -200,9 +226,22 @@ class Ha3dDashboard extends HTMLElement {
     if (this._loading) return this._loading;
     this._loading = (async () => {
       try {
-        const data = await loadData(this.dataUrl);
-        // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen
-        applyOverrides(data, await this.store.loadOverrides());
+        let data;
+        if (this._panel?.config?.demo) data = this._demoData(false);
+        else {
+          try {
+            data = await loadData(this.dataUrl);
+            this.toggleAttribute('demo', false);
+          } catch (e) {
+            // keine Daten unter data_url / neben dem Modul: Demo-Haus mit Hinweis statt nur einer Fehlermeldung
+            if (!e.unavailable || this.view) throw e;
+            console.warn('ha-3d-dashboard: eigene Daten nicht ladbar, zeige das Demo-Haus –', e.message);
+            data = this._demoData(true);
+          }
+        }
+        // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen –
+        // nie im Demo-Modus, damit das Demo-Haus keine Layouts eigener Daten übernimmt
+        if (!this.demo) applyOverrides(data, await this.store.loadOverrides());
         const old = this._dataText;
         this._dataText = data.text;
         this._showError(null);
@@ -289,9 +328,10 @@ class Ha3dDashboard extends HTMLElement {
     const ed = this.editor;
     if (!ed) return;
     if (act === 'move' || act === 'align') ed.setTool(act);
-    else if (act === 'link') this._openPicker();
+    else if (act === 'link' && !this.demo) this._openPicker();
     else if (act === 'undo') ed.undo();
     else if (act === 'done') this.setEditing(false);
+    else if ((act === 'save' || act === 'export') && this.demo) this._toast('Demo-Haus: Änderungen werden nicht gespeichert');
     else if (act === 'save') {
       try {
         const texts = await this.store.save(ed.changes, { furniture: this._dataText.furniture, devices: this._dataText.devices });
@@ -342,10 +382,13 @@ class Ha3dDashboard extends HTMLElement {
       const act = b.dataset.act;
       b.classList.toggle('active', act === info.tool);
       if (act === 'undo') b.disabled = !info.canUndo;
-      if (act === 'save') b.classList.toggle('dirty', info.dirty);
-      if (act === 'export') b.hidden = this.store.mode === 'files';
+      if (act === 'save') {
+        b.hidden = this.demo;
+        b.classList.toggle('dirty', info.dirty);
+      }
+      if (act === 'export') b.hidden = this.demo || this.store.mode === 'files';
       if (act === 'link') {
-        b.hidden = info.selection?.type !== 'lamp';
+        b.hidden = this.demo || info.selection?.type !== 'lamp';
         b.classList.toggle('active', !!this.picker?.isOpen);
       }
     }
@@ -400,7 +443,7 @@ class Ha3dDashboard extends HTMLElement {
     this.view.setSky(a && Number.isFinite(a.elevation) ? { azimuth: a.azimuth, elevation: a.elevation } : null);
     this.toggleAttribute('day', this.view.daylight > 0.5);
 
-    for (const [id, s] of this.view.lamps) {
+    for (const [id, s] of this.demo ? [] : this.view.lamps) {
       const ents = entitiesOf(s.lamp);
       if (!ents.length) continue;
       // nur neu rechnen, wenn sich eines der State-Objekte geändert hat (HA ersetzt sie bei Änderungen)
@@ -412,6 +455,11 @@ class Ha3dDashboard extends HTMLElement {
       this.view.setLamp(id, l.on, { color: l.color ?? s.baseColor, brightness: l.on ? l.brightness : undefined });
     }
     if (this.shadowRoot.querySelector('.links.show')) this._renderLinks();
+  }
+
+  /** Ohne HA-Verbindung oder im Demo-Modus schalten Antippen-Gesten nur lokal (Demo-Entities gibt es in HA nicht). */
+  get _local() {
+    return !this._hass || this.demo;
   }
 
   /** Leuchten eines Raums mit HA-Entities */
@@ -430,12 +478,12 @@ class Ha3dDashboard extends HTMLElement {
     const linked = this._linkedLamps(ids);
     const on = !this.view.isRoomLit(roomId);
     this.dispatchEvent(new CustomEvent('room-tap', { detail: { roomId, on } }));
-    if (this._hass && linked.length) {
+    if (!this._local && linked.length) {
       this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'}`);
       await this._call(on ? 'turn_on' : 'turn_off', linked.flatMap((s) => entitiesOf(s.lamp)));
-    } else if (!this._hass) {
+    } else if (this._local) {
       this.view.setRoomLight(roomId, on);
-      this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'} (Vorschau)`);
+      this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'} (${this.demo ? 'Demo' : 'Vorschau'})`);
     } else {
       this._toast(`${room?.name ?? roomId}: keine Leuchte mit HA verknüpft`);
     }
@@ -447,12 +495,12 @@ class Ha3dDashboard extends HTMLElement {
     const ents = entitiesOf(s.lamp);
     const on = !s.on;
     this.dispatchEvent(new CustomEvent('lamp-tap', { detail: { lampId, on } }));
-    if (this._hass && ents.length) {
+    if (!this._local && ents.length) {
       this._toast(`${s.lamp.name ?? lampId}: ${on ? 'an' : 'aus'}`);
       await this._call(on ? 'turn_on' : 'turn_off', ents);
-    } else if (!this._hass) {
+    } else if (this._local) {
       this.view.setLamp(lampId, on);
-      this._toast(`${s.lamp.name ?? lampId}: ${on ? 'an' : 'aus'} (Vorschau)`);
+      this._toast(`${s.lamp.name ?? lampId}: ${on ? 'an' : 'aus'} (${this.demo ? 'Demo' : 'Vorschau'})`);
     } else {
       this._toast(`${s.lamp.name ?? lampId}: nicht mit HA verknüpft`);
     }

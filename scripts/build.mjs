@@ -1,5 +1,6 @@
 // Bündelt den Panel-Code (inkl. three.js) in eine einzige Datei: dist/ha-3d-dashboard.js
-// Die Daten (data/) sind bewusst NICHT im Bundle – das Panel lädt sie zur Laufzeit.
+// Die Daten (data/) sind bewusst NICHT im Bundle – das Panel lädt sie zur Laufzeit. Einzige Ausnahme ist das
+// erfundene Demo-Haus (examples/demo, src/demo.js) für den Demo-Modus.
 import * as esbuild from 'esbuild';
 
 const watch = process.argv.includes('--watch');
@@ -11,6 +12,7 @@ const options = {
   target: 'es2022',
   minify: !watch,
   sourcemap: watch ? 'inline' : false,
+  loader: { '.yaml': 'text' }, // Demo-Haus (src/demo.js) wird eingebettet
   outfile: 'dist/ha-3d-dashboard.js',
   legalComments: 'none',
   logLevel: 'info',
