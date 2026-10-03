@@ -112,6 +112,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   verknüpfte über HA (`_liveEntities`), Sonne weiter aus `sun.sun`, kein Export. Speichern nur in eigene
   Benutzerdaten `ha_3d_dashboard_layout_demo` (`DEMO_USER_DATA_KEY`), nie in Dateien oder `ha_3d_dashboard_layout` –
   eigene Daten werden nie überschrieben, kaputte eigene Daten nie durch die Demo ersetzt.
+- Editor ohne Speichern-Knopf: **Fertig** (und der Stift) speichert und schließt; scheitert das Speichern, bleibt der
+  Editor offen. **Abbrechen** verwirft alle ungespeicherten Änderungen (Daten neu laden) und schließt.
+  `setEditing(false)` = Abbrechen.
 - Werkzeugleiste des Editors: volle Breite, bricht auf schmalen Bildschirmen in eine zweite Zeile um (das Panel fängt
   Wischgesten ab, seitliches Scrollen ginge auf dem iPhone nicht); Lampenauswahl/Meldungen richten sich nach ihrer Höhe
   (`--ha3d-editbar-h`).

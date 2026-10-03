@@ -118,6 +118,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
   cursor: pointer; backdrop-filter: blur(6px); display: none; }
 .demo-note[hidden] { display: none; }
 :host([demo]) .demo-note:not([hidden]) { display: block; }
+:host([demo][editing]) .demo-note { display: none; } /* im Editor nicht über Lampenauswahl und Leiste */
 .demo-note small { display: block; opacity: 0.65; font-size: 11px; }
 .error { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 24px;
   text-align: center; color: #e8b4a8; font-size: 15px; white-space: pre-line; }
@@ -165,8 +166,8 @@ class Ha3dDashboard extends HTMLElement {
           <button data-act="align">${icon('align')}Anlegen</button>
           <button data-act="link" hidden>${icon('plug')}Verknüpfen</button>
           <button data-act="undo">${icon('undo')}Rückgängig</button>
-          <button data-act="save">${icon('save')}Speichern</button>
           <button data-act="export">${icon('export')}Export</button>
+          <button data-act="cancel">${icon('close')}Abbrechen</button>
           <button data-act="done">${icon('done')}Fertig</button>
         </div>
       </div>
@@ -178,7 +179,8 @@ class Ha3dDashboard extends HTMLElement {
     });
     this.shadowRoot.querySelector('.demo-note').addEventListener('click', (e) => (e.currentTarget.hidden = true));
     this.shadowRoot.querySelector('.compass').addEventListener('click', () => this.view?.faceNorth());
-    this.shadowRoot.querySelector('.edit-toggle').addEventListener('click', () => this.setEditing(!this.hasAttribute('editing')));
+    // Stift: Bearbeiten beginnen bzw. wie „Fertig“ beenden (speichert)
+    this.shadowRoot.querySelector('.edit-toggle').addEventListener('click', () => (this.hasAttribute('editing') ? this.finishEditing() : this.setEditing(true)));
     this.shadowRoot.querySelector('.links-toggle').addEventListener('click', () => this._toggleLinks());
     this.shadowRoot.querySelector('.links-close').addEventListener('click', () => this._toggleLinks(false));
     this.shadowRoot.querySelector('.tools').addEventListener('click', (e) => {
@@ -336,25 +338,59 @@ class Ha3dDashboard extends HTMLElement {
 
   // ------------------------------------------------------------------ Editiermodus
 
+  /** Editiermodus an; aus = Abbrechen (Änderungen verwerfen). */
   setEditing(on) {
     if (!this.editor) return;
-    if (!on && this.editor.changes.size && !this._confirmLeave) {
-      this._confirmLeave = true;
-      this._toast('Ungespeicherte Änderungen – nochmal tippen zum Verwerfen, oder Speichern');
-      setTimeout(() => (this._confirmLeave = false), 3000);
-      return;
+    if (!on) return this.cancelEditing();
+    this.toggleAttribute('editing', true);
+    this.editor.setEnabled(true);
+  }
+
+  /** „Fertig“: Änderungen speichern und den Editiermodus verlassen. Scheitert das Speichern, bleibt er offen. */
+  async finishEditing() {
+    const ed = this.editor;
+    if (!ed) return;
+    // Demo-Haus ohne HA (reine Vorschau): nirgends zu speichern, Änderungen bleiben nur in der Ansicht
+    if (ed.changes.size && !(this.demo && !this._hass) && !(await this._save())) return;
+    ed.changes.clear();
+    this._leaveEditing();
+  }
+
+  /** „Abbrechen“: alle Änderungen seit dem letzten Speichern verwerfen und den Editiermodus verlassen. */
+  cancelEditing() {
+    const ed = this.editor;
+    if (!ed) return;
+    const discard = ed.changes.size > 0;
+    this._leaveEditing();
+    if (!discard) return;
+    ed.changes.clear();
+    this._dataText = null; // Daten neu laden = Stand vor den Änderungen
+    this.reloadData();
+    this._toast('Änderungen verworfen');
+  }
+
+  _leaveEditing() {
+    this.picker?.close();
+    this.toggleAttribute('editing', false);
+    this.editor.setEnabled(false);
+  }
+
+  /** Änderungen speichern (Dev-Server: Dateien; HA: Benutzerdaten; Demo-Haus: eigene Demo-Benutzerdaten). */
+  async _save() {
+    const ed = this.editor;
+    try {
+      const texts = await this.store.save(ed.changes, { furniture: this._dataText.furniture, devices: this._dataText.devices });
+      this._dataText = { ...this._dataText, ...texts };
+      ed.changes.clear();
+      ed._emit();
+      this._toast(this.demo ? 'Gespeichert – Demo-Haus, für diesen HA-Benutzer'
+        : this.store.mode === 'files' ? 'Gespeichert (furniture.yaml / devices.yaml)' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Dateien');
+      return true;
+    } catch (e) {
+      console.error('ha-3d-dashboard:', e);
+      this._toast(`Speichern fehlgeschlagen: ${e.message}`);
+      return false;
     }
-    this._confirmLeave = false;
-    this.toggleAttribute('editing', on);
-    if (!on && this.editor.changes.size) {
-      // Änderungen verwerfen: Daten neu laden
-      this.editor.changes.clear();
-      this._dataText = null;
-      this.editor.setEnabled(false);
-      this.reloadData();
-      return;
-    }
-    this.editor.setEnabled(on);
   }
 
   async _editAction(act) {
@@ -363,20 +399,9 @@ class Ha3dDashboard extends HTMLElement {
     if (act === 'move' || act === 'align') ed.setTool(act);
     else if (act === 'link') this._openPicker();
     else if (act === 'undo') ed.undo();
-    else if (act === 'done') this.setEditing(false);
-    else if (act === 'save') {
-      try {
-        const texts = await this.store.save(ed.changes, { furniture: this._dataText.furniture, devices: this._dataText.devices });
-        this._dataText = { ...this._dataText, ...texts };
-        ed.changes.clear();
-        ed._emit();
-        this._toast(this.demo ? 'Gespeichert – Demo-Haus, für diesen HA-Benutzer'
-          : this.store.mode === 'files' ? 'Gespeichert (furniture.yaml / devices.yaml)' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Dateien');
-      } catch (e) {
-        console.error('ha-3d-dashboard:', e);
-        this._toast(`Speichern fehlgeschlagen: ${e.message}`);
-      }
-    } else if (act === 'export') {
+    else if (act === 'done') await this.finishEditing();
+    else if (act === 'cancel') this.cancelEditing();
+    else if (act === 'export') {
       if (this.demo) return this._toast('Demo-Haus: kein Export');
       // fertige Dateien mit allen aktuellen Lagen
       const d = this.view.furnishingData;
@@ -416,9 +441,8 @@ class Ha3dDashboard extends HTMLElement {
       const act = b.dataset.act;
       b.classList.toggle('active', act === info.tool);
       if (act === 'undo') b.disabled = !info.canUndo;
-      if (act === 'save') b.classList.toggle('dirty', info.dirty);
+      if (act === 'done') b.classList.toggle('dirty', info.dirty);
       if (act === 'export') b.hidden = this.demo || this.store.mode === 'files';
-      if (act === 'save') b.hidden = this.demo && !this._hass; // Demo ohne HA (Vorschau): nirgends zu speichern
       if (act === 'link') {
         b.hidden = info.selection?.type !== 'lamp';
         b.classList.toggle('active', !!this.picker?.isOpen);

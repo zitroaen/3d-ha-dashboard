@@ -1,6 +1,6 @@
 // Bedien-Tests gegen das simulierte HA – mit den festen IDs des Demo-Hauses (examples/demo):
 // Antippen (Raum/Leuchte) über HA, Lichtfarbe aus HA, Link-Check, Einrichtung neu bauen, Daten-Reload,
-// Kompass, Editiermodus (Auswahl, Drehung, Anlegen, Rückgängig, Speichern, Verknüpfen).
+// Kompass, Editiermodus (Auswahl, Drehung, Anlegen, Rückgängig, Fertig = Speichern, Abbrechen, Verknüpfen).
 //   node tests/interaction.mjs
 import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -197,15 +197,41 @@ try {
   const un = await page.evaluate(() => window.panel.editor._entry({ type: 'item', id: 'sideboard' }).pos);
   ok(Math.abs(un[0] - 4.4) < 0.01, 'Editor: Rückgängig stellt die vorige Lage wieder her', `Rückgängig: ${JSON.stringify(un)}`);
 
-  // Speichern: Endpunkt abfangen (der Test ändert keine Dateien), nur Werte ersetzt, Kommentare bleiben
+  // Fertig speichert: Endpunkt abfangen (der Test ändert keine Dateien), nur Werte ersetzt, Kommentare bleiben
   let saved = null;
   await page.route('**/__save/**', async (route) => { saved = { url: route.request().url(), body: route.request().postData() }; await route.fulfill({ status: 204 }); });
-  await clickShadow('.tools button[data-act=save]');
+  await clickShadow('.tools button[data-act=done]');
   await until(() => saved);
   await page.unroute('**/__save/**');
   const line = saved?.body.split(/\r?\n/).find((l) => l.includes('id: sideboard'));
-  ok(saved?.url.endsWith('furniture.yaml') && saved.body.includes('# --- Wohnzimmer: Sitzecke') && line?.includes('pos: [4.4, 3.8]'),
-    `Editor: Speichern ersetzt nur die Werte (${line?.trim()})`, `Speichern: ${saved?.url} ${line}`);
+  const offAfterSave = await page.evaluate(() => !window.panel.hasAttribute('editing'));
+  ok(saved?.url.endsWith('furniture.yaml') && saved.body.includes('# --- Wohnzimmer: Sitzecke') && line?.includes('pos: [4.4, 3.8]') && offAfterSave,
+    `Editor: Fertig speichert (nur Werte ersetzt: ${line?.trim()}) und beendet den Editiermodus`, `Fertig: ${saved?.url} ${line} aus=${offAfterSave}`);
+
+  // Abbrechen verwirft: verschieben, Abbrechen -> nichts gespeichert, alte Lage wieder da
+  await clickShadow('.edit-toggle');
+  let savedOnCancel = false;
+  await page.route('**/__save/**', async (route) => { savedOnCancel = true; await route.fulfill({ status: 204 }); });
+  await page.evaluate(() => {
+    const ed = window.panel.editor;
+    ed.select({ type: 'item', id: 'sideboard' });
+    ed._pushUndo();
+    ed.sel.proxy.position.set(2.0, 0, 2.0);
+    ed._readProxy();
+  });
+  await clickShadow('.tools button[data-act=cancel]');
+  await settle(page, () => window.panel.view.furnishingData.items.find((i) => i.id === 'sideboard').pos[0] > 2.5);
+  const cancel = await page.evaluate(() => ({
+    editing: window.panel.hasAttribute('editing'),
+    pos: window.panel.view.furnishingData.items.find((i) => i.id === 'sideboard').pos,
+  }));
+  await page.unroute('**/__save/**');
+  // Erwartet: Stand der Datei (das Speichern oben wurde abgefangen, die Datei ist unverändert)
+  const filePos = (await readFile(join(DATA_DIR, 'furniture.yaml'), 'utf8')).split(/\r?\n/).find((l) => l.includes('id: sideboard'))
+    .match(/pos: \[([\d.]+), ([\d.]+)\]/).slice(1).map(Number);
+  ok(!cancel.editing && !savedOnCancel && Math.abs(cancel.pos[0] - filePos[0]) < 0.01 && Math.abs(cancel.pos[1] - filePos[1]) < 0.01,
+    'Editor: Abbrechen verwirft die Änderungen und speichert nichts', `Abbrechen: ${JSON.stringify(cancel)} gespeichert=${savedOnCancel}`);
+  await clickShadow('.edit-toggle');
 
   // Verknüpfen: Leuchtkugel wählen, Entity-Auswahl (vorgefiltert auf HA-Bereich Wohnzimmer), suchen, antippen
   await page.evaluate(() => window.panel.editor.select({ type: 'lamp', id: 'eg_wohnen_kugel' }));
@@ -230,15 +256,13 @@ try {
     on: window.panel.view.lamps.get('eg_wohnen_kugel').on,
   }));
   ok(ln.entity === 'light.demo_fernsehkugel' && ln.on, 'Entity antippen verknüpft die Leuchte, sie folgt sofort dem HA-Zustand', `Verknüpfen: ${JSON.stringify(ln)}`);
+  // Fertig -> Verknüpfung gespeichert, Editiermodus aus
   let savedDev = null;
   await page.route('**/__save/**', async (route) => { if (route.request().url().endsWith('devices.yaml')) savedDev = route.request().postData(); await route.fulfill({ status: 204 }); });
-  await clickShadow('.tools button[data-act=save]');
+  await clickShadow('.tools button[data-act=done]');
   await until(() => savedDev);
   await page.unroute('**/__save/**');
-  ok(savedDev?.includes('entity: light.demo_fernsehkugel') && savedDev.includes('# Geräte im Haus'), 'Verknüpfung wird in devices.yaml gespeichert (Kommentare bleiben)');
-
-  // Fertig -> Editiermodus aus
-  await clickShadow('.tools button[data-act=done]');
+  ok(savedDev?.includes('entity: light.demo_fernsehkugel') && savedDev.includes('# Geräte im Haus'), 'Fertig speichert die Verknüpfung in devices.yaml (Kommentare bleiben)');
   const off = await page.evaluate(() => !window.panel.hasAttribute('editing') && !window.panel.editor.sel);
   ok(off, 'Fertig beendet den Editiermodus');
   await page.close();

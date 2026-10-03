@@ -81,7 +81,7 @@ async function checkDemo(label, query, allowConsole, noteRe) {
   ok(real.unlinked && real.call === 'light.turn_off:light.demo_wandleuchte',
     `${label}: Demo-Leuchten unverknüpft, echte Verknüpfung schaltet über HA`, `${label}: echte Entity ${JSON.stringify(real)}`);
 
-  // Editor: Speichern (nur in eigene Demo-Benutzerdaten), kein Export; Leuchte verknüpfen und speichern
+  // Editor: Fertig speichert (nur in eigene Demo-Benutzerdaten), kein Export; Leuchte verknüpfen, Fertig
   await page.evaluate(() => window.panel.setEditing(true));
   await page.evaluate(() => {
     const ed = window.panel.editor;
@@ -90,17 +90,17 @@ async function checkDemo(label, query, allowConsole, noteRe) {
   });
   const bar = await page.evaluate(() => {
     const hidden = (a) => window.panel.shadowRoot.querySelector(`.tools button[data-act="${a}"]`).hidden;
-    return { save: hidden('save'), exp: hidden('export'), move: hidden('move') };
+    return { cancel: hidden('cancel'), done: hidden('done'), exp: hidden('export'), save: !!window.panel.shadowRoot.querySelector('.tools button[data-act="save"]') };
   });
-  ok(!bar.save && bar.exp && !bar.move, `${label}: Editor mit Speichern, ohne Export`, `${label}: Werkzeugleiste ${JSON.stringify(bar)}`);
-  await page.evaluate(() => window.panel._editAction('save'));
+  ok(!bar.cancel && !bar.done && bar.exp && !bar.save, `${label}: Editor mit Abbrechen/Fertig, ohne Speichern-Knopf und Export`, `${label}: Werkzeugleiste ${JSON.stringify(bar)}`);
   await page.evaluate(() => window.panel._editAction('export'));
+  await page.evaluate(() => window.panel._editAction('done'));
   const saved = await page.evaluate(() => {
     const keys = window.mockHass.calls.filter((c) => c.ws?.type === 'frontend/set_user_data').map((c) => c.ws.key);
     return { keys, entity: window.mockHass._userData?.ha_3d_dashboard_layout_demo?.devices?.eg_wohnen_wandleuchte?.entity };
   });
   ok(saved.keys.length === 1 && saved.keys[0] === 'ha_3d_dashboard_layout_demo' && saved.entity === 'light.demo_wandleuchte' && !writes.length,
-    `${label}: Speichern nur in Demo-Benutzerdaten (keine Dateien, eigene Daten unberührt)`, `${label}: Speichern ${JSON.stringify(saved)} ${writes}`);
+    `${label}: Fertig speichert nur in Demo-Benutzerdaten (keine Dateien, eigene Daten unberührt)`, `${label}: Speichern ${JSON.stringify(saved)} ${writes}`);
   // nach dem Neuladen ist die Verknüpfung wieder da
   const after = await page.evaluate(async () => {
     window.panel._dataText = null;
@@ -108,6 +108,20 @@ async function checkDemo(label, query, allowConsole, noteRe) {
     return window.panel.view.lamps.get('eg_wohnen_wandleuchte').lamp.entity;
   });
   ok(after === 'light.demo_wandleuchte', `${label}: gespeicherte Demo-Verknüpfung bleibt nach dem Neuladen`, `${label}: nach Neuladen ${after}`);
+  // Speichern scheitert -> Editiermodus bleibt offen, Änderungen bleiben erhalten
+  const failed = await page.evaluate(async () => {
+    const mh = window.mockHass, orig = mh.callWS;
+    mh.callWS = async (msg) => { if (msg.type === 'frontend/set_user_data') throw new Error('offline'); return orig(msg); };
+    window.panel.setEditing(true);
+    window.panel.editor.select({ type: 'lamp', id: 'eg_wohnen_wandleuchte' });
+    window.panel.editor.setEntity(null);
+    await window.panel._editAction('done');
+    const r = { editing: window.panel.hasAttribute('editing'), changes: window.panel.editor.changes.size };
+    mh.callWS = orig;
+    window.panel.cancelEditing();
+    return r;
+  });
+  ok(failed.editing && failed.changes > 0, `${label}: Speichern scheitert -> Editor bleibt offen, nichts geht verloren`, `${label}: Fehlschlag ${JSON.stringify(failed)}`);
   await page.evaluate(async () => { window.mockHass._userData = {}; window.panel._dataText = null; await window.panel.reloadData(); });
   await page.evaluate(() => window.panel.setEditing(false));
 
@@ -123,7 +137,7 @@ async function checkDemo(label, query, allowConsole, noteRe) {
 }
 
 try {
-  const p1 = await checkDemo('demo-config', '?demo=1', null, /^Demo-Haus/);
+  const p1 = await checkDemo('demo-config', '?demo=1', /Error: offline/, /^Demo-Haus/);
   // data_url wird als Ordner aufgelöst (auch ohne abschließenden Schrägstrich) und relativ zur Seite
   const urls = await p1.evaluate(() => {
     const u = (c) => { window.panel._panel = { config: c }; return new URL(window.panel.dataUrl).pathname; };
@@ -133,7 +147,7 @@ try {
     `data_url wird als Ordner aufgelöst (${urls.join(' · ')})`, `data_url: ${urls}`);
   await p1.close();
 
-  const p2 = await checkDemo('fallback', '?nodata=1', /404|Failed to load resource/, /keine Daten unter \/fehlt/);
+  const p2 = await checkDemo('fallback', '?nodata=1', /404|Failed to load resource|Error: offline/, /keine Daten unter \/fehlt/);
   await p2.close();
 
   // ohne Hass (reine Vorschau) funktioniert der Demo-Modus ebenfalls
