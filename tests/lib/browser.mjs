@@ -1,7 +1,8 @@
 // Headless-Browser für die Tests (playwright-core, WebGL per SwiftShader).
 // Windows: vorhandener Microsoft Edge (kein Download). Linux/macOS (z. B. Cloud-Agent, CI): Chromium, einmalig
 // installiert mit `npx playwright-core install chromium` (unter Linux ggf. `--with-deps`).
-// Mit PW_CHANNEL lässt sich ein Kanal erzwingen (msedge, chrome, chromium).
+// Mit PW_CHANNEL lässt sich ein Kanal erzwingen (msedge, chrome, chromium), mit PW_EXECUTABLE ein vorhandenes
+// Chromium (z. B. /opt/pw-browsers/chromium-1194/chrome-linux/chrome) ohne Download.
 import { chromium } from 'playwright-core';
 
 export async function launchBrowser() {
@@ -10,7 +11,8 @@ export async function launchBrowser() {
     headless: true,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   };
-  if (channel && channel !== 'chromium') opts.channel = channel;
+  if (process.env.PW_EXECUTABLE) opts.executablePath = process.env.PW_EXECUTABLE;
+  else if (channel && channel !== 'chromium') opts.channel = channel;
   try {
     return await chromium.launch(opts);
   } catch (e) {
