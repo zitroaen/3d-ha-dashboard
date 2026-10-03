@@ -3,7 +3,8 @@
 // Die Daten (house.json, furniture.yaml, devices.yaml) werden zur Laufzeit geladen – standardmäßig aus
 // demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url.
 import { HouseScene } from './scene.js';
-import { loadData } from './data.js';
+import { loadData, DataUnavailableError } from './data.js';
+import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
 import { LayoutStore, applyOverrides, patchYamlText, layoutValues, download } from './store.js';
 import { entitiesOf, lampLight, callForEntities } from './ha.js';
@@ -103,6 +104,13 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 14px; border-radius: 16px;
   background: #1a1c20d9; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
 .toast.show { opacity: 1; }
+/* Demo-Hinweis: dezent oben links, antippen blendet ihn aus (Touch-Ziel >= 48 px) */
+.demo-note { position: absolute; top: 56px; left: 12px; max-width: calc(100% - 100px); min-height: 48px; padding: 6px 14px; border-radius: 24px;
+  border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; font: inherit; font-size: 13px; line-height: 1.3; text-align: left;
+  cursor: pointer; backdrop-filter: blur(6px); display: none; }
+.demo-note[hidden] { display: none; }
+:host([demo]) .demo-note:not([hidden]) { display: block; }
+.demo-note small { display: block; opacity: 0.65; font-size: 11px; }
 .error { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 24px;
   text-align: center; color: #e8b4a8; font-size: 15px; white-space: pre-line; }
 .error.show { display: flex; }
@@ -154,11 +162,13 @@ class Ha3dDashboard extends HTMLElement {
           <button data-act="done">${icon('done')}Fertig</button>
         </div>
       </div>
+      <button class="demo-note" hidden aria-label="Hinweis ausblenden"></button>
       <div class="toast"></div>
       <div class="error"></div>`;
     this.shadowRoot.querySelector('button.menu').addEventListener('click', () => {
       this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
     });
+    this.shadowRoot.querySelector('.demo-note').addEventListener('click', (e) => (e.currentTarget.hidden = true));
     this.shadowRoot.querySelector('.compass').addEventListener('click', () => this.view?.faceNorth());
     this.shadowRoot.querySelector('.edit-toggle').addEventListener('click', () => this.setEditing(!this.hasAttribute('editing')));
     this.shadowRoot.querySelector('.links-toggle').addEventListener('click', () => this._toggleLinks());
@@ -189,7 +199,40 @@ class Ha3dDashboard extends HTMLElement {
 
   get dataUrl() {
     const configured = this._panel?.config?.data_url;
-    return configured ? new URL(configured, location.href) : MODULE_BASE;
+    // Ordner: ohne abschließenden Schrägstrich würde der letzte Teil beim Auflösen von house.json ersetzt
+    return configured ? new URL(configured.endsWith('/') ? configured : `${configured}/`, location.href) : MODULE_BASE;
+  }
+
+  /** Demo-Modus aktiv (config.demo oder Fallback ohne erreichbare Daten): lokal schalten, nichts speichern */
+  get demo() {
+    return this.hasAttribute('demo');
+  }
+
+  _setDemo(on, note = '') {
+    this.toggleAttribute('demo', on);
+    const el = this.shadowRoot.querySelector('.demo-note');
+    el.innerHTML = on ? `Demo-Haus – eigene Daten: siehe Anleitung${note ? `<small>${note}</small>` : ''}` : '';
+    el.hidden = !on;
+  }
+
+  /** Daten laden: eingebettetes Demo-Haus (config.demo) oder aus data_url bzw. neben dem Modul, sonst Demo-Fallback */
+  async _fetchData() {
+    if (this._panel?.config?.demo === true) {
+      this._setDemo(true);
+      return loadDemoData();
+    }
+    try {
+      const data = await loadData(this.dataUrl);
+      this._setDemo(false);
+      return data;
+    } catch (e) {
+      // nur bei unerreichbaren Daten (404, Netzwerk) und nur, solange noch nichts angezeigt wird;
+      // kaputte eigene Daten bleiben ein Fehler und werden nie durch das Demo-Haus ersetzt
+      if (!(e instanceof DataUnavailableError) || (this.view && !this.demo)) throw e;
+      console.warn('ha-3d-dashboard: Daten nicht erreichbar, zeige Demo-Haus –', e.message);
+      this._setDemo(true, this._panel?.config?.data_url ? `keine Daten unter ${this._panel.config.data_url}` : 'keine Daten neben dem Modul');
+      return loadDemoData();
+    }
   }
 
   /**
@@ -200,9 +243,9 @@ class Ha3dDashboard extends HTMLElement {
     if (this._loading) return this._loading;
     this._loading = (async () => {
       try {
-        const data = await loadData(this.dataUrl);
-        // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen
-        applyOverrides(data, await this.store.loadOverrides());
+        const data = await this._fetchData();
+        // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen (nie auf das Demo-Haus)
+        if (!this.demo) applyOverrides(data, await this.store.loadOverrides());
         const old = this._dataText;
         this._dataText = data.text;
         this._showError(null);
@@ -293,6 +336,7 @@ class Ha3dDashboard extends HTMLElement {
     else if (act === 'undo') ed.undo();
     else if (act === 'done') this.setEditing(false);
     else if (act === 'save') {
+      if (this.demo) return this._toast('Demo-Haus: Änderungen werden nicht gespeichert');
       try {
         const texts = await this.store.save(ed.changes, { furniture: this._dataText.furniture, devices: this._dataText.devices });
         this._dataText = { ...this._dataText, ...texts };
@@ -304,6 +348,7 @@ class Ha3dDashboard extends HTMLElement {
         this._toast(`Speichern fehlgeschlagen: ${e.message}`);
       }
     } else if (act === 'export') {
+      if (this.demo) return this._toast('Demo-Haus: kein Export');
       // fertige Dateien mit allen aktuellen Lagen
       const d = this.view.furnishingData;
       let furniture = this._dataText.furniture, devices = this._dataText.devices;
@@ -343,7 +388,8 @@ class Ha3dDashboard extends HTMLElement {
       b.classList.toggle('active', act === info.tool);
       if (act === 'undo') b.disabled = !info.canUndo;
       if (act === 'save') b.classList.toggle('dirty', info.dirty);
-      if (act === 'export') b.hidden = this.store.mode === 'files';
+      if (act === 'export') b.hidden = this.demo || this.store.mode === 'files';
+      if (act === 'save') b.hidden = this.demo;
       if (act === 'link') {
         b.hidden = info.selection?.type !== 'lamp';
         b.classList.toggle('active', !!this.picker?.isOpen);
@@ -352,7 +398,7 @@ class Ha3dDashboard extends HTMLElement {
     const s = info.selection;
     const FACE = { back: 'Rückseite', front: 'Vorderseite', left: 'linke Seite', right: 'rechte Seite', bottom: 'Unterseite' };
     let text;
-    if (!s) text = 'Möbel oder Leuchte antippen';
+    if (!s) text = this.demo ? 'Möbel oder Leuchte antippen (Demo: wird nicht gespeichert)' : 'Möbel oder Leuchte antippen';
     else {
       const y = s.height ?? s.elevation;
       text = `<b>${s.name}</b> · x ${s.pos[0].toFixed(2)} · y ${s.pos[1].toFixed(2)}${y != null ? ` · Höhe ${y.toFixed(2)}` : ''} · ${(s.rot || 0).toFixed(0)}°`;
@@ -400,7 +446,8 @@ class Ha3dDashboard extends HTMLElement {
     this.view.setSky(a && Number.isFinite(a.elevation) ? { azimuth: a.azimuth, elevation: a.elevation } : null);
     this.toggleAttribute('day', this.view.daylight > 0.5);
 
-    for (const [id, s] of this.view.lamps) {
+    // Demo-Entities gibt es in HA nicht: im Demo-Modus werden Leuchten lokal geschaltet, nur die Sonne kommt aus HA
+    for (const [id, s] of this.demo ? [] : this.view.lamps) {
       const ents = entitiesOf(s.lamp);
       if (!ents.length) continue;
       // nur neu rechnen, wenn sich eines der State-Objekte geändert hat (HA ersetzt sie bei Änderungen)
@@ -430,12 +477,12 @@ class Ha3dDashboard extends HTMLElement {
     const linked = this._linkedLamps(ids);
     const on = !this.view.isRoomLit(roomId);
     this.dispatchEvent(new CustomEvent('room-tap', { detail: { roomId, on } }));
-    if (this._hass && linked.length) {
+    if (this._hass && !this.demo && linked.length) {
       this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'}`);
       await this._call(on ? 'turn_on' : 'turn_off', linked.flatMap((s) => entitiesOf(s.lamp)));
-    } else if (!this._hass) {
+    } else if (!this._hass || this.demo) {
       this.view.setRoomLight(roomId, on);
-      this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'} (Vorschau)`);
+      this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'} (${this.demo ? 'Demo' : 'Vorschau'})`);
     } else {
       this._toast(`${room?.name ?? roomId}: keine Leuchte mit HA verknüpft`);
     }
@@ -447,12 +494,12 @@ class Ha3dDashboard extends HTMLElement {
     const ents = entitiesOf(s.lamp);
     const on = !s.on;
     this.dispatchEvent(new CustomEvent('lamp-tap', { detail: { lampId, on } }));
-    if (this._hass && ents.length) {
+    if (this._hass && !this.demo && ents.length) {
       this._toast(`${s.lamp.name ?? lampId}: ${on ? 'an' : 'aus'}`);
       await this._call(on ? 'turn_on' : 'turn_off', ents);
-    } else if (!this._hass) {
+    } else if (!this._hass || this.demo) {
       this.view.setLamp(lampId, on);
-      this._toast(`${s.lamp.name ?? lampId}: ${on ? 'an' : 'aus'} (Vorschau)`);
+      this._toast(`${s.lamp.name ?? lampId}: ${on ? 'an' : 'aus'} (${this.demo ? 'Demo' : 'Vorschau'})`);
     } else {
       this._toast(`${s.lamp.name ?? lampId}: nicht mit HA verknüpft`);
     }
