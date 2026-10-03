@@ -1,0 +1,58 @@
+# Release für HACS (Kategorie "Dashboard"): baut dist/ha-3d-dashboard.js und hängt es an ein GitHub-Release.
+#   - Tag v* gepusht      -> Release zu diesem Tag
+#   - Actions → Release → Run workflow (Version, z. B. 0.2.0) -> legt den Tag v<Version> selbst an
+# Die Version muss zu package.json passen, sonst bricht der Lauf ab.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version ohne v (z. B. 0.2.0) – muss package.json entsprechen'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version bestimmen und gegen package.json prüfen
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::Version $VERSION passt nicht zu package.json ($PKG)"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm test
+      - run: npm run build
+      - name: Release-Notizen aus CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '$0 ~ "^## \\[?"v"\\]?" {f=1; next} /^## / {f=0} f' CHANGELOG.md > release-notes.md
+          [ -s release-notes.md ] || echo "Version $VERSION" > release-notes.md
+      - name: GitHub-Release anlegen (Tag wird bei Bedarf angelegt)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # bei Tag-Push existiert der Tag schon; sonst legt gh ihn am geprüften Commit an
+          gh release create "v$VERSION" dist/ha-3d-dashboard.js \
+            --title "v$VERSION" --notes-file release-notes.md --target "$GITHUB_SHA"
