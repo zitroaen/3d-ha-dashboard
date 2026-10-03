@@ -98,8 +98,11 @@ nicht in `engine/` der Instanz ändern.
    `textures/*` (`npm run deploy:data` bzw. von Hand). Das ist der voreingestellte Datenordner
    (`/local/ha-3d-dashboard/`); ein anderer lässt sich unter Geräte & Dienste → 3D-HA-Dashboard → **Konfigurieren**
    einstellen, ebenso Titel und Symbol in der Seitenleiste.
-4. Updates kommen über HACS (danach HA neu starten); die Integration hängt ihre Version an die Bundle-Adresse, der
-   Browser lädt das neue Bundle also von selbst.
+4. Updates kommen über HACS (danach HA **neu starten**); die Integration hängt ihre Version an die Bundle-Adresse, der
+   Browser lädt das neue Bundle also von selbst – aber erst nach dem Neustart. Welche Version das Panel wirklich
+   ausführt und woher das Modell kommt (Demo-Haus, gespeichertes Modell oder `model.yaml`), steht im Link-Check
+   (Ketten-Symbol) unter der Überschrift. Zeigt die iOS-App danach noch den alten Stand: in der App unter
+   Einstellungen → Companion App → Fehlerbehebung den Frontend-Cache zurücksetzen.
 
 **Gemeinsames Modell (nur mit der Integration):** Das Dashboard ist für alle Benutzer gleich. **Fertig** im Editor
 speichert das ganze Modell in der Integration (`/config/.storage/ha_3d_dashboard.model`, Teil jedes HA-Backups); alle

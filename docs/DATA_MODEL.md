@@ -77,7 +77,7 @@ Wohnhaus, Garage, Gartenhaus, Carport … jeweils mit Etagen.
 |---|---|---|---|
 | `id` | ja | | z. B. `eg`, `og`, `kg` |
 | `name` | ja | | z. B. „Erdgeschoss“ |
-| `level` | ja | | **Ebene** als ganze Zahl: 0 = Erdgeschoss, 1 = 1. OG, −1 = Keller. Das Panel zeigt jeweils eine Ebene; Etagen verschiedener Gebäude mit gleichem `level` erscheinen zusammen (Wohnhaus-EG mit Garage und Gartenhaus) |
+| `level` | ja | | **Ebene** als ganze Zahl: 0 = Erdgeschoss, 1 = 1. OG, −1 = Keller. Das Panel zeigt die gewählte Ebene auf allen darunter (höhere sind ausgeblendet); Etagen verschiedener Gebäude mit gleichem `level` erscheinen zusammen (Wohnhaus-EG mit Garage und Gartenhaus) |
 | `elevation` | nein | 0 | Höhe des Fußbodens |
 | `height` | ja | | Wandhöhe (Schnitthöhe der Darstellung, Raumhöhe für Licht) |
 | `ha_floor` | nein | | `floor_id` der HA-Etage |
