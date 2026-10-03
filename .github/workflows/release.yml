@@ -1,0 +1,62 @@
+name: Release
+
+# Release für HACS (Kategorie Dashboard): baut das Bundle und hängt dist/ha-3d-dashboard.js an ein GitHub-Release.
+#   - Tag v* gepusht:      Release zu diesem Tag
+#   - Actions → Release → Run workflow (Eingabe: Version, z. B. 0.2.0): legt den Tag v<Version> selbst an
+# Die Version muss mit package.json übereinstimmen.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version ohne v (muss package.json entsprechen), z. B. 0.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version bestimmen und prüfen
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="${INPUT_VERSION#v}"
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "::error::Release nur von main aus starten (aktuell: $GITHUB_REF)"; exit 1
+            fi
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::Version $VERSION passt nicht zu package.json ($PKG)"; exit 1
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Ungültige Version: $VERSION"; exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm test
+      - run: npm run build
+      - name: GitHub-Release erstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # bei workflow_dispatch legt gh den Tag v<Version> am aktuellen Commit selbst an
+          gh release create "v$VERSION" dist/ha-3d-dashboard.js \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --generate-notes
