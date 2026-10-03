@@ -1,5 +1,7 @@
 {
   "name": "3D-HA-Dashboard",
-  "filename": "ha-3d-dashboard.js",
+  "zip_release": true,
+  "filename": "ha_3d_dashboard.zip",
+  "homeassistant": "2024.7.0",
   "render_readme": true
 }

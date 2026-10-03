@@ -13,7 +13,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 ## Funktionen
 
 - **three.js, ein JS-Bundle, offline:** keine CDNs, keine externen Requests, keine Tokens – das Panel nutzt die
-  angemeldete HA-Sitzung (`panel_custom`).
+  angemeldete HA-Sitzung.
+- **Ohne YAML:** HACS-Integration, die das Panel selbst in die Seitenleiste einträgt.
 - **Licht:** Raum antippen schaltet alle Lichter des Raums, Leuchte antippen nur diese. Farbe und Helligkeit kommen
   aus HA. Das Licht wirkt nur im eigenen Raum (kein Durchscheinen durch Wände) und ist mobil-tauglich.
 - **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden.
@@ -26,28 +27,26 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 
 ## Über HACS installieren und ausprobieren
 
-Ohne Build und ohne eigene Hausdaten – das Panel bringt das erfundene Demo-Haus mit:
+Ohne Build, ohne YAML und ohne eigene Hausdaten – das Panel bringt das erfundene Demo-Haus mit:
 
 1. In Home Assistant: **HACS → ⋮ → Benutzerdefinierte Repositories** → `https://github.com/zitroaen/3d-ha-dashboard`,
-   Typ **Dashboard** → hinzufügen und **herunterladen**. (Voraussetzung: es gibt ein GitHub-Release des Repos.)
-2. In der `configuration.yaml`:
-```yaml
-panel_custom:
-  - name: ha-3d-dashboard
-    url_path: haus-3d
-    sidebar_title: Haus 3D
-    sidebar_icon: mdi:home-floor-3
-    module_url: /hacsfiles/3d-ha-dashboard/ha-3d-dashboard.js
-    config:
-      demo: true   # zum Ausprobieren; für das eigene Haus stattdessen data_url: /local/ha-3d-dashboard/
-```
-3. Home Assistant neu starten – in der Seitenleiste erscheint **Haus 3D**.
+   Typ **Integration** → hinzufügen, dann **3D-HA-Dashboard** öffnen und **herunterladen**.
+2. Home Assistant neu starten (HACS bietet das unter **Einstellungen → Reparaturen** an).
+3. **Einstellungen → Geräte & Dienste → Integration hinzufügen → 3D-HA-Dashboard → OK** – oder direkt:
+   [![Integration hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ha_3d_dashboard)
 
-HACS registriert Dashboard-Dateien nur als Ressource unter `/hacsfiles/…`; das Seitenleisten-Panel entsteht erst durch
-den `panel_custom`-Eintrag. Raum oder Leuchte antippen schaltet im Demo-Modus **lokal** (die Demo-Entities gibt es in
-deiner HA nicht), Sonne und Mond folgen `sun.sun`. Der Editor funktioniert, speichert im Demo-Modus aber nichts.
-Findet das Panel keine Daten (kein `demo`, kein Datenordner), zeigt es ebenfalls das Demo-Haus mit einem Hinweis.
-Das eigene Haus: [docs/SETUP.md](docs/SETUP.md), Abschnitt „In Home Assistant installieren“.
+In der Seitenleiste erscheint **Haus 3D**. Ohne eigene Daten zeigt es das Demo-Haus: Raum oder Leuchte antippen
+schaltet **lokal** (die Demo-Entities gibt es in deiner HA nicht), Sonne und Mond folgen `sun.sun`, der Editor
+funktioniert, speichert aber nichts.
+
+**Eigenes Haus:** `house.json`, `furniture.yaml`, `devices.yaml` und `textures/` nach `/config/www/ha-3d-dashboard/`
+legen – das Panel findet sie dort automatisch (Seite neu laden). Titel, Symbol und Datenordner lassen sich unter
+**Einstellungen → Geräte & Dienste → 3D-HA-Dashboard → Konfigurieren** ändern. Wie die Daten entstehen:
+[docs/SETUP.md](docs/SETUP.md).
+
+> **Umstieg von 0.2.0:** Bis 0.2.0 war das Repo in HACS ein *Dashboard* mit `panel_custom`-Eintrag. Dort das
+> Repository entfernen, den `panel_custom`-Eintrag aus der `configuration.yaml` löschen und wie oben als
+> *Integration* neu hinzufügen.
 
 ## Mit Claude für das eigene Haus einrichten
 

@@ -21,3 +21,13 @@ jobs:
         with:
           name: screenshots
           path: tests/output/
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: bash tests/ha/install.sh
+      - run: python -m pytest tests/ha -q -p no:cacheprovider

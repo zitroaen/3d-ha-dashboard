@@ -4,7 +4,7 @@
   "license": "MIT",
   "repository": "github:zitroaen/3d-ha-dashboard",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -18,7 +18,9 @@
     "test:interaction": "node tests/interaction.mjs",
     "test:demo": "node tests/demo.mjs",
     "privacy": "node tests/privacy-guard.mjs",
-    "test": "npm run privacy && npm run validate && npm run test:unit && npm run link-check && npm run build && npm run test:screens && npm run test:interaction && npm run test:demo"
+    "test:integration": "node tests/integration-check.mjs",
+    "package": "node scripts/package-integration.mjs",
+    "test": "npm run privacy && npm run test:integration && npm run validate && npm run test:unit && npm run link-check && npm run build && npm run test:screens && npm run test:interaction && npm run test:demo"
   },
   "dependencies": {
     "three": "^0.186.1",

@@ -142,7 +142,8 @@ Zusätzliche Screenshot-Ansichten für `npm test` der Instanz:
 
 ## Panel-Konfiguration (`panel_custom` → `config`)
 
-Alle Felder optional:
+Mit der HACS-Integration stellt man das in der Oberfläche ein (Geräte & Dienste → 3D-HA-Dashboard → Konfigurieren);
+sie setzt `data_url`, voreingestellt `/local/ha-3d-dashboard/`. Bei `panel_custom` von Hand sind alle Felder optional:
 
 | Feld | Bedeutung |
 |---|---|
