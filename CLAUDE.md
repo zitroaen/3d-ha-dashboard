@@ -9,7 +9,8 @@ Ein interaktiver 3D-Grundriss als Home-Assistant-Panel (Custom Element `<ha-3d-d
 Kategorie Integration – die Integration `custom_components/ha_3d_dashboard` trägt das Panel ohne YAML in die Seitenleiste
 ein; alternativ `panel_custom` von Hand):
 three.js, ein JS-Bundle, offline, touch-tauglich. Das Panel lädt die Hausdaten zur Laufzeit aus seinem Ordner
-(`house.json`, `furniture.yaml`, `devices.yaml`, `textures/`) bzw. aus `panel_custom → config → data_url`.
+(`model.yaml`, `textures/`) bzw. aus `panel_custom → config → data_url`. Das Datenmodell ist in `docs/DATA_MODEL.md`
+spezifiziert (maschinenlesbar: `schema/model.schema.json`).
 
 **Engine vs. Instanz:** Dieses Repo ist öffentlich und enthält nur Code, Werkzeuge, Doku und das erfundene Demo-Haus
 (`examples/demo`). Echte Häuser leben in privaten Instanzen, die die Engine als Submodul `engine/` einbinden
@@ -27,8 +28,11 @@ three.js, ein JS-Bundle, offline, touch-tauglich. Das Panel lädt die Hausdaten 
 - **Performance:** Render-on-demand (keine Dauerschleife), schlanke Geometrie, ein Mesh pro Material, Licht im
   Shader statt Schatten-Maps pro Lampe. Muss auf Tablets flüssig laufen.
 - **Touch:** Bedienelemente ≥ 48 px, Gesten (1 Finger drehen, 2 Finger zoomen/verschieben).
-- **Datenformat stabil halten:** Instanzen pflegen ihre Daten von Hand. Änderungen am Format nur abwärtskompatibel
-  (neue Felder optional, Standardwerte im Code) und in `docs/DATA_FORMAT.md` dokumentieren. Raum-IDs, Element-Name
+- **Datenmodell versioniert:** Instanzen (und Agenten) pflegen `model.yaml` von Hand. Optionale neue Felder mit
+  Standardwert im Code gehen ohne neue Version. Alles andere (Umbenennen, Umstrukturieren, Pflichtfelder) nur mit
+  neuer `version` und Migration in `src/model/migrate.js` (`MIGRATIONS[n]` hebt n−1 → n, mit Test) – alte Modelle
+  werden beim Laden automatisch migriert. Jede Änderung in `docs/DATA_MODEL.md` (inkl. „Änderungen“) und
+  `schema/model.schema.json` nachziehen; `npm run validate` prüft Doku-Katalog und Code. Raum-IDs, Element-Name
   (`ha-3d-dashboard`), Bundle-Name (`dist/ha-3d-dashboard.js`) und Speicherschlüssel (`ha_3d_dashboard_layout`)
   nicht ändern.
 - **Sprache:** Oberfläche, Kommentare und Doku auf Deutsch.
@@ -55,7 +59,9 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run package` | `dist/ha_3d_dashboard.zip` (Integration + Bundle, für HACS; nach `npm run build`) |
 | `bash tests/ha/install.sh && python -m pytest tests/ha` | Tests der HA-Integration (Python ≥ 3.13) |
 | `npm run demo` | Demo-Haus aus `examples/demo/build-house.mjs` neu erzeugen |
-| `python scripts/extract_plan.py <pdf> --out <ordner>/house.json [--config plan.json] [--debug]` | Magicplan-Import |
+| `npm run test:unit` | Modell: Migration, YAML, Szenen-Adapter, Zurückschreiben (Teil von `npm test`) |
+| `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude) |
+| `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
 
 Alle Werkzeuge nehmen den Datenordner aus `DATA_DIR` (bzw. `--data` oder `ha3d.config.json` der Instanz), Standard
 ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zusätzliche Screenshot-Ansichten.
@@ -63,20 +69,23 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 ## Code-Aufbau
 
 - `src/main.js` Custom Element, Kompass, Editier-Werkzeugleiste, Link-Check, HA-Anbindung
-- `src/data.js` lädt die Daten zur Laufzeit (js-yaml im Browser) · `src/demo.js` eingebettetes Demo-Haus
+- `src/model/` Datenmodell: `model.js` (Parsen, `toScene()` = Adapter Modell → Szene, `writeBack()` Editor → Modell,
+  Gesten/Aktionen), `migrate.js` (Version, Migrationen), `catalog.js` (Modellkatalog mit Fähigkeiten), `yaml.js`
+  (YAML-Schreiber) · `schema/model.schema.json` JSON-Schema
+- `src/data.js` lädt `model.yaml` zur Laufzeit (js-yaml im Browser) · `src/demo.js` eingebettetes Demo-Haus
 - `src/scene.js` Kamera, Himmel (Sonne/Mond aus `sun.sun`), Render-on-demand, Antippen, Licht-Zustand
-- `src/house.js` Bauwerk aus `house.json` · `src/openings.js` Fenster und Türen im Detail
+- `src/house.js` Bauwerk einer Etage (Räume, Wände, Böden) · `src/openings.js` Fenster und Türen im Detail
 - `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen)
 - `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE`
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
-- `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (YAML-Patch,
-  Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl · `src/ha.js` Zustand/Dienste
+- `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (ganzes Modell
+  über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl · `src/ha.js` Zustand/Dienste
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
-  (Demo-IDs), `validate-data.mjs`, `link-check.mjs`, `store.test.mjs`, `privacy-guard.mjs`, `lib/`
+  (Demo-IDs), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
 - `custom_components/ha_3d_dashboard/` HA-Integration: Config-Flow (ein Klick), liefert `frontend/ha-3d-dashboard.js`
   aus (nur im Release-Zip) und registriert das Panel `/haus-3d`; Optionen Titel, Symbol, `data_url`
-- `scripts/` Build, Magicplan-Import, `house_fixes.py`, Platzhalter-Leuchten, Deploy, `init-instance.mjs`
+- `scripts/` Build, Magicplan-Import, `import-building.mjs`, `house_fixes.py`, Platzhalter-Leuchten, Deploy, `init-instance.mjs`
 
 ## Lichtmodell
 
@@ -93,7 +102,6 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   (`frontend/set_user_data`), plus Export. Eine HA-Integration für gemeinsames Speichern ist eine mögliche
   Weiterentwicklung.
 - Drehwinkel aus der Quaternion lesen (nicht `rotation.y`, das ist über 90° gespiegelt).
-- YAML-Patch erhält das Zeilenende (CRLF-Dateien unter Windows).
 - CI: Tests nur für PRs und main (nicht doppelt), veraltete Läufe werden abgebrochen, Doku-Änderungen lösen nichts aus.
   Die Bedien-Tests nutzen das auf den Runnern vorinstallierte Google Chrome (`PW_CHANNEL=chrome`), ein eigener Job
   prüft WebKit (Safari/iOS, `npm run test:webkit`), die Python-Tests installieren mit uv und Cache. Release
@@ -126,3 +134,13 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Statusleiste und ragte unten hinaus. Daher misst `_fitHeight()` den Abstand vom oberen Panelrand bis zum unteren
   Bildschirmrand (`--ha3d-fit-height`, bei resize/visualViewport neu); untere Leisten mit `env(safe-area-inset-bottom)`.
   `tests/harness.html?ha=1&top=47` bildet das nach (`tests/demo.mjs`, `tests/webkit.mjs`).
+- Datenmodell v2 (0.6.0) ersetzt `house.json`/`furniture.yaml`/`devices.yaml` ohne Migration (es gab nur Testdaten):
+  ein Dokument `model.yaml` mit `site`, `buildings[].floors[]` (`level`), `outdoor[]`, `objects[]`; globales
+  Koordinatensystem; Raum- und Außenbereichs-IDs im ganzen Modell eindeutig. Möbel, Leuchten und Geräte sind alle
+  Objekte; Leuchte = Katalog-Fähigkeit `light` plus `light`-Block. Entities je Objekt mit Rollen (`power`, `info`),
+  Gesten `tap`/`double_tap`/`hold` mit Standardaktionen.
+- Die Szene arbeitet weiter mit internen Etagen: `toScene()` macht aus jeder Gebäude-Etage eine (`gebäude/etage`) und
+  aus den Außenbereichen die Pseudo-Etage `__aussen` (Ebene 0, ohne Wände). Ebenen-Knöpfe zeigen alle Etagen einer
+  Ebene; Objekte in Außenbereichen bekommen deren Höhe als `base`.
+- Der Editor schreibt über `writeBack()` ins Modell, gespeichert wird das ganze Modell mit eigenem YAML-Schreiber
+  (`src/model/yaml.js`, kurze Einträge einzeilig, Kopfkommentar bleibt; andere Kommentare gehen verloren).
