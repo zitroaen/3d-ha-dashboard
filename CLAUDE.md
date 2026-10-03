@@ -105,3 +105,6 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   vorhandene Ansicht). Dann: lokal schalten statt HA-Dienste, Sonne weiter aus `sun.sun`, kein Speichern/Export, keine
   Benutzerdaten-Overrides – eigene Daten werden nie überschrieben, kaputte eigene Daten nie durch die Demo ersetzt.
 - `data_url` wird als Ordner behandelt (fehlender `/` wird ergänzt).
+- Panel-Höhe nicht vom Container erben: ab HA 2026.9 ist `partial-panel-resolver` inline und `ha-panel-custom` ohne
+  Höhe, `height: 100%` ergibt 0 (weiße Seite). Daher `min-height: 100dvh` am `:host`; `tests/harness.html?ha=1` bildet
+  diese Einbettung nach (`tests/demo.mjs`).
