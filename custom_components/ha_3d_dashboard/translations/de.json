@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "3D-HA-Dashboard",
+        "description": "Legt das 3D-Dashboard in der Seitenleiste an. Ohne eigene Hausdaten zeigt es das eingebaute Demo-Haus. Titel, Symbol und Datenordner lassen sich später unter „Konfigurieren“ ändern."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Das 3D-Dashboard ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "3D-HA-Dashboard",
+        "data": {
+          "sidebar_title": "Titel in der Seitenleiste",
+          "sidebar_icon": "Symbol in der Seitenleiste",
+          "data_url": "Ordner mit den Hausdaten"
+        },
+        "data_description": {
+          "data_url": "Enthält house.json, furniture.yaml, devices.yaml und textures/. /local/ha-3d-dashboard/ entspricht dem Ordner /config/www/ha-3d-dashboard/. Fehlt er, wird das Demo-Haus angezeigt."
+        }
+      }
+    }
+  }
+}

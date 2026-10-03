@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "3D-HA-Dashboard",
+        "description": "Adds the 3D dashboard to the sidebar. Without your own house data it shows the built-in demo house. Title, icon and data folder can be changed later under “Configure”."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "The 3D dashboard is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "3D-HA-Dashboard",
+        "data": {
+          "sidebar_title": "Sidebar title",
+          "sidebar_icon": "Sidebar icon",
+          "data_url": "House data folder"
+        },
+        "data_description": {
+          "data_url": "Contains house.json, furniture.yaml, devices.yaml and textures/. /local/ha-3d-dashboard/ is the folder /config/www/ha-3d-dashboard/. If it is missing, the demo house is shown."
+        }
+      }
+    }
+  }
+}

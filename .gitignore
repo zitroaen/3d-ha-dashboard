@@ -5,3 +5,6 @@ tests/output/
 .env
 # lokale Liste privater Begriffe für den Datenschutz-Check (nie committen)
 .privacy-terms
+# Bundle in der Integration entsteht erst beim Release (npm run package)
+custom_components/ha_3d_dashboard/frontend/
+__pycache__/

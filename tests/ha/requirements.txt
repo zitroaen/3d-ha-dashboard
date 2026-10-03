@@ -1,0 +1,2 @@
+# Tests der HA-Integration: pip install -r tests/ha/requirements.txt && pytest tests/ha
+pytest-homeassistant-custom-component
