@@ -17,6 +17,7 @@
     "test:screens": "node tests/screenshots.mjs",
     "test:interaction": "node tests/interaction.mjs",
     "test:demo": "node tests/demo.mjs",
+    "test:webkit": "node tests/webkit.mjs",
     "privacy": "node tests/privacy-guard.mjs",
     "test:integration": "node tests/integration-check.mjs",
     "package": "node scripts/package-integration.mjs",
