@@ -1,11 +1,41 @@
 name: Tests
 
+# Läuft für Pull Requests und auf main (nicht doppelt für Push + PR). Ein neuer Push bricht den veralteten Lauf ab.
+# Reine Doku-Änderungen lösen keine Tests aus.
 on:
   push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    runs-on: ubuntu-latest
+    env:
+      # Google Chrome ist auf den GitHub-Runnern vorinstalliert – kein Browser-Download nötig
+      PW_CHANNEL: chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: tests/output/
+
+  # Safari/iOS-Engine (HA-App auf iPhone/iPad)
+  webkit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,20 +44,32 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright-core install --with-deps chromium
-      - run: npm test
+      - id: pw
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-webkit-${{ steps.pw.outputs.version }}
+      - run: npx playwright-core install --with-deps webkit
+      - run: npm run build
+      - run: npm run test:webkit
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: screenshots
-          path: tests/output/
+          name: screenshots-webkit
+          path: tests/output/webkit_*.png
 
   integration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.13'
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: tests/ha/requirements.txt
+          # das HA-Frontend-Paket (110 MB) soll im Cache bleiben
+          prune-cache: false
       - run: bash tests/ha/install.sh
       - run: python -m pytest tests/ha -q -p no:cacheprovider

@@ -51,6 +51,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run serve` | Vorschau mit Demo-Haus: http://127.0.0.1:8123/tests/harness.html |
 | `npm test` | Datenschutz-Check, Datenprüfung, Unit-Tests, Link-Check, Build, Screenshots, Bedien-Tests |
 | `npm run test:demo` | Demo-Modus und Fallback (Teil von `npm test`) |
+| `npm run test:webkit` | Safari/iOS-Engine, HA-Einbettung (nach `npx playwright-core install webkit`; in der CI) |
 | `npm run package` | `dist/ha_3d_dashboard.zip` (Integration + Bundle, für HACS; nach `npm run build`) |
 | `bash tests/ha/install.sh && python -m pytest tests/ha` | Tests der HA-Integration (Python ≥ 3.13) |
 | `npm run demo` | Demo-Haus aus `examples/demo/build-house.mjs` neu erzeugen |
@@ -93,11 +94,15 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Weiterentwicklung.
 - Drehwinkel aus der Quaternion lesen (nicht `rotation.y`, das ist über 90° gespiegelt).
 - YAML-Patch erhält das Zeilenende (CRLF-Dateien unter Windows).
+- CI: Tests nur für PRs und main (nicht doppelt), veraltete Läufe werden abgebrochen, Doku-Änderungen lösen nichts aus.
+  Die Bedien-Tests nutzen das auf den Runnern vorinstallierte Google Chrome (`PW_CHANNEL=chrome`), ein eigener Job
+  prüft WebKit (Safari/iOS, `npm run test:webkit`), die Python-Tests installieren mit uv und Cache. Release
+  (`release.yml`) automatisch, sobald die Tests auf main grün sind und es zur Version aus `package.json` noch kein
+  Release gibt – ohne zweiten Testlauf. Neue Version = `package.json` und `manifest.json` erhöhen und mergen.
 - HACS (Kategorie Integration, seit 0.3.0; vorher Dashboard): Eine Dashboard-Ressource kann kein Seitenleisten-Panel
   anlegen, nur `panel_custom` in der YAML oder eine Integration – daher `custom_components/ha_3d_dashboard` mit
   Config-Flow und `panel_custom.async_register_panel`. `hacs.json` mit `zip_release`; das Zip (Integration + Bundle)
-  und `ha-3d-dashboard.js` baut `.github/workflows/release.yml` (Tag `v*` oder Actions → Release → Run workflow mit
-  Version = `package.json` = `manifest.json`). `dist/` und `custom_components/ha_3d_dashboard/frontend/` bleiben
+  und `ha-3d-dashboard.js` baut `.github/workflows/release.yml` (Version = `package.json` = `manifest.json`). `dist/` und `custom_components/ha_3d_dashboard/frontend/` bleiben
   gitignored. Panel-Adresse `/haus-3d`, Domain `ha_3d_dashboard` nicht ändern. Eine HACS-Validierung (hacs/action) fehlt bewusst: sie scheitert vor dem ersten Release
   und braucht Repo-Beschreibung/Topics in den GitHub-Einstellungen.
 - Demo-Modus: Das Demo-Haus steckt als Text im Bundle (esbuild-Plugin `demo-data`, ~15 kB). Aktiv per
