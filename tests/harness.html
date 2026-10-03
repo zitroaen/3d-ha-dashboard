@@ -17,14 +17,17 @@
     const el = document.querySelector('ha-3d-dashboard');
     // Daten direkt aus dem Repo laden: Änderungen in data/ sind nach einem Neuladen sichtbar, ohne Build
     // save_url: der Dev-Server (npm run serve) schreibt Editor-Änderungen direkt nach data/
-    el.panel = { config: { data_url: '/data/', save_url: '/__save/' } };
+    // ?modus=demo -> panel_custom config { demo: true }; ?modus=keine-daten -> data_url ohne Dateien (404, Fallback)
+    const modus = new URLSearchParams(location.search).get('modus');
+    el.panel = { config: modus === 'demo' ? { demo: true } : modus === 'keine-daten' ? { data_url: '/gibt-es-nicht' } : { data_url: '/data/', save_url: '/__save/' } };
 
     // Simuliertes HA wie die echte Installation: alle Entities aus dem HA-Export (reference/entities.txt) mit
     // Bereich (wie hass.states + Entity-/Bereichs-Registry) plus jede in devices.yaml verknüpfte Entity –
     // alles aus, Nacht als Ausgangszustand
-    const devices = parseYaml(await (await fetch('/data/devices.yaml')).text()).devices || [];
+    // (in den Demo-/Fallback-Varianten gibt es nur sun.sun – die Demo-Entities existieren in "HA" nicht)
+    const devices = modus ? [] : parseYaml(await (await fetch('/data/devices.yaml')).text()).devices || [];
     const exported = {}, entities = {}, areas = {};
-    try {
+    if (!modus) try {
       let area = null;
       const slug = (n) => n.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '_');
       const exportText = await (await fetch('/reference/entities.txt')).text();

@@ -21,17 +21,17 @@ export async function launchBrowser() {
   }
 }
 
-/** Seite mit Fehler- und Request-Wächtern: JS-Fehler und externe Requests landen in errors */
-export async function guardedPage(browser, base, errors, { viewport, label }) {
+/** Seite mit Fehler- und Request-Wächtern: JS-Fehler und externe Requests landen in errors (query: z. B. ?modus=demo) */
+export async function guardedPage(browser, base, errors, { viewport, label, query = '', ignore = null }) {
   const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`));
-  page.on('console', (m) => m.type() === 'error' && errors.push(`${label}: ${m.text()}`));
+  page.on('console', (m) => m.type() === 'error' && !ignore?.test(m.text()) && errors.push(`${label}: ${m.text()}`));
   // Externe Requests sind verboten – das Panel muss offline funktionieren
   page.on('request', (r) => {
     const u = r.url();
     if (!u.startsWith(base) && !u.startsWith('data:') && !u.startsWith('blob:')) errors.push(`externer Request: ${u}`);
   });
-  await page.goto(`${base}/tests/harness.html`);
+  await page.goto(`${base}/tests/harness.html${query}`);
   await page.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
   return page;
 }
