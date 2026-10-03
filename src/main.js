@@ -20,8 +20,10 @@ const MODULE_BASE = new URL('./', import.meta.url);
 
 const STYLE = `
 :host { display: block; position: relative; width: 100%; height: 100%; background: #07090d; overflow: hidden;
-  /* Ab HA 2026.9 hat der Panel-Container keine Höhe mehr (height: 100% ergäbe 0) – das Panel füllt den Bildschirm */
-  min-height: 100vh; min-height: 100dvh;
+  /* Ab HA 2026.9 hat der Panel-Container keine Höhe mehr (height: 100% ergäbe 0). Das Panel reicht deshalb bis zum
+     unteren Bildschirmrand: --ha3d-fit-height misst _fitHeight() (in der iOS-App beginnt das Panel unter der
+     Statusleiste, 100dvh wäre dort zu hoch). */
+  min-height: var(--ha3d-fit-height, 100dvh);
   font-family: var(--paper-font-body1_-_font-family, 'Segoe UI', Roboto, sans-serif); color: #e8e2d8;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
 button { touch-action: manipulation; }
@@ -46,7 +48,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .links-toggle { position: absolute; top: 140px; right: 12px; width: 56px; height: 56px; border-radius: 50%;
   border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 /* Link-Check: Liste aller Geräte mit Verknüpfungsstatus */
-.links { position: absolute; top: 10px; right: 80px; bottom: 10px; width: min(420px, calc(100% - 100px)); display: none; flex-direction: column;
+.links { position: absolute; top: 10px; right: 80px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: min(420px, calc(100% - 100px)); display: none; flex-direction: column;
   border-radius: 16px; background: #12151bf2; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
 .links.show { display: flex; }
 .links header { display: flex; align-items: center; gap: 8px; padding: 10px 8px 6px 16px; }
@@ -63,7 +65,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .links li.ok .dot { background: #6cc28a; } .links li.bad .dot { background: #e0624f; } .links li.warn .dot { background: #e0b04f; }
 .links li.free .dot { background: transparent; border: 1.5px solid #9aa; }
 /* Entity-Auswahl (Editor): Seitenleiste rechts, große Zeilen für Touch */
-.picker { position: absolute; top: 10px; right: 80px; bottom: 150px; width: min(440px, calc(100% - 100px)); display: none; flex-direction: column;
+.picker { position: absolute; top: 10px; right: 80px; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 100px)); display: none; flex-direction: column;
   border-radius: 16px; background: #12151bf5; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
 .picker.show { display: flex; }
 .picker header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
@@ -88,10 +90,10 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .picker .list .mark { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 20px; text-align: center; color: #f0b45a; }
 .picker .more { padding: 10px; font-size: 13px; opacity: 0.6; text-align: center; }
 :host([editing]) .edit-toggle { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
-.editbar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 8px;
+.editbar { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 8px;
   max-width: calc(100% - 24px); }
 :host([editing]) .editbar { display: flex; }
-:host([editing]) .toast { bottom: 150px; }
+:host([editing]) .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 .editinfo { padding: 7px 14px; border-radius: 14px; background: #12151be6; font-size: 14px; text-align: center; max-width: 100%; }
 .editinfo b { color: #f0b45a; font-weight: 600; }
 .tools { display: flex; gap: 6px; padding: 6px; border-radius: 18px; background: #12151be6; backdrop-filter: blur(8px); overflow-x: auto; max-width: 100%; }
@@ -103,7 +105,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .tools button.dirty { color: #f0b45a; }
 .tools button[hidden] { display: none; }
 :host([narrow]) button.menu { display: inline-flex; align-items: center; justify-content: center; }
-.toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 14px; border-radius: 16px;
+.toast { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 14px; border-radius: 16px;
   background: #1a1c20d9; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
 .toast.show { opacity: 1; }
 /* Demo-Hinweis: dezent oben links, antippen blendet ihn aus (Touch-Ziel >= 48 px) */
@@ -186,17 +188,31 @@ class Ha3dDashboard extends HTMLElement {
     // beim Wiederanzeigen neu laden – aber nicht mitten in einer Bearbeitung
     this._onVisible ??= () => document.visibilityState === 'visible' && !this.editor?.changes.size && this.reloadData();
     document.addEventListener('visibilitychange', this._onVisible);
+    this._onResize ??= () => this._fitHeight();
+    window.addEventListener('resize', this._onResize);
+    window.visualViewport?.addEventListener('resize', this._onResize);
+    this._fitHeight();
+    requestAnimationFrame(this._onResize); // nach dem Layout von HA noch einmal messen
     // Erst starten, wenn HA die Properties (panel) gesetzt hat und das Element Größe hat
     requestAnimationFrame(() => this.reloadData());
   }
 
   disconnectedCallback() {
     document.removeEventListener('visibilitychange', this._onVisible);
+    window.removeEventListener('resize', this._onResize);
+    window.visualViewport?.removeEventListener('resize', this._onResize);
     this.editor?.dispose();
     this.editor = null;
     this.view?.dispose();
     this.view = null;
     this._dataText = null;
+  }
+
+  /** Höhe vom oberen Rand des Panels bis zum unteren Bildschirmrand (siehe :host im STYLE) */
+  _fitHeight() {
+    const vh = window.visualViewport?.height ?? window.innerHeight;
+    const top = Math.max(0, this.getBoundingClientRect().top);
+    this.style.setProperty('--ha3d-fit-height', `${Math.max(200, Math.round(vh - top))}px`);
   }
 
   get dataUrl() {
