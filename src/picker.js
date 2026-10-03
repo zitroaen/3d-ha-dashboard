@@ -44,8 +44,10 @@ export function listEntities(hass) {
   return out.sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
+// Filter der Liste; Steckdosen (und andere Schalter) sind in HA switch.*
 const DOMAINS = [
-  { key: 'light', label: 'Licht', match: (d) => d === 'light' || d === 'switch' },
+  { key: 'light', label: 'Licht', match: (d) => d === 'light' },
+  { key: 'switch', label: 'Steckdosen', match: (d) => d === 'switch' },
   { key: 'all', label: 'Alle', match: () => true },
 ];
 
@@ -92,6 +94,8 @@ export class EntityPicker {
     this.usedBy = usedBy;
     this.linked = device.entity == null ? [] : [].concat(device.entity);
     this.onlyArea = !!area;
+    // Filter passend zur bestehenden Verknüpfung (z. B. Lampe an einer Steckdose), sonst Licht
+    this.domain = this.linked.length && this.linked.every((id) => id.startsWith('switch.')) ? 'switch' : 'light';
     this.search.value = '';
     this.root.classList.add('show');
     this._render();

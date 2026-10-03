@@ -1,5 +1,10 @@
 # Änderungen
 
+## 0.5.1
+
+- **Filter „Steckdosen“** in der Entity-Auswahl: „Licht“ zeigt nur `light.*`, „Steckdosen“ nur `switch.*` (z. B. Lampen
+  an schaltbaren Steckdosen). Ist eine Leuchte schon mit einer Steckdose verknüpft, öffnet die Auswahl mit diesem Filter.
+
 ## 0.5.0
 
 - **Fertig speichert, Abbrechen verwirft:** Der Speichern-Knopf entfällt. „Fertig“ (und der Stift) speichert alle

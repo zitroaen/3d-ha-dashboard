@@ -242,6 +242,17 @@ try {
   });
   ok(pk.open && /Wohnzimmer/.test(pk.area || '') && pk.rows.length > 3 && pk.rows.every((t) => t.includes('Wohnzimmer')),
     `Entity-Auswahl: vorgefiltert auf ${pk.area} (${pk.rows.length} Einträge)`, `Entity-Auswahl: ${JSON.stringify({ ...pk, rows: pk.rows.slice(0, 3) })}`);
+  // Filter Steckdosen: nur switch.* (im Demo-Wohnzimmer die TV-Steckdose), dann zurück auf Licht
+  const plugs = await page.evaluate(() => {
+    const r = window.panel.shadowRoot.querySelector('.picker');
+    r.querySelector('.chip[data-id="switch"]').click();
+    const ids = [...r.querySelectorAll('.list button[data-id]')].map((b) => b.dataset.id);
+    r.querySelector('.chip[data-id="light"]').click();
+    const lights = [...r.querySelectorAll('.list button[data-id]')].map((b) => b.dataset.id);
+    return { ids, lightsOnly: lights.length > 0 && lights.every((i) => i.startsWith('light.')) };
+  });
+  ok(plugs.ids.length > 0 && plugs.ids.every((i) => i.startsWith('switch.')) && plugs.lightsOnly,
+    `Entity-Auswahl: Filter Steckdosen (${plugs.ids.join(', ')}) und Licht getrennt`, `Filter: ${JSON.stringify(plugs)}`);
   await page.evaluate(() => {
     const inp = window.panel.shadowRoot.querySelector('.picker .search');
     inp.value = 'fernseh';
