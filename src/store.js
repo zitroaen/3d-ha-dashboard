@@ -5,8 +5,10 @@
 // - In Home Assistant kann das Panel keine Dateien schreiben. Änderungen landen als "Layout-Overrides" in den
 //   HA-Benutzerdaten (frontend/set_user_data) und werden beim Laden über die Dateien gelegt. Über "Export"
 //   gibt es die fertigen YAML-Dateien zum Übernehmen ins Repo.
+// - Demo-Haus: eigene Benutzerdaten (DEMO_USER_DATA_KEY), damit Änderungen am Demo-Haus nie die eigenen Daten berühren.
 
 export const USER_DATA_KEY = 'ha_3d_dashboard_layout';
+export const DEMO_USER_DATA_KEY = 'ha_3d_dashboard_layout_demo';
 
 const num = (v) => String(Math.round(v * 1000) / 1000);
 const arr = (a) => `[${a.map(num).join(', ')}]`;
@@ -72,10 +74,12 @@ export class LayoutStore {
   /**
    * @param saveUrl  Dev-Server-Endpunkt (z. B. "/__save/"), sonst null
    * @param hass     HA-Objekt (callWS) für Overrides
+   * @param key      Schlüssel der Benutzerdaten (Demo-Haus: DEMO_USER_DATA_KEY)
    */
-  constructor({ saveUrl = null, hass = null } = {}) {
+  constructor({ saveUrl = null, hass = null, key = USER_DATA_KEY } = {}) {
     this.saveUrl = saveUrl;
     this.hass = hass;
+    this.key = key;
   }
 
   get mode() {
@@ -85,7 +89,7 @@ export class LayoutStore {
   async loadOverrides() {
     if (this.saveUrl || !this.hass?.callWS) return null;
     try {
-      const res = await this.hass.callWS({ type: 'frontend/get_user_data', key: USER_DATA_KEY });
+      const res = await this.hass.callWS({ type: 'frontend/get_user_data', key: this.key });
       return res?.value || null;
     } catch (e) {
       console.warn('ha-3d-dashboard: Layout-Overrides nicht lesbar', e);
@@ -117,13 +121,13 @@ export class LayoutStore {
         const bucket = type === 'lamp' ? 'devices' : 'items';
         (prev[bucket] ??= {})[id] = values;
       }
-      await this.hass.callWS({ type: 'frontend/set_user_data', key: USER_DATA_KEY, value: prev });
+      await this.hass.callWS({ type: 'frontend/set_user_data', key: this.key, value: prev });
     }
     return out;
   }
 
   async resetOverrides() {
-    if (this.hass?.callWS) await this.hass.callWS({ type: 'frontend/set_user_data', key: USER_DATA_KEY, value: null });
+    if (this.hass?.callWS) await this.hass.callWS({ type: 'frontend/set_user_data', key: this.key, value: null });
   }
 }
 

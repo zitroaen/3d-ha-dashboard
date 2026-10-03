@@ -1,5 +1,6 @@
 // Demo-Modus: eingebettetes Demo-Haus (panel config demo: true) und Fallback, wenn die Daten nicht erreichbar sind.
-// Prüft: Hinweis, lokales Schalten ohne HA-Aufrufe, Sonne weiter aus hass, Editor ohne Speichern/Export,
+// Prüft: Hinweis, lokales Schalten ohne HA-Aufrufe, Sonne weiter aus hass, Editor speichert nur in eigene
+// Demo-Benutzerdaten (nie Dateien, nie die Daten des eigenen Hauses), kein Export,
 // keine Schreib-Requests, keine externen Requests, data_url wird als Ordner aufgelöst.
 //   node tests/demo.mjs
 import { mkdir } from 'node:fs/promises';
@@ -80,22 +81,34 @@ async function checkDemo(label, query, allowConsole, noteRe) {
   ok(real.unlinked && real.call === 'light.turn_off:light.demo_wandleuchte',
     `${label}: Demo-Leuchten unverknüpft, echte Verknüpfung schaltet über HA`, `${label}: echte Entity ${JSON.stringify(real)}`);
 
-  // Editor: Speichern/Export ausgeblendet, Änderungen werden nirgends hingeschrieben
+  // Editor: Speichern (nur in eigene Demo-Benutzerdaten), kein Export; Leuchte verknüpfen und speichern
   await page.evaluate(() => window.panel.setEditing(true));
   await page.evaluate(() => {
     const ed = window.panel.editor;
-    const it = window.panel.view.furnishingData.items[0];
-    ed.select({ type: 'item', id: it.id });
+    ed.select({ type: 'lamp', id: 'eg_wohnen_wandleuchte' });
+    ed.setEntity('light.demo_wandleuchte');
   });
   const bar = await page.evaluate(() => {
     const hidden = (a) => window.panel.shadowRoot.querySelector(`.tools button[data-act="${a}"]`).hidden;
     return { save: hidden('save'), exp: hidden('export'), move: hidden('move') };
   });
-  ok(bar.save && bar.exp && !bar.move, `${label}: Editor ohne Speichern/Export`, `${label}: Werkzeugleiste ${JSON.stringify(bar)}`);
+  ok(!bar.save && bar.exp && !bar.move, `${label}: Editor mit Speichern, ohne Export`, `${label}: Werkzeugleiste ${JSON.stringify(bar)}`);
   await page.evaluate(() => window.panel._editAction('save'));
   await page.evaluate(() => window.panel._editAction('export'));
-  const ws = await page.evaluate(() => window.mockHass.calls.filter((c) => c.ws?.type === 'frontend/set_user_data').length);
-  ok(ws === 0 && !writes.length, `${label}: nichts wird gespeichert (keine Benutzerdaten, keine POSTs)`, `${label}: Schreibzugriffe ${ws} ${writes}`);
+  const saved = await page.evaluate(() => {
+    const keys = window.mockHass.calls.filter((c) => c.ws?.type === 'frontend/set_user_data').map((c) => c.ws.key);
+    return { keys, entity: window.mockHass._userData?.ha_3d_dashboard_layout_demo?.devices?.eg_wohnen_wandleuchte?.entity };
+  });
+  ok(saved.keys.length === 1 && saved.keys[0] === 'ha_3d_dashboard_layout_demo' && saved.entity === 'light.demo_wandleuchte' && !writes.length,
+    `${label}: Speichern nur in Demo-Benutzerdaten (keine Dateien, eigene Daten unberührt)`, `${label}: Speichern ${JSON.stringify(saved)} ${writes}`);
+  // nach dem Neuladen ist die Verknüpfung wieder da
+  const after = await page.evaluate(async () => {
+    window.panel._dataText = null;
+    await window.panel.reloadData();
+    return window.panel.view.lamps.get('eg_wohnen_wandleuchte').lamp.entity;
+  });
+  ok(after === 'light.demo_wandleuchte', `${label}: gespeicherte Demo-Verknüpfung bleibt nach dem Neuladen`, `${label}: nach Neuladen ${after}`);
+  await page.evaluate(async () => { window.mockHass._userData = {}; window.panel._dataText = null; await window.panel.reloadData(); });
   await page.evaluate(() => window.panel.setEditing(false));
 
   // Hinweis lässt sich wegtippen
@@ -143,18 +156,22 @@ try {
     p4.on('pageerror', (e) => errors.push(`ha-${label}: ${e.message}`));
     await p4.goto(`${base}/tests/harness.html?demo=1&ha=1${top ? `&top=${top}` : ''}`);
     await p4.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
-    await p4.evaluate(() => window.panel.setEditing(true));
+    // Leuchte gewählt: alle Knöpfe (auch Verknüpfen, Speichern) in der Leiste
+    await p4.evaluate(() => { window.panel.setEditing(true); window.panel.editor.select({ type: 'lamp', id: 'eg_wohnen_wandleuchte' }); });
     await p4.waitForTimeout(300);
-    const size = await p4.evaluate(() => {
+    const size = await p4.evaluate(([w, h]) => {
       const r = window.panel.getBoundingClientRect();
       const bar = window.panel.shadowRoot.querySelector('.editbar').getBoundingClientRect();
+      const buttons = [...window.panel.shadowRoot.querySelectorAll('.tools button')].filter((b) => !b.hidden);
+      const outside = buttons.filter((b) => { const q = b.getBoundingClientRect(); return q.left < 0 || q.right > w || q.bottom > h || q.width < 48; })
+        .map((b) => b.dataset.act);
       return { top: Math.round(r.top), bottom: Math.round(r.bottom), canvas: window.panel.view.renderer.domElement.clientHeight,
-        barBottom: Math.round(bar.bottom), barH: Math.round(bar.height) };
-    });
+        barBottom: Math.round(bar.bottom), barH: Math.round(bar.height), buttons: buttons.length, outside };
+    }, [viewport.width, viewport.height]);
     await p4.screenshot({ path: join(OUT, `demo_ha-einbettung_${label}.png`) });
     ok(size.top === top && size.bottom === viewport.height && size.canvas === viewport.height - top &&
-      size.barH > 0 && size.barBottom <= viewport.height,
-      `HA-Einbettung (${label}): Panel reicht bis zum unteren Rand, Werkzeugleiste sichtbar (${size.top}–${size.bottom}px)`,
+      size.barH > 0 && size.barBottom <= viewport.height && size.buttons >= 6 && !size.outside.length,
+      `HA-Einbettung (${label}): Panel reicht bis zum unteren Rand, alle ${size.buttons} Knöpfe sichtbar (${size.top}–${size.bottom}px)`,
       `HA-Einbettung ${label}: ${JSON.stringify(size)}`);
     await p4.close();
   }
