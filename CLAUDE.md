@@ -156,3 +156,7 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   gegen gleichzeitiges Speichern, Abo für sofortiges Nachladen). Import = neue/geänderte `model.yaml` im Datenordner
   (Prüfwert `file_hash` weicht ab -> Datei gewinnt), Export = Knopf im Editor. Benutzerdaten-Overrides
   (`ha_3d_dashboard_layout`) nur noch ohne Integration; das Demo-Haus speichert weiter pro Benutzer.
+- Gelände (0.9.0): Höhe je Eckpunkt eines Außenbereichs (`[x, y, z]`, abwärtskompatibel), dazwischen Dreiecke.
+  Objekte bekommen die Höhe an ihrer Position als `base` (der Editor folgt ihr nach dem Verschieben). Der Boden
+  (`site.ground`) ist dann ein Gitter, das tiefer liegendes Gelände nach außen fortsetzt (sonst sähe ein Hang wie eine
+  Grube aus); höheres Gelände bekommt Erdkanten. Pflanzen (`tree`, `shrub`, `flowers`) prozedural wie Möbel.
