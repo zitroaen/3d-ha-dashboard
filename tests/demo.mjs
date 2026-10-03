@@ -119,6 +119,23 @@ try {
   const h = await p3.evaluate(() => window.panel.shadowRoot.querySelector('.demo-note').getBoundingClientRect().height);
   ok(h >= 48, `Telefon: Demo-Hinweis (${h}px)`);
   await p3.close();
+
+  // Einbettung wie in HA ab 2026.9: Container ohne Höhe – das Panel muss trotzdem den Bildschirm füllen
+  for (const [label, viewport] of [['desktop', { width: 1400, height: 900 }], ['phone', { width: 390, height: 844 }]]) {
+    const p4 = await newPage(browser, { viewport });
+    p4.on('pageerror', (e) => errors.push(`ha-${label}: ${e.message}`));
+    await p4.goto(`${base}/tests/harness.html?demo=1&ha=1`);
+    await p4.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
+    const size = await p4.evaluate(() => {
+      const r = window.panel.getBoundingClientRect();
+      const c = window.panel.view.renderer.domElement;
+      return { h: Math.round(r.height), canvas: c.clientHeight };
+    });
+    await p4.screenshot({ path: join(OUT, `demo_ha-einbettung_${label}.png`) });
+    ok(size.h === viewport.height && size.canvas === viewport.height,
+      `HA-Einbettung (${label}): Panel füllt den Bildschirm trotz Container ohne Höhe (${size.h}px)`, `HA-Einbettung ${label}: ${JSON.stringify(size)}`);
+    await p4.close();
+  }
 } finally {
   await browser.close();
   server.close();
