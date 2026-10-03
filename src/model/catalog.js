@@ -2,7 +2,7 @@
 // Ohne three.js, damit Werkzeuge (Validierung, Import) ihn in Node nutzen können. Die Geometrie steckt in
 // src/models.js (FURNITURE bzw. LAMPS) unter demselben Namen.
 //
-//   category      furniture | lamp | device   (Anzeige; Leuchten bauen aus LAMPS, alles andere aus FURNITURE)
+//   category      furniture | lamp | device | plant   (Anzeige; Leuchten bauen aus LAMPS, alles andere aus FURNITURE)
 //   capabilities  light = Lichtquelle (Objekt braucht `light`)
 //   size          Standardmaß [B, T, H] bzw. [B, T] (nur Doku)
 //   params        erlaubte Schlüssel in objects[].params
@@ -25,6 +25,10 @@ export const CATALOG = {
   storage_cube: { category: 'furniture', params: [] },
   stove: { category: 'furniture', params: [] },
   toy_storage: { category: 'furniture', params: ['columns'] },
+  // --- Pflanzen (Garten)
+  flowers: { category: 'plant', size: [1.5, 0.8, 0.35], params: ['color'] },
+  shrub: { category: 'plant', size: [1.2, 1.0, 1.0], params: ['color'] },
+  tree: { category: 'plant', size: [3, 3, 5], params: ['shape', 'color'] },
   // --- Geräte
   box: { category: 'device', size: [0.6, 0.6, 0.85], params: ['color'] },
   marker: { category: 'device', size: [0.12], params: ['color'] },
@@ -39,7 +43,7 @@ export const CATALOG = {
   wall_box: { category: 'lamp', capabilities: ['light'], params: [] },
 };
 
-export const CATEGORY_LABEL = { furniture: 'Möbel', device: 'Gerät', lamp: 'Leuchte' };
+export const CATEGORY_LABEL = { furniture: 'Möbel', device: 'Gerät', lamp: 'Leuchte', plant: 'Pflanze' };
 
 /** Hat das Modell die Fähigkeit (z. B. 'light')? */
 export const hasCapability = (model, cap) => !!CATALOG[model]?.capabilities?.includes(cap);

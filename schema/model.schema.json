@@ -20,6 +20,11 @@
     "num": { "type": "number" },
     "pos": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
     "polygon": { "type": "array", "items": { "$ref": "#/$defs/pos" }, "minItems": 3 },
+    "terrainPolygon": {
+      "type": "array",
+      "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 },
+      "minItems": 3
+    },
     "surface": { "enum": ["parquet", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water"] },
     "entityId": { "type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$" },
     "entityList": {
@@ -126,7 +131,7 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string" },
-        "polygon": { "$ref": "#/$defs/polygon" },
+        "polygon": { "$ref": "#/$defs/terrainPolygon" },
         "surface": { "$ref": "#/$defs/surface" },
         "elevation": { "type": "number" },
         "ha_area": { "type": "string" }

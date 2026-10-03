@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import * as yaml from 'js-yaml';
 import { ENGINE_ROOT } from './lib/config.mjs';
 import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.js';
-import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
+import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 
@@ -60,6 +60,20 @@ const garten = sc.devices.find((d) => d.id === 'gartenstrahler');
 check('Szene: Leuchte im Außenbereich liegt auf der Außen-Etage mit dessen Höhe', garten.floor === OUTDOOR_FLOOR && garten.outdoor && garten.base === -0.04, JSON.stringify({ f: garten.floor, b: garten.base }));
 const free = toScene({ ...base(), objects: [{ id: 'x', model: 'box', pos: [1, 1] }] }).items[0];
 check('Szene: Objekt ohne Bereich steht auf freiem Gelände', free.floor === OUTDOOR_FLOOR && free.room === OPEN_GROUND);
+
+// --- Gelände: Höhe je Eckpunkt, Objekte stehen auf dem Hang
+{
+  const m = parseModel(demoText);
+  const sc = toScene(m);
+  const garten = sc.house.floors.find((f) => f.id === OUTDOOR_FLOOR).rooms.find((r) => r.id === 'garten');
+  const terr = sc.house.floors.find((f) => f.id === OUTDOOR_FLOOR).rooms.find((r) => r.id === 'terrasse');
+  check('Gelände: Höhen je Eckpunkt, ebene Bereiche ohne', garten.heights?.join() === '-0.05,-0.05,-1.5,-1.5' && terr.heights === null);
+  const z = m.outdoor.find((o) => o.id === 'garten');
+  const mid = outdoorHeightAt(z, [3, (11.3 + 18) / 2]);
+  check('Gelände: Höhe dazwischen linear', Math.abs(mid - (-0.05 - 1.5) / 2) < 1e-6 && Math.abs(outdoorHeightAt(z, [0, 18]) + 1.5) < 1e-6, String(mid));
+  const tree = sc.items.find((i) => i.id === 'apfelbaum');
+  check('Gelände: Objekt bekommt die Hanghöhe als base', Math.abs(tree.base - outdoorHeightAt(z, tree.pos)) < 1e-9 && tree.base < -0.5, String(tree.base));
+}
 
 // --- Zurückschreiben (Editor) und Rollen
 const mm = parseModel(demoText);

@@ -4,8 +4,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FloorModel, createSharedMaterials } from './house.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
-import { pointInPoly } from './geometry.js';
-import { makeFloorAO } from './house.js';
+import { pointInPoly, heightAt, terrainHeightNear } from './geometry.js';
+import { makeFloorAO, GROUND_Y } from './house.js';
 
 // Warmweiß ~2700 K
 const DEFAULT_LIGHT = new THREE.Color().setRGB(1.0, 0.8, 0.6, THREE.SRGBColorSpace);
@@ -102,6 +102,7 @@ export class HouseScene {
    */
   setLevel(level, { silent = false } = {}) {
     if (!this.levels.includes(level)) return false;
+    this._anim?.finish();
     this.level = level;
     this._tops = null;
     this.activeFloors = this.floors.filter((f) => (f.floor.level ?? 0) === level);
@@ -126,6 +127,56 @@ export class HouseScene {
   /** Etage (FloorModel) zu einem Etagen-Schlüssel */
   floorModel(key) {
     return this.floors.find((f) => f.floor.id === key);
+  }
+
+  /** Bodenhöhe eines Objekts in einem Außenbereich (Gelände) relativ zur Etage; in Räumen 0 */
+  baseAt(floorKey, roomId, pos) {
+    const fm = this.floorModel(floorKey);
+    const r = fm?.floor.outdoor && fm.rooms.get(roomId)?.room;
+    if (!r) return 0;
+    return r.heights ? heightAt(r.polygon, r.heights, pos) : r.elevation || 0;
+  }
+
+  /**
+   * Bodenfläche: eben auf GROUND_Y – oder, wenn es Gelände gibt, ein Gitter, das dem Gelände folgt (ein Hang setzt
+   * sich seitlich und darunter fort), knapp unter den Geländeflächen und nie höher als GROUND_Y. Fein (0,5 m) um
+   * das Grundstück, grob nach außen.
+   */
+  _groundGeometry(cx, cz) {
+    const R = 80;
+    const areas = this.floors.flatMap((f) => f.floor.rooms.filter((r) => r.heights).map((r) => ({ polygon: r.polygon, heights: r.heights })));
+    const axis = (c, lo, hi) => {
+      const out = [c - R];
+      for (let v = Math.floor(lo - 14); v <= hi + 14; v += 0.5) out.push(v);
+      out.push(c + R);
+      for (const v of [c - R / 2, c - R / 4, c + R / 4, c + R / 2]) if (v < lo - 14 || v > hi + 14) out.push(v);
+      return [...new Set(out)].sort((a, b) => a - b);
+    };
+    const b = this.bounds;
+    const xs = areas.length ? axis(cx, b.x0, b.x1) : [cx - R, cx + R];
+    const zs = areas.length ? axis(cz, b.z0, b.z1) : [cz - R, cz + R];
+    const pos = [], uv = [], idx = [];
+    for (const z of zs) {
+      for (const x of xs) {
+        const h = areas.length ? terrainHeightNear(areas, [x, z]) : null;
+        pos.push(x, h == null ? GROUND_Y : Math.min(GROUND_Y, h - 0.012), z);
+        uv.push(x, z);
+      }
+    }
+    const n = xs.length;
+    for (let j = 0; j < zs.length - 1; j++) {
+      for (let i = 0; i < n - 1; i++) {
+        const a = j * n + i, b2 = a + 1, c = a + n, d = c + 1;
+        idx.push(a, c, b2, b2, c, d);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setAttribute('roomIdx', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3), 1));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
   }
 
   /** Raum bzw. Außenbereich nach ID (über alle Etagen) */
@@ -207,13 +258,7 @@ export class HouseScene {
 
     // Boden außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen (kein Flackern)
     const groundMat = this.shared.mat[this.house.ground] || this.shared.mat.lawn;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), groundMat);
-    const uv = ground.geometry.attributes.uv;
-    const pos = ground.geometry.attributes.position;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) + cx, -pos.getY(i) + cz);
-    ground.geometry.setAttribute('roomIdx', new THREE.Float32BufferAttribute(new Float32Array(uv.count), 1));
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.set(cx, -0.12, cz);
+    const ground = new THREE.Mesh(this._groundGeometry(cx, cz), groundMat);
     ground.receiveShadow = true;
     this.scene.add(ground);
 
@@ -416,7 +461,11 @@ export class HouseScene {
     const offset = new THREE.Vector3().subVectors(this.camera.position, c.target);
     const sph = new THREE.Spherical().setFromVector3(offset);
     const t0 = performance.now();
+    // eine laufende Animation lässt sich sofort beenden (Ebenenwechsel: sonst dreht sie danach weiter)
+    const anim = { finish: () => step(Infinity) };
+    this._anim = anim;
     const step = (now) => {
+      if (this._anim !== anim) return;
       const k = duration ? Math.min(1, (now - t0) / duration) : 1;
       const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; // ease-in-out
       sph.theta = start + delta * e;
@@ -425,8 +474,9 @@ export class HouseScene {
       c.update();
       this.renderer.render(this.scene, this.camera);
       this.onViewChange?.();
-      if (k < 1) requestAnimationFrame(step);
-      else this.resize(); // Bildausschnitt für die neue Blickrichtung neu einpassen
+      if (k < 1) return requestAnimationFrame(step);
+      this._anim = null;
+      this.resize(); // Bildausschnitt für die neue Blickrichtung neu einpassen
     };
     if (duration) requestAnimationFrame(step);
     else step(t0);

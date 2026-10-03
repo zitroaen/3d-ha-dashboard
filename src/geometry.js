@@ -39,6 +39,49 @@ export function poleOfInaccessibility(poly, step = 0.1) {
 }
 
 /**
+ * Gelände: Höhe im Punkt p eines Polygons mit Höhen je Eckpunkt (Dreiecke zwischen den Eckpunkten, linear
+ * interpoliert). Außerhalb: Höhe des nächsten Eckpunkts.
+ */
+export function heightAt(poly, heights, [x, y]) {
+  if (heights.every((h) => h === heights[0])) return heights[0];
+  const tris = THREE.ShapeUtils.triangulateShape(poly.map(([px, py]) => new THREE.Vector2(px, py)), []);
+  for (const [i, j, k] of tris) {
+    const [ax, ay] = poly[i], [bx, by] = poly[j], [cx, cy] = poly[k];
+    const d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    if (Math.abs(d) < 1e-12) continue;
+    const u = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / d;
+    const v = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / d;
+    if (u >= -1e-9 && v >= -1e-9 && u + v <= 1 + 1e-9) return u * heights[i] + v * heights[j] + (1 - u - v) * heights[k];
+  }
+  let best = 0, bd = Infinity;
+  poly.forEach(([px, py], i) => {
+    const dd = Math.hypot(px - x, py - y);
+    if (dd < bd) { bd = dd; best = i; }
+  });
+  return heights[best];
+}
+
+/**
+ * Gelände nach außen fortsetzen: Höhe im Punkt p aus den Geländeflächen [{ polygon, heights }] – innen wie
+ * heightAt, außen die Höhe des nächstgelegenen Randpunkts der nächsten Fläche (ein Hang läuft seitlich weiter,
+ * unterhalb bleibt es unten). null ohne Geländeflächen.
+ */
+export function terrainHeightNear(areas, p) {
+  let best = null, bd = Infinity;
+  for (const { polygon: poly, heights } of areas) {
+    if (pointInPoly(p, poly)) return heightAt(poly, heights, p);
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [ax, ay] = poly[j], [bx, by] = poly[i];
+      const dx = bx - ax, dy = by - ay;
+      const t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy || 1)));
+      const d = Math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy);
+      if (d < bd) { bd = d; best = heights[j] + t * (heights[i] - heights[j]); }
+    }
+  }
+  return best;
+}
+
+/**
  * Sammelt Dreiecke mit Raum-Index pro Fläche (nicht indiziert, damit jede Fläche ihren eigenen Raum hat).
  */
 export class Builder {
@@ -81,6 +124,24 @@ export class Builder {
       if ((ny < 0) !== down) [b, c] = [c, b];
       this.tri(a, b, c, roomIdx, uvScale);
     }
+  }
+
+  /** Gelände: Polygon mit Höhe je Eckpunkt (Normale nach oben) */
+  polyT(poly, heights, roomIdx, lift = 0, uvScale = 1) {
+    const tris = THREE.ShapeUtils.triangulateShape(poly.map(([x, z]) => new THREE.Vector2(x, z)), []);
+    const P = (i) => [poly[i][0], heights[i] + lift, poly[i][1]];
+    for (const [i, j, k] of tris) {
+      let a = P(i), b = P(j), c = P(k);
+      const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+      if (ny < 0) [b, c] = [c, b];
+      this.tri(a, b, c, roomIdx, uvScale);
+    }
+  }
+
+  /** Senkrechte Fläche zwischen zwei Punkten mit eigener Ober-/Unterkante (Geländekante), beidseitig */
+  skirt(a, ya0, ya1, b, yb0, yb1, roomIdx) {
+    const A0 = [a[0], ya0, a[1]], A1 = [a[0], ya1, a[1]], B0 = [b[0], yb0, b[1]], B1 = [b[0], yb1, b[1]];
+    for (const [p, q, r] of [[A0, B0, B1], [A0, B1, A1], [A0, B1, B0], [A0, A1, B1]]) this.tri(p, q, r, roomIdx);
   }
 
   /** @param attr Name des Index-Attributs (Raum oder Lampe) */

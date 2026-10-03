@@ -37,6 +37,23 @@ export const PALETTE = {
   toy_red: { color: 0xb8322a, roughness: 0.6 },
   toy_yellow: { color: 0xd8a72a, roughness: 0.6 },
   toy_blue: { color: 0x2f5fa8, roughness: 0.6 },
+  // Garten
+  bark: { color: 0x5a4330, roughness: 0.95 },
+  leaf_green: { color: 0x4f7a34, roughness: 0.9 },
+  leaf_dark: { color: 0x2f5a2c, roughness: 0.9 },
+  leaf_light: { color: 0x7fa046, roughness: 0.9 },
+  conifer: { color: 0x24432c, roughness: 0.9 },
+  flower_red: { color: 0xc8323a, roughness: 0.7 },
+  flower_yellow: { color: 0xe6c23a, roughness: 0.7 },
+  flower_violet: { color: 0x7d55b8, roughness: 0.7 },
+  flower_white: { color: 0xeeeae0, roughness: 0.7 },
+  flower_pink: { color: 0xe07aa6, roughness: 0.7 },
+};
+
+/** Fester Pseudozufall (gleiche Daten -> gleiches Bild) */
+const jitter = (i, k) => {
+  const s = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return s - Math.floor(s);
 };
 
 /**
@@ -98,6 +115,12 @@ export class PartCollector {
 
   sphere(key, r, x = 0, y = 0, z = 0, { kind = 'lit', seg = 12 } = {}) {
     return this.add(new THREE.SphereGeometry(r, seg, Math.max(6, seg / 2)), key, kind, new THREE.Matrix4().setPosition(x, y, z));
+  }
+
+  /** Ellipsoid mit Halbachsen rx, ry, rz um den Mittelpunkt (x, y, z) – Baumkronen, Büsche */
+  blob(key, rx, ry, rz, x = 0, y = 0, z = 0, { kind = 'lit', seg = 10 } = {}) {
+    const m = new THREE.Matrix4().makeScale(rx, ry, rz).setPosition(x, y, z);
+    return this.add(new THREE.SphereGeometry(1, seg, Math.max(5, Math.round(seg * 0.6))), key, kind, m);
   }
 
   /** Zylinder zwischen zwei Punkten (für Arme, Stangen, Beine). */
@@ -390,6 +413,64 @@ export const FURNITURE = {
     for (let i = 0; i < folds; i++) {
       const x = -W / 2 + (i + 0.5) * (W / folds);
       P.cyl(it.color || 'curtain_green', 0.05, 0.05, H, x, y, (i % 2) * 0.03, { seg: 8 });
+    }
+  },
+
+  /**
+   * Baum: size = [Kronendurchmesser, –, Höhe]; params.shape round (Laubbaum, Standard) oder conifer (Nadelbaum),
+   * params.color = Laubfarbe (Palette).
+   */
+  tree(P, it) {
+    const [Dm, , H] = [it.size?.[0] ?? 3, 0, it.size?.[2] ?? it.size?.[1] ?? 5];
+    const r = Dm / 2;
+    if (it.shape === 'conifer') {
+      P.cyl('bark', 0.08, 0.12, H * 0.25, 0, 0, 0, { seg: 8 });
+      const c = it.color || 'conifer';
+      for (let i = 0; i < 3; i++) {
+        const y0 = H * (0.15 + i * 0.25), h = H * (0.45 - i * 0.07), rr = r * (1 - i * 0.28);
+        P.cyl(c, 0, rr, h, 0, y0, 0, { seg: 10 });
+      }
+      return;
+    }
+    const c = it.color || 'leaf_green';
+    const trunk = Math.max(0.6, H - Dm * 0.9);
+    P.cyl('bark', 0.1, 0.16, trunk + r * 0.3, 0, 0, 0, { seg: 8 });
+    const cy = H - r * 0.95;
+    P.blob(c, r * 0.85, r * 0.8, r * 0.85, 0, cy, 0);
+    // drei Nebenkronen, damit die Krone nicht wie eine Kugel aussieht
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.6;
+      P.blob(i === 1 ? 'leaf_dark' : c, r * 0.55, r * 0.5, r * 0.55, Math.cos(a) * r * 0.45, cy - r * 0.15 + i * r * 0.12, Math.sin(a) * r * 0.45);
+    }
+  },
+
+  /** Strauch/Busch: size = [Breite, Tiefe, Höhe], params.color = Laubfarbe */
+  shrub(P, it) {
+    const [W, D, H] = it.size || [1.2, 1.0, 1.0];
+    const c = it.color || 'leaf_dark';
+    P.blob(c, W * 0.45, H * 0.55, D * 0.45, 0, H * 0.45, 0);
+    P.blob('leaf_green', W * 0.3, H * 0.4, D * 0.3, W * 0.18, H * 0.4, -D * 0.1);
+  },
+
+  /**
+   * Blumen auf einer Fläche (Blumenbeet): size = [Breite, Tiefe, Höhe]; params.color = eine Blütenfarbe
+   * (flower_red …), ohne Angabe gemischt.
+   */
+  flowers(P, it) {
+    const [W, D, H] = it.size || [1.5, 0.8, 0.35];
+    P.blob('leaf_green', W / 2, H * 0.35, D / 2, 0, 0, 0, { seg: 12 });
+    const mix = ['flower_red', 'flower_yellow', 'flower_violet', 'flower_white', 'flower_pink'];
+    const step = 0.2;
+    const nx = Math.max(1, Math.round(W / step)), nz = Math.max(1, Math.round(D / step));
+    for (let i = 0; i < nx; i++) {
+      for (let k = 0; k < nz; k++) {
+        const x = -W / 2 + (i + 0.2 + jitter(i, k) * 0.6) * (W / nx);
+        const z = -D / 2 + (k + 0.2 + jitter(k + 7, i) * 0.6) * (D / nz);
+        // innen höher als am Rand (Hügelform des Laubs)
+        const e = 1 - Math.max(Math.abs(x) / (W / 2), Math.abs(z) / (D / 2)) ** 2;
+        const c = it.color || mix[Math.floor(jitter(i * 3 + 1, k * 5 + 2) * mix.length)];
+        P.sphere(c, 0.045, x, H * (0.45 + 0.5 * e), z, { seg: 6 });
+      }
     }
   },
 
