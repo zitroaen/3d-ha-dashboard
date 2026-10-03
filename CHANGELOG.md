@@ -1,5 +1,14 @@
 # Änderungen
 
+## 0.7.0
+
+- **Gemeinsames Modell für alle Benutzer:** Mit der Integration speichert „Fertig“ das Modell in Home Assistant
+  (Teil jedes Backups) statt pro Benutzer. Alle offenen Panels übernehmen Änderungen sofort. Bearbeiten dürfen nur
+  Administratoren; andere Benutzer sehen keinen Stift.
+- **Import/Export:** Eine neue oder geänderte `model.yaml` im Datenordner ersetzt das gespeicherte Modell; „Export“ im
+  Editor lädt es als `model.yaml` herunter. Nach dem ersten Speichern ist die Datei unter `/local/` nicht mehr nötig.
+- Speichern zwei Administratoren gleichzeitig, scheitert das zweite Speichern mit Meldung (nichts wird überschrieben).
+
 ## 0.6.0
 
 - **Neues Datenmodell (Version 2):** Ein Dokument `model.yaml` ersetzt `house.json`, `furniture.yaml` und

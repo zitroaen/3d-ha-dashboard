@@ -82,9 +82,10 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl · `src/ha.js` Zustand/Dienste
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
-  (Demo-IDs), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
+  (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
 - `custom_components/ha_3d_dashboard/` HA-Integration: Config-Flow (ein Klick), liefert `frontend/ha-3d-dashboard.js`
-  aus (nur im Release-Zip) und registriert das Panel `/haus-3d`; Optionen Titel, Symbol, `data_url`
+  aus (nur im Release-Zip) und registriert das Panel `/haus-3d`; Optionen Titel, Symbol, `data_url`; `storage.py`
+  gemeinsames Modell (WebSocket `ha_3d_dashboard/model/get|save|subscribe`)
 - `scripts/` Build, Magicplan-Import, `import-building.mjs`, `house_fixes.py`, Platzhalter-Leuchten, Deploy, `init-instance.mjs`
 
 ## Lichtmodell
@@ -144,3 +145,8 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Ebene; Objekte in Außenbereichen bekommen deren Höhe als `base`.
 - Der Editor schreibt über `writeBack()` ins Modell, gespeichert wird das ganze Modell mit eigenem YAML-Schreiber
   (`src/model/yaml.js`, kurze Einträge einzeilig, Kopfkommentar bleibt; andere Kommentare gehen verloren).
+- Gemeinsamer Speicher (0.7.0): Das Dashboard ist für alle Benutzer gleich. Mit der Integration (`config.shared`)
+  liegt das Modell im HA-Speicher `ha_3d_dashboard.model` (WebSocket, Speichern nur für Administratoren, `revision`
+  gegen gleichzeitiges Speichern, Abo für sofortiges Nachladen). Import = neue/geänderte `model.yaml` im Datenordner
+  (Prüfwert `file_hash` weicht ab -> Datei gewinnt), Export = Knopf im Editor. Benutzerdaten-Overrides
+  (`ha_3d_dashboard_layout`) nur noch ohne Integration; das Demo-Haus speichert weiter pro Benutzer.
