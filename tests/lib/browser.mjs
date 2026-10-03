@@ -30,7 +30,7 @@ export async function guardedPage(browser, base, errors, { viewport, label }) {
     if (!u.startsWith(base) && !u.startsWith('data:') && !u.startsWith('blob:')) errors.push(`externer Request: ${u}`);
   });
   await page.goto(`${base}/tests/harness.html`);
-  await page.waitForFunction(() => window.panelReady === true, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
   return page;
 }
 

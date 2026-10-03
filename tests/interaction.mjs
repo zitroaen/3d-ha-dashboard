@@ -18,6 +18,9 @@ const { server, base } = await startServer({ dataDir: DATA_DIR, entities: ENTITI
 const browser = await launchBrowser();
 const errors = [];
 const ok = (cond, msg, fail) => (cond ? console.log(`✔ ${msg}`) : errors.push(fail ?? msg));
+// Auf einen Zustand warten statt fester Pausen: Software-WebGL in der CI ist deutlich langsamer als lokal.
+const settle = (page, fn, arg) => page.waitForFunction(fn, arg, { timeout: 15000, polling: 50 }).catch(() => {});
+const until = async (cond, ms = 15000) => { const t = Date.now(); while (!cond() && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 50)); };
 
 try {
   const page = await guardedPage(browser, base, errors, { viewport: { width: 1600, height: 1000 }, label: 'desktop' });
@@ -42,7 +45,7 @@ try {
   let pt = await toScreen(page, [lampPos[0] + 1.5, 0, lampPos[2] + 1.5]);
   await page.evaluate(() => (window.mockHass.calls.length = 0));
   await page.mouse.click(pt.x, pt.y);
-  await page.waitForTimeout(100);
+  await settle(page, () => window.panel.view.isRoomLit('wohnen'));
   const room = await page.evaluate(() => ({
     lit: window.panel.view.isRoomLit('wohnen'),
     calls: window.mockHass.calls.map((c) => `${c.domain}.${c.service}:${[].concat(c.data.entity_id).length}`),
@@ -55,7 +58,7 @@ try {
   await page.evaluate(() => window.panel.view.setRoomLight('schlafen', true));
   pt = await toScreen(page, lampPos);
   await page.mouse.click(pt.x, pt.y);
-  await page.waitForTimeout(150);
+  await settle(page, (id) => !window.panel.view.lamps.get(id).on, lampId);
   const st = await page.evaluate((id) => ({
     lamp: window.panel.view.lamps.get(id).on,
     sconce: window.panel.view.lamps.get('eg_wohnen_wandleuchte').on,
@@ -112,19 +115,19 @@ try {
   // ---------------- Kompass ----------------
   const before = await page.evaluate(() => window.panel.view.northScreenAngle());
   await clickShadow('.compass');
-  await page.waitForTimeout(900);
+  await settle(page, () => Math.abs(window.panel.view.northScreenAngle()) < 1);
   const after = await page.evaluate(() => window.panel.view.northScreenAngle());
   ok(Math.abs(after) < 1, `Kompass nordet ein (${before.toFixed(0)}° -> ${after.toFixed(1)}°)`, `Kompass: vorher ${before}, nachher ${after}`);
   await page.screenshot({ path: join(OUT, 'demo_genordet.png') });
 
   // ---------------- Editiermodus ----------------
   await page.reload();
-  await page.waitForFunction(() => window.panelReady === true, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
   await clickShadow('.edit-toggle');
   // Sideboard-Front knapp über dem Boden antippen (darüber hängt der Fernseher)
   pt = await toScreen(page, [5.46, 0.08, 3.4]);
   await page.mouse.click(pt.x, pt.y);
-  await page.waitForTimeout(80);
+  await settle(page, () => !!window.panel.editor.sel);
   const sel = await page.evaluate(() => window.panel.editor.sel?.id);
   ok(sel === 'sideboard', 'Editor: Möbel antippen wählt es aus', `Editor: Antippen wählt ${sel} statt sideboard`);
 
@@ -163,7 +166,7 @@ try {
   await clickShadow('.tools button[data-act=align]');
   pt = await toScreen(page, [4.6, 0.8, 0.3]);
   await page.mouse.click(pt.x, pt.y);
-  await page.waitForTimeout(80);
+  await settle(page, () => window.panel.editor.sel?.entry.rot === 0);
   const al = await page.evaluate(() => ({ pos: window.panel.editor.sel.entry.pos, rot: window.panel.editor.sel.entry.rot }));
   ok(al.rot === 0 && Math.abs(al.pos[1] - 0.527) < 0.02, `Editor: Anlegen setzt die Rückseite bündig an die Wand (${JSON.stringify(al)})`, `Anlegen: ${JSON.stringify(al)}`);
   await page.screenshot({ path: join(OUT, 'demo_editor_anlegen.png') });
@@ -177,7 +180,7 @@ try {
   let saved = null;
   await page.route('**/__save/**', async (route) => { saved = { url: route.request().url(), body: route.request().postData() }; await route.fulfill({ status: 204 }); });
   await clickShadow('.tools button[data-act=save]');
-  await page.waitForTimeout(200);
+  await until(() => saved);
   await page.unroute('**/__save/**');
   const line = saved?.body.split(/\r?\n/).find((l) => l.includes('id: sideboard'));
   ok(saved?.url.endsWith('furniture.yaml') && saved.body.includes('# --- Wohnzimmer: Sitzecke') && line?.includes('pos: [4.4, 3.8]'),
@@ -200,7 +203,7 @@ try {
   await page.screenshot({ path: join(OUT, 'demo_editor_verknuepfen.png') });
   await page.evaluate(() => window.panel.shadowRoot.querySelector('.picker .list button[data-id="light.demo_fernsehkugel"]').click());
   await page.evaluate(() => window.mockHass.callService('light', 'turn_on', { entity_id: 'light.demo_fernsehkugel' }));
-  await page.waitForTimeout(50);
+  await settle(page, () => window.panel.view.lamps.get('eg_wohnen_kugel').on);
   const ln = await page.evaluate(() => ({
     entity: window.panel.editor.sel.entry.entity,
     on: window.panel.view.lamps.get('eg_wohnen_kugel').on,
@@ -209,7 +212,7 @@ try {
   let savedDev = null;
   await page.route('**/__save/**', async (route) => { if (route.request().url().endsWith('devices.yaml')) savedDev = route.request().postData(); await route.fulfill({ status: 204 }); });
   await clickShadow('.tools button[data-act=save]');
-  await page.waitForTimeout(200);
+  await until(() => savedDev);
   await page.unroute('**/__save/**');
   ok(savedDev?.includes('entity: light.demo_fernsehkugel') && savedDev.includes('# Geräte im Haus'), 'Verknüpfung wird in devices.yaml gespeichert (Kommentare bleiben)');
 
