@@ -2,6 +2,9 @@
 
 ## 0.4.0
 
+- **iPhone (HA-App, Hochformat):** Die Werkzeugleiste war unten abgeschnitten. Das Panel beginnt dort unter der
+  Statusleiste, war aber bildschirmhoch. Es misst jetzt, wo es beginnt, und reicht genau bis zum unteren Rand; Leisten
+  halten Abstand zum Home-Balken (`safe-area-inset-bottom`).
 - **Leuchte lange drücken** öffnet den HA-Dialog der verknüpften Entity (Farbe, Helligkeit, Farbtemperatur, Verlauf).
 - **Demo-Haus ohne Verknüpfungen:** Die erfundenen Demo-Entities sind entfernt. Leuchten schalten lokal; im Editor mit
   einer echten Lampe verknüpft, schalten sie über HA (im Demo-Modus nicht gespeichert).
