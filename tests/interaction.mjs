@@ -256,7 +256,16 @@ try {
 
   // Verknüpfen: Leuchtkugel wählen, Entity-Auswahl (vorgefiltert auf HA-Bereich Wohnzimmer), suchen, antippen
   await page.evaluate(() => window.panel.editor.select({ type: 'lamp', id: 'eg_wohnen_kugel' }));
+  // Verknüpfen öffnet die Einstellungen des Objekts (Rollen, Gesten, Zustandsanzeige), dort „+ Entity“ bei Schalten
   await clickShadow('.tools button[data-act=link]');
+  const cfg = await page.evaluate(() => {
+    const r = window.panel.shadowRoot.querySelector('.objcfg');
+    return { open: r.classList.contains('show'), title: r.querySelector('h2')?.textContent, gestures: r.querySelectorAll('.gesture select').length,
+      roles: [...r.querySelectorAll('button[data-act=pick]')].map((b) => b.dataset.role).join() };
+  });
+  ok(cfg.open && cfg.gestures === 3 && cfg.roles === 'power,info', `Einstellungen: ${cfg.title} mit Rollen und 3 Gesten`, `Einstellungen: ${JSON.stringify(cfg)}`);
+  await page.screenshot({ path: join(OUT, 'demo_editor_einstellungen.png') });
+  await clickShadow('.objcfg button[data-act=pick][data-role=power]');
   const pk = await page.evaluate(() => {
     const r = window.panel.shadowRoot.querySelector('.picker');
     return { open: r.classList.contains('show'), area: r.querySelector('.chip.sel')?.textContent, rows: [...r.querySelectorAll('.list small')].map((x) => x.textContent) };
@@ -287,7 +296,7 @@ try {
     entity: window.panel.editor.sel.entry.entity,
     on: window.panel.view.lamps.get('eg_wohnen_kugel').on,
   }));
-  ok(ln.entity === 'light.demo_fernsehkugel' && ln.on, 'Entity antippen verknüpft die Leuchte, sie folgt sofort dem HA-Zustand', `Verknüpfen: ${JSON.stringify(ln)}`);
+  ok([].concat(ln.entity).join() === 'light.demo_fernsehkugel' && ln.on, 'Entity antippen verknüpft die Leuchte, sie folgt sofort dem HA-Zustand', `Verknüpfen: ${JSON.stringify(ln)}`);
   // Fertig -> Verknüpfung gespeichert, Editiermodus aus
   let savedDev = null;
   await page.route('**/__save/**', async (route) => { if (route.request().url().endsWith('model.yaml')) savedDev = route.request().postData(); await route.fulfill({ status: 204 }); });
@@ -298,6 +307,67 @@ try {
   ok(kugel?.ha?.entities?.power === 'light.demo_fernsehkugel' && savedDev.startsWith('# Erfundenes Demo-Haus'), 'Fertig speichert die Verknüpfung im Modell (ha.entities.power)', `Verknüpfung gespeichert: ${JSON.stringify(kugel?.ha)}`);
   const off = await page.evaluate(() => !window.panel.hasAttribute('editing') && !window.panel.editor.sel);
   ok(off, 'Fertig beendet den Editiermodus');
+
+  // ---------------- Geräte: Zustandsanzeige, Gesten, Rückfrage ----------------
+  // Waschmaschine (Garage): power switch.demo_waschmaschine, info Restzeit, Antippen = HA-Dialog
+  const WM = { type: 'item', id: 'waschmaschine' };
+  await page.evaluate(async () => {
+    window.panel.setLevel(0);
+    const h = window.mockHass;
+    await h.callService('switch', 'turn_on', { entity_id: 'switch.demo_waschmaschine' });
+    h.states = { ...h.states, 'sensor.demo_waschmaschine_restzeit': { entity_id: 'sensor.demo_waschmaschine_restzeit', state: '42', attributes: { unit_of_measurement: 'min', friendly_name: 'Restzeit' } } };
+    window.panel.hass = h;
+    window.panel.view.renderNow();
+  });
+  const badge = await page.evaluate(() => {
+    const el = [...window.panel.shadowRoot.querySelectorAll('.badge')].find((b) => b.ref.id === 'waschmaschine');
+    const r = el?.getBoundingClientRect();
+    return el && { text: el.textContent, on: el.classList.contains('on'), hidden: el.hidden, inView: r.width > 0 && r.top > 0 && r.left > 0 && r.right < innerWidth };
+  });
+  ok(badge?.text === '42 min' && badge.on && !badge.hidden && badge.inView, `Zustandsanzeige über der Waschmaschine: ${badge?.text}`, `Zustandsanzeige: ${JSON.stringify(badge)}`);
+  await page.screenshot({ path: join(OUT, 'demo_zustand.png') });
+  const wmTop = await page.evaluate((ref) => window.panel.view.objectTop(ref).toArray(), WM);
+  const wmPt = await toScreen(page, [wmTop[0], wmTop[1] - 0.4, wmTop[2]]);
+  const wmTap = await (async () => {
+    await page.evaluate(() => {
+      window.moreInfo = [];
+      window.addEventListener('hass-more-info', (e) => window.moreInfo.push(e.detail.entityId), { once: true });
+      window.callsBefore = window.mockHass.calls.length;
+    });
+    await page.mouse.click(wmPt.x, wmPt.y);
+    await settle(page, () => window.moreInfo.length);
+    return page.evaluate(() => ({ moreInfo: window.moreInfo, calls: window.mockHass.calls.length - window.callsBefore }));
+  })();
+  ok(wmTap.moreInfo[0] === 'switch.demo_waschmaschine' && wmTap.calls === 0, 'Gerät antippen: Aktion aus dem Modell (HA-Dialog)', `Gerät antippen: ${JSON.stringify(wmTap)}`);
+  // Doppeltippen mit Rückfrage: erst nach „OK“ wird geschaltet, das einzelne Antippen entfällt
+  await page.evaluate((ref) => {
+    const e = window.panel._objEntry(ref);
+    e.ha = { ...e.ha, double_tap: { action: 'toggle', confirm: 'Waschmaschine ausschalten?' } };
+    window.moreInfo = [];
+    window.addEventListener('hass-more-info', (ev) => window.moreInfo.push(ev.detail.entityId), { once: true });
+    window.callsBefore = window.mockHass.calls.length;
+  }, WM);
+  await page.mouse.click(wmPt.x, wmPt.y);
+  await page.mouse.click(wmPt.x, wmPt.y);
+  await settle(page, () => window.panel.shadowRoot.querySelector('.confirm.show'));
+  const ask = await page.evaluate(() => ({
+    text: window.panel.shadowRoot.querySelector('.confirm.show p')?.textContent,
+    calls: window.mockHass.calls.length - window.callsBefore,
+    h: window.panel.shadowRoot.querySelector('.confirm .yes').getBoundingClientRect().height,
+  }));
+  await page.screenshot({ path: join(OUT, 'demo_rueckfrage.png') });
+  await clickShadow('.confirm .yes');
+  await settle(page, () => window.mockHass.states['switch.demo_waschmaschine'].state === 'off');
+  const dbl = await page.evaluate(() => ({
+    last: window.mockHass.calls.at(-1),
+    moreInfo: window.moreInfo.length,
+    badge: [...window.panel.shadowRoot.querySelectorAll('.badge')].find((b) => b.ref.id === 'waschmaschine')?.classList.contains('on'),
+  }));
+  ok(ask.text === 'Waschmaschine ausschalten?' && ask.calls === 0 && ask.h >= 48 && dbl.last?.domain === 'switch' && dbl.last.service === 'turn_off'
+    && dbl.moreInfo === 0 && dbl.badge === false, 'Doppeltippen mit Rückfrage schaltet das Gerät erst nach OK (ohne Antippen-Aktion)', `Doppeltippen: ${JSON.stringify({ ask, dbl })}`);
+  // Möbel ohne Verknüpfung reagieren nicht – Antippen geht an den Raum
+  const sofaRef = await page.evaluate(() => [...window.panel._gesturesOf({ type: 'item', id: 'sofa' })].join());
+  ok(sofaRef === '', 'Möbel ohne Verknüpfung: keine Geste (Antippen schaltet den Raum)', `Sofa: ${sofaRef}`);
   await page.close();
 } finally {
   await browser.close();

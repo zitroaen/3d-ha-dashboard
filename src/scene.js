@@ -18,12 +18,18 @@ export class HouseScene {
    * @param furnishing   { devices, items } (Leuchten und übrige Objekte)
    */
   /** assetBase: Ordner der Daten (für Texturen wie textures/…), wie data_url */
-  constructor(container, house, furnishing, { onRoomTap, onLampTap, onLampHold, onViewChange, assetBase = null } = {}) {
+  /**
+   * @param onObjectGesture  (ref {type, id}, 'tap'|'double_tap'|'hold') – Objekt angetippt usw.
+   * @param objectGestures   ref -> Set der Gesten, auf die das Objekt reagiert (sonst geht das Antippen zum Raum)
+   * @param onRender         nach jedem Bild (Zustandsanzeigen nachführen)
+   */
+  constructor(container, house, furnishing, { onRoomTap, onObjectGesture, objectGestures, onViewChange, onRender, assetBase = null } = {}) {
     this.container = container;
     this.house = house;
     this.onRoomTap = onRoomTap;
-    this.onLampTap = onLampTap;
-    this.onLampHold = onLampHold;
+    this.onObjectGesture = onObjectGesture;
+    this.objectGestures = objectGestures;
+    this.onRender = onRender;
     this.onViewChange = onViewChange;
     this.lamps = new Map(); // lampId -> { idx, lamp, room, roomIdx, floor, on, color, brightness }
     this.furnishing = [];
@@ -97,6 +103,7 @@ export class HouseScene {
   setLevel(level, { silent = false } = {}) {
     if (!this.levels.includes(level)) return false;
     this.level = level;
+    this._tops = null;
     this.activeFloors = this.floors.filter((f) => (f.floor.level ?? 0) === level);
     // "Haupt"-Etage der Ebene (Titel, Editor-Standard): die erste echte Gebäude-Etage
     this.activeFloor = this.activeFloors.find((f) => !f.floor.outdoor) || this.activeFloors[0];
@@ -140,6 +147,7 @@ export class HouseScene {
    */
   setFurnishing({ devices = [], items = [] } = {}, { exclude } = {}) {
     for (const layer of this.furnishing || []) layer.dispose();
+    this._tops = null;
     this.furnishingData = { devices, items }; // dieselben Objekte bearbeitet der Editor
     const prev = this.lamps || new Map();
     this.lamps = new Map();
@@ -430,6 +438,7 @@ export class HouseScene {
       this._raf = 0;
       const moving = this.controls.update();
       this.renderer.render(this.scene, this.camera);
+      this.onRender?.();
       this.frames = (this.frames || 0) + 1;
       if (moving) this.requestRender();
     });
@@ -439,6 +448,40 @@ export class HouseScene {
   renderNow() {
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    this.onRender?.();
+  }
+
+  /**
+   * Punkt über einem Objekt (Weltkoordinaten) für die Zustandsanzeige, oder null, wenn es nicht auf der gezeigten
+   * Ebene liegt.
+   */
+  objectTop(ref) {
+    const key = `${ref.type}:${ref.id}`;
+    // Zwischenspeicher je Einrichtung und Ebene (wird bei setFurnishing/setLevel geleert)
+    this._tops ??= new Map();
+    if (this._tops.has(key)) return this._tops.get(key);
+    const top = this._objectTop(ref);
+    this._tops.set(key, top);
+    return top;
+  }
+
+  _objectTop(ref) {
+    for (const layer of this.activeLayers) {
+      const hit = [...layer.lampHits, ...layer.itemHits].find((h) => h.userData.ref.type === ref.type && h.userData.ref.id === ref.id);
+      if (!hit) continue;
+      hit.updateWorldMatrix(true, false);
+      const box = new THREE.Box3().setFromObject(hit);
+      return new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y + 0.1, (box.min.z + box.max.z) / 2);
+    }
+    return null;
+  }
+
+  /** Weltpunkt -> Bildschirmkoordinaten im Panel (px), null hinter der Kamera */
+  toScreen(p) {
+    const s = p.clone().project(this.camera);
+    if (s.z > 1) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: ((s.x + 1) / 2) * rect.width, y: ((1 - s.y) / 2) * rect.height };
   }
 
   // ---------- Licht-Zustand ----------
@@ -520,33 +563,45 @@ export class HouseScene {
   _bindPointer() {
     const el = this.renderer.domElement;
     const ray = new THREE.Raycaster();
-    const HOLD_MS = 500; // so lange ruhig drücken = langes Drücken (HA-Dialog der Leuchte)
+    const HOLD_MS = 500; // so lange ruhig drücken = langes Drücken (z. B. HA-Dialog)
+    const DOUBLE_MS = 300; // zweites Antippen innerhalb dieser Zeit = Doppeltippen
     let down = null;
     let pointers = 0;
     let holdTimer = 0;
+    let pendingTap = null; // { ref, timer }: Antippen wartet, ob ein zweites folgt (nur bei Objekten mit Doppeltippen)
     const cancelHold = () => clearTimeout(holdTimer);
+    const gesture = (ref, g) => this.onObjectGesture?.(ref, g);
     const rayAt = (x, y) => {
       const rect = el.getBoundingClientRect();
       ray.setFromCamera(new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1), this.camera);
       return ray;
     };
-    // getroffene Leuchte unter dem zuletzt gesetzten Strahl
-    const lampAt = () => ray.intersectObjects(this.activeLayers.flatMap((l) => l.lampHits), false)[0]?.object.userData.lampId;
+    // vorderstes Objekt unter dem zuletzt gesetzten Strahl, das auf die Geste reagiert (Leuchten vor Möbeln)
+    const objectAt = (g) => {
+      const layers = this.activeLayers;
+      for (const hits of [layers.flatMap((l) => l.lampHits), layers.flatMap((l) => l.itemHits)]) {
+        for (const h of ray.intersectObjects(hits, false)) {
+          const ref = h.object.userData.ref;
+          if (this.objectGestures?.(ref).has(g)) return ref;
+        }
+      }
+      return null;
+    };
     el.addEventListener('pointerdown', (e) => {
       pointers++;
       cancelHold();
       // nur ein Finger zählt als Antippen; ein zweiter Finger macht daraus eine Geste
       down = pointers === 1 ? { x: e.clientX, y: e.clientY, t: performance.now(), touch: e.pointerType !== 'mouse' } : null;
-      // langes Drücken nur auf eine Leuchte, nur mit der Haupttaste und nicht im Editiermodus
-      if (!down || e.button !== 0 || this.tapHandler || !this.onLampHold) return;
+      // langes Drücken nur auf ein Objekt, nur mit der Haupttaste und nicht im Editiermodus
+      if (!down || e.button !== 0 || this.tapHandler || !this.onObjectGesture) return;
       const start = down;
       holdTimer = setTimeout(() => {
         if (down !== start) return;
         rayAt(start.x, start.y);
-        const lampId = lampAt();
-        if (!lampId) return;
+        const ref = objectAt('hold');
+        if (!ref) return;
         down = null; // das Loslassen ist dann kein Antippen mehr
-        this.onLampHold(lampId);
+        gesture(ref, 'hold');
       }, HOLD_MS);
     });
     el.addEventListener('pointermove', (e) => {
@@ -567,9 +622,26 @@ export class HouseScene {
       rayAt(e.clientX, e.clientY);
       // Im Editiermodus entscheidet der Editor, was ein Antippen bedeutet
       if (this.tapHandler?.(ray)) return;
-      // Lampen haben Vorrang vor Räumen
-      const lampId = lampAt();
-      if (lampId) return this.onLampTap?.(lampId);
+      // Objekte haben Vorrang vor Räumen; mit Doppeltippen wartet das Antippen kurz auf ein zweites
+      const dbl = objectAt('double_tap');
+      if (pendingTap) {
+        const p = pendingTap;
+        clearTimeout(p.timer);
+        pendingTap = null;
+        if (dbl && dbl.type === p.ref.type && dbl.id === p.ref.id) return gesture(dbl, 'double_tap');
+        if (p.tap) gesture(p.ref, 'tap'); // anderes Ziel: das erste Antippen jetzt ausführen
+      }
+      const ref = objectAt('tap');
+      if (dbl) {
+        const p = { ref: dbl, tap: !!ref && ref.type === dbl.type && ref.id === dbl.id };
+        p.timer = setTimeout(() => {
+          pendingTap = null;
+          if (p.tap) gesture(dbl, 'tap');
+        }, DOUBLE_MS);
+        pendingTap = p;
+        return;
+      }
+      if (ref) return gesture(ref, 'tap');
       const targets = this.activeFloors.flatMap((f) => [...f.rooms.values()].map((r) => r.hitMesh));
       const hit = ray.intersectObjects(targets, false)[0];
       if (hit) this.onRoomTap?.(hit.object.userData.roomId);
