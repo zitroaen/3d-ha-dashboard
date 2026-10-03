@@ -12,6 +12,7 @@
 import { load as parseYaml } from 'js-yaml';
 import { CATALOG, DEFAULT_MOUNT, hasCapability } from './catalog.js';
 import { migrate } from './migrate.js';
+import { heightAt } from '../geometry.js';
 
 export { MODEL_VERSION, ModelVersionError } from './migrate.js';
 
@@ -53,6 +54,18 @@ export function spacesOf(model) {
 }
 
 export const floorKey = (b, f) => `${b.id}/${f.id}`;
+
+/** Gelände eines Außenbereichs: Höhe je Eckpunkt (dritte Koordinate, sonst elevation) – oder null, wenn eben */
+export function terrainHeights(z) {
+  if (!z.polygon.some((p) => p.length > 2)) return null;
+  return z.polygon.map((p) => p[2] ?? (z.elevation || 0));
+}
+
+/** Bodenhöhe eines Außenbereichs an einer Stelle (Gelände interpoliert, sonst elevation) */
+export function outdoorHeightAt(z, pos) {
+  const hs = terrainHeights(z);
+  return hs ? heightAt(z.polygon, hs, pos) : z.elevation || 0;
+}
 
 const list = (v) => (v == null ? [] : [].concat(v));
 
@@ -142,7 +155,10 @@ export function toScene(model) {
       level: 0,
       elevation: 0,
       ceiling: 3,
-      rooms: model.outdoor.map((z) => ({ id: z.id, name: z.name, polygon: z.polygon, floor: z.surface || 'lawn', elevation: z.elevation || 0, area: z.ha_area })),
+      rooms: model.outdoor.map((z) => ({
+        id: z.id, name: z.name, polygon: z.polygon, floor: z.surface || 'lawn', elevation: z.elevation || 0, area: z.ha_area,
+        heights: terrainHeights(z),
+      })),
       walls: [],
       windows: [],
       doors: [],
@@ -157,7 +173,7 @@ export function toScene(model) {
     const floor = sp ? sp.floorKey : OUTDOOR_FLOOR;
     const room = sp ? o.space : OPEN_GROUND;
     // Außenbereiche liegen auf der Außen-Etage (Höhe 0): ihre eigene Höhe kommt zu den Objekthöhen dazu
-    const base = sp?.kind === 'outdoor' ? sp.base : 0;
+    const base = sp?.kind === 'outdoor' ? outdoorHeightAt(sp.room, o.pos) : 0;
     // ha: Kopie, die der Editor bearbeitet (writeBack schreibt sie zurück)
     const common = { id: o.id, name: o.name, floor, room, pos: o.pos, rot: o.rot, ...(o.params || {}), src: o, base, ha: o.ha ? structuredClone(o.ha) : undefined };
     if (hasCapability(o.model, 'light')) {

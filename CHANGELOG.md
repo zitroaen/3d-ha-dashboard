@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.9.0
+
+- **Gelände:** Außenbereiche können Höhen je Eckpunkt haben (`[x, y, z]`) – z. B. ein Garten als Hang. Objekte stehen
+  auf dem Gelände; der umgebende Boden setzt den Hang fort. Das Format bleibt abwärtskompatibel.
+- **Pflanzen im Katalog:** `tree` (Laub- oder Nadelbaum), `shrub` (Strauch) und `flowers` (Blumenbeet).
+- **Demo-Haus:** Garten als Südhang mit Apfelbaum, Kirschbaum, Tanne und Sträuchern; Blumenbeete rund um die Terrasse
+  und ein Weg in den Garten.
+
 ## 0.8.0
 
 - **Entities an allen Objekten:** Nicht nur Leuchten – jedes Möbel und Gerät lässt sich mit HA verknüpfen: Rolle

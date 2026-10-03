@@ -157,6 +157,26 @@ outdoor:
     surface: gravel
     elevation: -0.05
   - { id: beet, name: Beet, polygon: [[7, 9], [10.5, 9], [10.5, 10.5], [7, 10.5]], surface: soil, elevation: -0.04 }
+  - id: beet_west
+    name: Beet West
+    polygon: [[-1, 8], [0, 8], [0, 11.3], [-1, 11.3]]
+    surface: soil
+    elevation: -0.04
+  - id: beet_sued_1
+    name: Beet Süd links
+    polygon: [[0, 10.5], [2.7, 10.5], [2.7, 11.3], [0, 11.3]]
+    surface: soil
+    elevation: -0.04
+  - id: beet_sued_2
+    name: Beet Süd rechts
+    polygon: [[3.8, 10.5], [6.5, 10.5], [6.5, 11.3], [3.8, 11.3]]
+    surface: soil
+    elevation: -0.04
+  - { id: weg, name: Gartenweg, polygon: [[2.7, 10.5], [3.8, 10.5], [3.8, 11.3], [2.7, 11.3]], surface: paving }
+  - id: garten
+    name: Garten
+    surface: lawn
+    polygon: [[-4, 11.3, -0.05], [11.2, 11.3, -0.05], [11.2, 18, -1.5], [-4, 18, -1.5]]
 objects:
   - id: sofa
     model: sofa_u
@@ -286,3 +306,38 @@ objects:
     params: { radius: 0.12 }
     light: { height: 0.12, range: 2.5, color: "#9fd0ff" }
     ha: { entities: { power: light.demo_garten } }
+  # Garten: Bäume und Sträucher am Südhang, Blumen in den Beeten um die Terrasse
+  - { id: apfelbaum, name: Apfelbaum, model: tree, space: garten, pos: [1.2, 14.4], size: [3.2, 3.2, 4.5] }
+  - id: kirschbaum
+    name: Kirschbaum
+    model: tree
+    space: garten
+    pos: [8.4, 15.3]
+    size: [3.6, 3.6, 5.2]
+    params: { color: leaf_light }
+  - id: tanne
+    name: Tanne
+    model: tree
+    space: garten
+    pos: [-2.6, 16.3]
+    size: [2.4, 2.4, 6.5]
+    params: { shape: conifer }
+  - { id: strauch_1, name: Strauch, model: shrub, space: garten, pos: [10.1, 12.6] }
+  - { id: strauch_2, name: Strauch, model: shrub, space: garten, pos: [-2.9, 12.5], size: [1.4, 1.1, 1.2] }
+  - { id: strauch_3, name: Strauch, model: shrub, space: garten, pos: [5.4, 17], size: [1.6, 1.2, 1.1] }
+  - { id: blumen_west, name: Blumen, model: flowers, space: beet_west, pos: [-0.5, 9.65], size: [0.8, 3.1, 0.35] }
+  - { id: blumen_sued_1, name: Blumen, model: flowers, space: beet_sued_1, pos: [1.35, 10.9], size: [2.5, 0.65, 0.35] }
+  - id: blumen_sued_2
+    name: Lavendel
+    model: flowers
+    space: beet_sued_2
+    pos: [5.15, 10.9]
+    size: [2.5, 0.65, 0.4]
+    params: { color: flower_violet }
+  - id: blumen_ost
+    name: Blumen
+    model: flowers
+    space: beet
+    pos: [7.9, 9.75]
+    size: [1.4, 1.1, 0.35]
+    params: { color: flower_yellow }

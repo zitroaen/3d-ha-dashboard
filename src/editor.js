@@ -176,6 +176,19 @@ export class Editor {
     if (s.type === 'lamp') e.height = r2(y);
     else if (e.elevation != null) e.elevation = r2(y);
     if (s.type === 'lamp') this.view.moveLampLight(s.id, [p.x, y, p.z]);
+    // im Gelände: nach dem Verschieben der Bodenhöhe an der neuen Stelle folgen (Höhe über Boden bleibt)
+    if (!live) {
+      const nb = this.view.baseAt(e.floor, e.room, e.pos);
+      if (Math.abs(nb - (e.base || 0)) > 1e-3) {
+        e.base = nb;
+        p.y = s.floorY + nb + y;
+        const st = s.type === 'lamp' && this.view.lamps.get(s.id);
+        if (st) {
+          st.lamp.base = nb;
+          this.view.moveLampLight(s.id, [p.x, y, p.z]);
+        }
+      }
+    }
     if (!live) this.changes.set(refKey(s.type, s.id), { type: s.type, id: s.id, values: layoutValues(s.type, e) });
     this._emit();
   }

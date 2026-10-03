@@ -134,12 +134,26 @@ Bereiche wie Räume: Objekte können darin stehen, Außenleuchten beleuchten sie
 |---|---|---|---|
 | `id` | ja | | Bereichs-ID (eindeutig zusammen mit allen Räumen) |
 | `name` | ja | | Anzeigename |
-| `polygon` | ja | | Fläche |
+| `polygon` | ja | | Fläche; Eckpunkte `[x, y]` oder mit Höhe `[x, y, z]` (Gelände, siehe unten) |
 | `surface` | nein | `lawn` | Oberfläche |
-| `elevation` | nein | 0 | Höhe der Fläche (Terrasse auf Fußbodenhöhe, Garten tiefer) |
+| `elevation` | nein | 0 | Höhe der Fläche (Terrasse auf Fußbodenhöhe, Garten tiefer); bei Gelände: Höhe der Eckpunkte ohne `z` |
 | `ha_area` | nein | nach Name | HA-Bereich |
 
-Reserviert für später: `site.terrain` (Geländehöhen als Stützpunkte `[x, y, z]`, zwischen ihnen wird trianguliert).
+**Gelände (Hang, Böschung):** Hat mindestens ein Eckpunkt eine dritte Koordinate `z`, ist der Bereich schräg: `z` ist
+die Höhe dieses Eckpunkts (Meter, wie `elevation`), zwischen den Eckpunkten wird in Dreiecken linear interpoliert.
+Ein Hang mit gleichmäßigem Gefälle braucht also nur ein Viereck, dessen obere Kante höher liegt als die untere;
+für einen geknickten Hang mehr Eckpunkte am Rand setzen (Punkte im Inneren gibt es nicht). Objekte im Bereich stehen auf dem Gelände (Höhe an ihrer Position),
+`elevation` und `light.height` zählen ab dort. Liegt das Gelände tiefer als der umgebende Boden (`site.ground`, Höhe ≈ 0),
+setzt der Boden es nach außen fort (ein Hang läuft seitlich weiter, unterhalb bleibt es unten); liegt es höher (Hügel,
+Wall), zeigt das Panel eine Erdkante wie bei einem Geländemodell.
+
+```yaml
+- id: garten
+  name: Garten
+  surface: lawn
+  # Südhang: oben (Norden) auf Terrassenhöhe, unten 1,5 m tiefer
+  polygon: [[-4, 11.3, -0.05], [11.2, 11.3, -0.05], [11.2, 18, -1.5], [-4, 18, -1.5]]
+```
 
 ## `objects` – Objekte
 
@@ -268,18 +282,21 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `chair` | Möbel | | | `guitar` |
 | `chest_table` | Möbel | | 0.8 × 0.6 × 0.48 | |
 | `curtain` | Möbel | | | `color` |
+| `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
 | `grand_piano` | Möbel | | 1.48 × 1.6 | |
 | `hearth` | Möbel | | | |
 | `marker` | Gerät | | 0.12 | `color` |
 | `picture` | Möbel | | | `frame`, `mat`, `color`, `texture` |
 | `radiator` | Möbel | | | |
 | `rug` | Möbel | | 2.0 × 3.0 | `color` |
+| `shrub` | Pflanze | | 1.2 × 1.0 × 1.0 | `color` |
 | `sideboard` | Möbel | | 1.2 × 0.45 × 0.6 | |
 | `sofa_u` | Möbel | | 3.5 × 2.4 × 0.82 | `seat_depth`, `left`, `right`, `color` |
 | `speaker` | Möbel | | 0.22 × 0.3 × 1.0 | |
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
 | `toy_storage` | Möbel | | | `columns` |
+| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`), `color` |
 | `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
 | `ball` | Leuchte | `light` | | `radius` |
 | `chandelier_candles` | Leuchte | `light` | | `arms` |
@@ -468,5 +485,7 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.9.0, abwärtskompatibel):** Gelände – Eckpunkte von Außenbereichen mit Höhe
+  `[x, y, z]`; Katalog-Art „Pflanze“ mit `tree`, `shrub`, `flowers`.
 - **Version 2, Ergänzung (0.8.0, abwärtskompatibel):** `ha.badge`; Standardaktionen für Leuchten; „Umschalten“ schaltet
   über `turn_on`/`turn_off` der jeweiligen Domain.

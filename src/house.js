@@ -11,6 +11,8 @@ const DOOR_HEIGHT = 2.05;
 // Jeder Raumboden liegt minimal höher als der vorige: Raumpolygone überlappen in den Türöffnungen,
 // ohne Versatz flackern die Böden dort (Z-Fighting).
 const FLOOR_STEP = 0.0008;
+/** Höhe der Bodenfläche außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen */
+export const GROUND_Y = -0.12;
 
 export class FloorModel {
   /**
@@ -61,7 +63,18 @@ export class FloorModel {
       const kind = this.shared.mat[r.room.floor] ? r.room.floor : 'parquet';
       const fb = (floors[kind] ??= new Builder());
       const uvStart = fb.uv.length;
-      fb.polyH(r.room.polygon, y, r.idx);
+      const hs = r.room.heights; // Gelände: Höhe je Eckpunkt
+      if (hs) {
+        fb.polyT(r.room.polygon, hs, r.idx, r.order * FLOOR_STEP);
+        // Liegt das Gelände über dem Boden (Hügel, Böschung nach oben): Erdkante bis zum Boden wie beim
+        // Geländemodell. Tiefer liegendes Gelände setzt der Boden selbst fort (scene._groundGeometry).
+        const sk = (floors.soil ??= new Builder());
+        const poly = r.room.polygon;
+        for (let i = 0; i < poly.length; i++) {
+          const j = (i + 1) % poly.length;
+          if (hs[i] > GROUND_Y + 0.1 || hs[j] > GROUND_Y + 0.1) sk.skirt(poly[i], GROUND_Y, Math.max(hs[i], GROUND_Y), poly[j], GROUND_Y, Math.max(hs[j], GROUND_Y), r.idx);
+        }
+      } else fb.polyH(r.room.polygon, y, r.idx);
       // floor_rot: Verlegerichtung des Bodens in Grad (z. B. 45 für diagonal verlegtes Würfelparkett)
       if (r.room.floor_rot) {
         const a = (r.room.floor_rot * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
@@ -72,7 +85,8 @@ export class FloorModel {
         }
       }
       const hit = new Builder();
-      hit.polyH(r.room.polygon, (r.room.elevation || 0) + 0.01, r.idx);
+      if (r.room.heights) hit.polyT(r.room.polygon, r.room.heights, r.idx, 0.01);
+      else hit.polyH(r.room.polygon, (r.room.elevation || 0) + 0.01, r.idx);
       const mesh = new THREE.Mesh(hit.geometry(), this.shared.hitMaterial); // Material unsichtbar, Mesh raycastbar
       mesh.userData.roomId = r.room.id;
       r.hitMesh = mesh;
