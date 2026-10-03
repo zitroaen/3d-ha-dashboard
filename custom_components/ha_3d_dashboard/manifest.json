@@ -3,12 +3,12 @@
   "name": "3D-HA-Dashboard",
   "codeowners": ["@zitroaen"],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "panel_custom"],
+  "dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
   "documentation": "https://github.com/zitroaen/3d-ha-dashboard",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/zitroaen/3d-ha-dashboard/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.6.0"
+  "version": "0.7.0"
 }

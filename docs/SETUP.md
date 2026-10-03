@@ -97,6 +97,19 @@ nicht in `engine/` der Instanz ändern.
 4. Updates kommen über HACS (danach HA neu starten); die Integration hängt ihre Version an die Bundle-Adresse, der
    Browser lädt das neue Bundle also von selbst.
 
+**Gemeinsames Modell (nur mit der Integration):** Das Dashboard ist für alle Benutzer gleich. **Fertig** im Editor
+speichert das ganze Modell in der Integration (`/config/.storage/ha_3d_dashboard.model`, Teil jedes HA-Backups); alle
+offenen Panels übernehmen es sofort. Bearbeiten dürfen nur Administratoren, alle anderen sehen keinen Stift.
+- **Import:** eine neue `model.yaml` in den Datenordner legen und das Panel neu öffnen. Eine Datei, die sich seit dem
+  letzten Speichern geändert hat (oder neu ist), **ersetzt** das gespeicherte Modell – vorher exportieren, wenn im
+  Editor Änderungen gemacht wurden, die erhalten bleiben sollen.
+- **Export:** Stift → **Export** lädt das aktuelle Modell als `model.yaml` herunter (z. B. für `data/` der Instanz).
+- Nach dem ersten Speichern braucht das Panel die Datei nicht mehr: Wer den Grundriss nicht unter `/local/` (ohne
+  Anmeldung, siehe unten) liegen lassen möchte, kann `model.yaml` dann aus dem Datenordner löschen; nur `textures/`
+  bleibt dort.
+- Ein Konflikt (zwei Administratoren speichern gleichzeitig) wird erkannt: Das zweite Speichern scheitert mit
+  Meldung, der Editor bleibt offen – **Abbrechen** lädt den neuen Stand.
+
 Solange im Datenordner nichts liegt, zeigt das Panel das eingebaute **Demo-Haus** mit Hinweis: Seine Leuchten sind
 unverknüpft und schalten lokal; im Editor mit einer echten Lampe verknüpfte schalten über HA. Sonne/Mond kommen aus
 `sun.sun`. **Fertig** speichert Änderungen am Demo-Haus in eigene HA-Benutzerdaten (`ha_3d_dashboard_layout_demo`), nie in
@@ -127,9 +140,9 @@ Geräteliste sind damit für jeden lesbar, der die HA-Adresse erreicht. Für rei
 unkritisch – bei Fernzugriff abwägen.
 
 **Speichern im Panel:** **Fertig** speichert, **Abbrechen** verwirft alle Änderungen seit dem Öffnen des Editors.
-In HA kann das Panel keine Dateien schreiben. Änderungen aus dem Editor landen in den
-HA-Benutzerdaten (pro Benutzer) und werden über die Dateien gelegt; **Export** im Editor liefert die fertigen YAML-
-Dateien für die Instanz.
+Mit der Integration (Variante HACS) speichert das Panel gemeinsam für alle (siehe oben). Ohne Integration
+(`panel_custom` von Hand) kann es nichts Gemeinsames schreiben: Änderungen landen in den HA-Benutzerdaten (pro
+Benutzer) und werden über die Datei gelegt; **Export** im Editor liefert das fertige `model.yaml` für die Instanz.
 
 ## 6. Pflege
 

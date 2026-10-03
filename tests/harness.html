@@ -20,11 +20,13 @@
     // Daten direkt aus dem Repo laden: Änderungen in data/ sind nach einem Neuladen sichtbar, ohne Build
     // save_url: der Dev-Server (npm run serve) schreibt Editor-Änderungen direkt nach data/
     // Varianten für die Demo-Tests: ?demo=1 (config.demo) bzw. ?nodata=1 (Daten nicht erreichbar -> Demo-Fallback)
+    // ?shared=1: wie mit der Integration (gemeinsamer Speicher, simuliert in mock-hass.js), &user=1: kein Administrator
     const q = new URLSearchParams(location.search);
     document.body.classList.toggle('ha', q.has('ha'));
     // ?top=47: Panel beginnt tiefer, wie in der iOS-App unter der Statusleiste
     if (q.has('top')) document.body.style.paddingTop = `${q.get('top')}px`;
-    el.panel = { config: q.has('demo') ? { demo: true } : q.has('nodata') ? { data_url: '/fehlt' } : { data_url: '/data/', save_url: '/__save/' } };
+    el.panel = { config: q.has('demo') ? { demo: true } : q.has('nodata') ? { data_url: q.has('shared') ? '/fehlt/' : '/fehlt', shared: q.has('shared') }
+      : q.has('shared') ? { data_url: '/data/', shared: true } : { data_url: '/data/', save_url: '/__save/' } };
 
     // Simuliertes HA wie die echte Installation: alle Entities aus dem HA-Export (reference/entities.txt) mit
     // Bereich (wie hass.states + Entity-/Bereichs-Registry) plus jede im Modell verknüpfte Entity –
@@ -55,6 +57,7 @@
       'sun.sun': { state: 'below_horizon', attributes: { azimuth: 330, elevation: -25, friendly_name: 'Sun' } },
     }, (h) => { el.hass = h; });
     Object.assign(hass, { entities, areas, devices: {} });
+    if (q.has('user')) hass.user = { name: 'Gast', is_admin: false };
     el.hass = hass;
     el.narrow = matchMedia('(max-width: 870px)').matches;
     window.panel = el;

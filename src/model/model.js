@@ -31,6 +31,11 @@ export function parseModel(text, file = 'model.yaml') {
   return migrate(doc).doc;
 }
 
+/** Modell aus einem bereits geparsten Objekt (z. B. dem gemeinsamen Speicher der Integration), migriert */
+export function modelFromObject(obj) {
+  return migrate(structuredClone(obj)).doc;
+}
+
 /** Alle Bereiche (Räume und Außenbereiche) mit ihrer Lage: Map id -> { kind, building, floor, room, base, height } */
 export function spacesOf(model) {
   const out = new Map();

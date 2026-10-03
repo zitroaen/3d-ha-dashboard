@@ -1,7 +1,8 @@
 """3D-HA-Dashboard: trägt das 3D-Grundriss-Panel ohne YAML in die Seitenleiste ein.
 
 Die Integration liefert das gebündelte Panel (frontend/ha-3d-dashboard.js) selbst aus und registriert es als
-Seitenleisten-Panel – genau das, was sonst ein panel_custom-Eintrag in der configuration.yaml erledigt.
+Seitenleisten-Panel – genau das, was sonst ein panel_custom-Eintrag in der configuration.yaml erledigt. Außerdem
+hält sie das Modell für alle Benutzer gemeinsam (storage.py).
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from .const import (
@@ -28,10 +31,19 @@ from .const import (
     PANEL_URL_PATH,
     STATIC_URL,
 )
+from .storage import async_setup_storage
 
 _LOGGER = logging.getLogger(__name__)
 
 FRONTEND_DIR = Path(__file__).parent / "frontend"
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Gemeinsamen Speicher und WebSocket-Befehle einmal pro HA-Start anlegen."""
+    async_setup_storage(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -61,7 +73,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         sidebar_title=options.get(CONF_SIDEBAR_TITLE, DEFAULT_SIDEBAR_TITLE),
         sidebar_icon=options.get(CONF_SIDEBAR_ICON, DEFAULT_SIDEBAR_ICON),
         module_url=f"{STATIC_URL}/{BUNDLE_FILE}?v={version}",
-        config={"data_url": options.get(CONF_DATA_URL, DEFAULT_DATA_URL)},
+        # shared: das Panel lädt und speichert das Modell gemeinsam über die Integration (storage.py)
+        config={"data_url": options.get(CONF_DATA_URL, DEFAULT_DATA_URL), "shared": True},
         require_admin=False,
     )
 

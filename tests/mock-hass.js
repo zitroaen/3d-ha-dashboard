@@ -30,7 +30,32 @@ export function createMockHass(initialStates = {}, onChange = () => {}) {
       hass.calls.push({ ws: msg });
       if (msg.type === 'frontend/get_user_data') return { value: hass._userData?.[msg.key] ?? null };
       if (msg.type === 'frontend/set_user_data') (hass._userData ??= {})[msg.key] = msg.value;
+      // gemeinsamer Speicher der Integration (custom_components/ha_3d_dashboard/storage.py)
+      if (msg.type === 'ha_3d_dashboard/model/get') return structuredClone(hass._shared);
+      if (msg.type === 'ha_3d_dashboard/model/save') {
+        if (!hass.user.is_admin) throw { code: 'unauthorized', message: 'Unauthorized' };
+        if ('revision' in msg && msg.revision !== hass._shared.revision) {
+          throw { code: 'conflict', message: 'Das Modell wurde inzwischen an anderer Stelle gespeichert – bitte neu laden' };
+        }
+        return { revision: hass._sharedSave(msg.model, msg.header, msg.file_hash) };
+      }
       return null;
+    },
+    _shared: { model: null, revision: 0 },
+    _subs: [],
+    /** Speichern im gemeinsamen Speicher (auch: „ein anderer Administrator speichert“ in den Tests) */
+    _sharedSave(model, header = '', fileHash = null) {
+      hass._shared = { model: structuredClone(model), header, file_hash: fileHash, revision: hass._shared.revision + 1 };
+      const { revision } = hass._shared;
+      setTimeout(() => hass._subs.forEach((cb) => cb({ revision })), 0);
+      return revision;
+    },
+    connection: {
+      async subscribeMessage(cb, msg) {
+        hass.calls.push({ ws: msg });
+        hass._subs.push(cb);
+        return async () => { hass._subs = hass._subs.filter((c) => c !== cb); };
+      },
     },
   };
   return hass;

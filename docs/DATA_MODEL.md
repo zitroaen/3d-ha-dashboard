@@ -434,8 +434,25 @@ sie setzt `data_url`, voreingestellt `/local/ha-3d-dashboard/`. Bei `panel_custo
 | `data_url` | Ordner mit `model.yaml` und `textures/` (z. B. `/local/ha-3d-dashboard/`). Ohne Angabe: neben dem Modul. |
 | `demo` | `true`: eingebettetes Demo-Haus statt eigener Daten (unverknüpft, lokales Schalten; Speichern nur in eigene Demo-Benutzerdaten). |
 | `save_url` | nur Entwicklung: Dev-Server-Endpunkt zum Speichern des Editors. |
+| `shared` | `true` (setzt die Integration): Modell gemeinsam über die Integration laden und speichern, siehe unten. |
 
 Sind die Daten nicht erreichbar (HTTP-Fehler), zeigt das Panel das Demo-Haus mit Hinweis.
+
+## Anhang: Gemeinsamer Speicher der Integration
+
+Mit `shared: true` hält die Integration das Modell für alle Benutzer (HA-Speicher `ha_3d_dashboard.model`). Sie
+speichert das Modell als JSON-Objekt (gleicher Inhalt wie `model.yaml`), den Kopfkommentar (`header`), den Prüfwert
+der `model.yaml`, aus der es hervorging (`file_hash`), und eine fortlaufende `revision`. WebSocket-Befehle:
+
+| Befehl | Rechte | Inhalt |
+|---|---|---|
+| `ha_3d_dashboard/model/get` | alle | `{model, header, file_hash, revision, updated_at, updated_by}`; ohne Modell `{model: null, revision: 0}` |
+| `ha_3d_dashboard/model/save` | Administratoren | `{model, header?, file_hash?, revision?}` → `{revision}`; weicht `revision` ab: Fehler `conflict` |
+| `ha_3d_dashboard/model/subscribe` | alle | Ereignis `{revision}` nach jedem Speichern |
+
+Quelle beim Laden: das gespeicherte Modell, außer im Datenordner liegt eine `model.yaml` mit anderem Prüfwert (neue
+oder geänderte Datei = Import, sie gewinnt). Ohne beides: Demo-Haus. Das gespeicherte Modell wird beim Laden wie eine
+Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Speicher.
 
 ## Änderungen
 

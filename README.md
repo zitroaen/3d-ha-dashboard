@@ -44,7 +44,8 @@ antippen → **Verknüpfen** → eigene Lampe wählen – dann schaltet sie übe
 **Abbrechen** verwirft sie.
 
 **Eigenes Haus:** `model.yaml` und `textures/` nach `/config/www/ha-3d-dashboard/`
-legen – das Panel findet sie dort automatisch (Seite neu laden). Titel, Symbol und Datenordner lassen sich unter
+legen – das Panel findet sie dort automatisch (Seite neu laden). Was Administratoren im Editor ändern, speichert die
+Integration **für alle Benutzer gleich**; Export und Import über `model.yaml`. Titel, Symbol und Datenordner lassen sich unter
 **Einstellungen → Geräte & Dienste → 3D-HA-Dashboard → Konfigurieren** ändern. Wie die Daten entstehen:
 [docs/SETUP.md](docs/SETUP.md).
 
