@@ -65,6 +65,21 @@ async function checkDemo(label, query, allowConsole, noteRe) {
   });
   ok(sun.day && sun.sconce, `${label}: Sonne kommt aus hass, Lampen bleiben lokal`, `${label}: Sonne ${JSON.stringify(sun)}`);
 
+  // Das Demo-Haus ist unverknüpft; eine (im Editor) mit einer echten Entity verknüpfte Leuchte schaltet über HA
+  const real = await page.evaluate(async () => {
+    const v = window.panel.view;
+    const unlinked = [...v.lamps.values()].every((s) => s.lamp.entity == null);
+    const s = v.lamps.get('eg_wohnen_wandleuchte');
+    s.lamp.entity = 'light.demo_wandleuchte'; // existiert im simulierten HA wie eine echte Lampe
+    window.mockHass.calls.length = 0;
+    await window.panel._onLampTap('eg_wohnen_wandleuchte');
+    const call = window.mockHass.calls.find((c) => c.domain);
+    s.lamp.entity = null;
+    return { unlinked, call: call && `${call.domain}.${call.service}:${call.data.entity_id}` };
+  });
+  ok(real.unlinked && real.call === 'light.turn_off:light.demo_wandleuchte',
+    `${label}: Demo-Leuchten unverknüpft, echte Verknüpfung schaltet über HA`, `${label}: echte Entity ${JSON.stringify(real)}`);
+
   // Editor: Speichern/Export ausgeblendet, Änderungen werden nirgends hingeschrieben
   await page.evaluate(() => window.panel.setEditing(true));
   await page.evaluate(() => {
