@@ -194,6 +194,7 @@ ha:
 | `tap` | siehe Standards | Aktion beim Antippen |
 | `double_tap` | `none` | Aktion beim Doppeltippen |
 | `hold` | `more-info` | Aktion beim langen Drücken (½ s) |
+| `badge` | siehe Standards | Zustand über dem Objekt anzeigen (`true`/`false`) |
 
 **Rollen:**
 
@@ -208,7 +209,7 @@ Reserviert für spätere Versionen: `speed` (Drehzahl), `flow` (Leistung für En
 
 | Aktion | Kurzform | ausführlich | Wirkung |
 |---|---|---|---|
-| Umschalten | `toggle` | `{ action: toggle }` | `power`-Entities umschalten (`homeassistant.toggle`; Leuchten und Schalter gemeinsam an bzw. aus) |
+| Umschalten | `toggle` | `{ action: toggle }` | `power`-Entities gemeinsam umschalten: ist eine an, gehen alle aus, sonst alle an (`<domain>.turn_on/turn_off`, andere Domains über `homeassistant.turn_on/turn_off`) |
 | HA-Dialog | `more-info` | `{ action: more-info, entity: sensor.x }` | HA-eigenen Dialog öffnen (ohne `entity`: erste `power`-, sonst erste `info`-Entity) |
 | Dienst | – | `{ action: service, service: script.kamin_an, data: { … } }` | HA-Dienst aufrufen; ohne `entity_id` in `data` gelten die `power`-Entities |
 | Seite | – | `{ action: navigate, path: /lovelace/energie }` | HA-Seite öffnen |
@@ -217,7 +218,16 @@ Reserviert für spätere Versionen: `speed` (Drehzahl), `flow` (Leistung für En
 Jede ausführliche Aktion kann `confirm: "Text der Rückfrage"` haben.
 
 **Standards:** `tap` = `toggle`, wenn `power` verknüpft ist, sonst `more-info`, wenn irgendeine Entity verknüpft ist,
-sonst `none`. `hold` = `more-info`. `double_tap` = `none`. Ein Objekt ohne `ha` ist reine Einrichtung.
+sonst `none`. `hold` = `more-info`, wenn irgendeine Entity verknüpft ist, sonst `none`. `double_tap` = `none`.
+Leuchten (Fähigkeit `light`) haben immer `tap` = `toggle` und `hold` = `more-info` – unverknüpft schalten sie im
+Demo-Haus und in der Vorschau lokal. Ein anderes Objekt ohne `ha` ist reine Einrichtung (Antippen geht an den Raum).
+Hat ein Objekt eine Aktion für `double_tap`, wartet ein einzelnes Antippen kurz (0,3 s), ob ein zweites folgt.
+
+**Zustandsanzeige** (`badge`): ein kleines Schild über dem Objekt mit dem Wert der `info`-Entities (mit Einheit,
+mehrere durch „·“ getrennt) oder – ohne `info` – „An“/„Aus“ der `power`-Entities; hervorgehoben, solange eine
+`power`-Entity an ist. Als „an“ gilt jeder Zustand außer `off`, `idle`, `standby`, `closed`, `locked`, `docked`,
+`not_home`, `unavailable`, `unknown` und `0`. Standard: angezeigt bei `info`-Entities oder bei geschalteten Objekten,
+die keine Leuchte sind (Leuchten zeigen ihren Zustand durch ihr Licht). Keine Animationen.
 
 **Räume** schalten beim Antippen alle `power`-Entities der Leuchten im Raum (alle an bzw. alle aus).
 
@@ -458,3 +468,5 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.8.0, abwärtskompatibel):** `ha.badge`; Standardaktionen für Leuchten; „Umschalten“ schaltet
+  über `turn_on`/`turn_off` der jeweiligen Domain.

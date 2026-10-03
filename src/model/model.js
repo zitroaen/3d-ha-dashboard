@@ -65,14 +65,46 @@ export function normAction(a) {
 /** Entities einer Rolle als Liste */
 export const roleEntities = (obj, role) => list(obj.ha?.entities?.[role]);
 
-/** Aktion für eine Geste mit Standardwerten (docs/DATA_MODEL.md → Standards) */
-export function gestureAction(obj, gesture) {
+export const GESTURES = ['tap', 'double_tap', 'hold'];
+
+/**
+ * Aktion für eine Geste mit Standardwerten (docs/DATA_MODEL.md → Standards).
+ * @param obj    Objekt mit `ha` (Modell-Objekt oder interne Kopie)
+ * @param light  Objekt kann leuchten (Leuchten schalten auch unverknüpft: Demo/Vorschau lokal)
+ */
+export function gestureAction(obj, gesture, light = false) {
   const set = normAction(obj.ha?.[gesture]);
   if (set) return set;
+  return defaultAction(obj, gesture, light);
+}
+
+/** Standardaktion einer Geste (ohne ausdrückliche Angabe) */
+export function defaultAction(obj, gesture, light = false) {
   const power = roleEntities(obj, 'power'), info = roleEntities(obj, 'info');
-  if (gesture === 'tap') return power.length ? { action: 'toggle' } : info.length ? { action: 'more-info' } : { action: 'none' };
-  if (gesture === 'hold') return power.length || info.length ? { action: 'more-info' } : { action: 'none' };
+  if (gesture === 'tap') return power.length || light ? { action: 'toggle' } : info.length ? { action: 'more-info' } : { action: 'none' };
+  if (gesture === 'hold') return power.length || info.length || light ? { action: 'more-info' } : { action: 'none' };
   return { action: 'none' };
+}
+
+/** Zustandsanzeige über dem Objekt? (`ha.badge`, Standard: bei info-Entities oder geschalteten Nicht-Leuchten) */
+export function showsBadge(obj, light = false) {
+  if (obj.ha?.badge != null) return obj.ha.badge;
+  return roleEntities(obj, 'info').length > 0 || (!light && roleEntities(obj, 'power').length > 0);
+}
+
+/** `ha` aufräumen: leere Rollen und leere Angaben entfernen; nichts übrig -> undefined */
+export function cleanHa(ha) {
+  if (!ha) return undefined;
+  const out = {};
+  const ents = {};
+  for (const [role, v] of Object.entries(ha.entities || {})) {
+    const l = list(v).filter(Boolean);
+    if (l.length) ents[role] = l.length === 1 ? l[0] : l;
+  }
+  if (Object.keys(ents).length) out.entities = ents;
+  for (const g of GESTURES) if (ha[g] != null) out[g] = ha[g];
+  if (ha.badge != null) out.badge = ha.badge;
+  return Object.keys(out).length ? out : undefined;
 }
 
 /**
@@ -126,7 +158,8 @@ export function toScene(model) {
     const room = sp ? o.space : OPEN_GROUND;
     // Außenbereiche liegen auf der Außen-Etage (Höhe 0): ihre eigene Höhe kommt zu den Objekthöhen dazu
     const base = sp?.kind === 'outdoor' ? sp.base : 0;
-    const common = { id: o.id, name: o.name, floor, room, pos: o.pos, rot: o.rot, ...(o.params || {}), src: o, base };
+    // ha: Kopie, die der Editor bearbeitet (writeBack schreibt sie zurück)
+    const common = { id: o.id, name: o.name, floor, room, pos: o.pos, rot: o.rot, ...(o.params || {}), src: o, base, ha: o.ha ? structuredClone(o.ha) : undefined };
     if (hasCapability(o.model, 'light')) {
       const l = o.light || {};
       devices.push({
@@ -162,10 +195,13 @@ export function writeBack(type, e) {
   if (!o) return;
   o.pos = e.pos.map(r3);
   if (e.rot != null && (e.rot !== 0 || o.rot != null)) o.rot = e.rot;
-  if (type === 'lamp') {
-    o.light = { ...(o.light || {}), height: r3(e.height) };
-    setRole(o, 'power', e.entity);
-  } else if (e.elevation != null) {
+  if (type === 'lamp') o.light = { ...(o.light || {}), height: r3(e.height) };
+  if ('ha' in e) {
+    const ha = cleanHa(e.ha);
+    if (ha) o.ha = structuredClone(ha);
+    else delete o.ha;
+  } else if (type === 'lamp') setRole(o, 'power', e.entity);
+  if (type !== 'lamp' && e.elevation != null) {
     const el = r3(e.elevation);
     if (el !== 0 || o.elevation != null) o.elevation = el;
   }
