@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import * as yaml from 'js-yaml';
 import { ENGINE_ROOT } from './lib/config.mjs';
 import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.js';
-import { parseModel, toScene, writeBack, gestureAction, setRole, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
+import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 
@@ -65,11 +65,11 @@ check('Szene: Objekt ohne Bereich steht auf freiem Gelände', free.floor === OUT
 const mm = parseModel(demoText);
 const sc2 = toScene(mm);
 const lamp = sc2.devices.find((d) => d.id === 'eg_wohnen_wandleuchte');
-Object.assign(lamp, { pos: [4.0001, 0.5], height: 1.8, entity: ['light.neu'] });
+Object.assign(lamp, { pos: [4.0001, 0.5], height: 1.8, ha: { entities: { power: ['light.neu'], info: [] }, hold: 'none' } });
 writeBack('lamp', lamp);
 const src = mm.objects.find((o) => o.id === 'eg_wohnen_wandleuchte');
-check('Zurückschreiben: Lage, Lichthöhe und Verknüpfung landen im Modell', src.pos[0] === 4 && src.light.height === 1.8 && src.ha.entities.power === 'light.neu', JSON.stringify(src));
-lamp.entity = [];
+check('Zurückschreiben: Lage, Lichthöhe und Verknüpfung landen im Modell', src.pos[0] === 4 && src.light.height === 1.8 && src.ha.entities.power === 'light.neu' && !('info' in src.ha.entities) && src.ha.hold === 'none', JSON.stringify(src));
+lamp.ha = { entities: { power: null } };
 writeBack('lamp', lamp);
 check('Zurückschreiben: Verknüpfung lösen entfernt ha', !src.ha, JSON.stringify(src.ha));
 const o = { id: 'a' };
@@ -87,6 +87,14 @@ check('Overrides: überschreiben Lage und Verknüpfung, null entfernt Felder', s
 const act = (ha, g) => gestureAction({ ha }, g).action;
 check('Aktionen: power -> Antippen schaltet, lange drücken öffnet den Dialog', act({ entities: { power: 'light.a' } }, 'tap') === 'toggle' && act({ entities: { power: 'light.a' } }, 'hold') === 'more-info');
 check('Aktionen: nur info -> Antippen öffnet den Dialog', act({ entities: { info: 'sensor.a' } }, 'tap') === 'more-info');
+check('Aktionen: Leuchten schalten auch unverknüpft (Demo/Vorschau)', gestureAction({}, 'tap', true).action === 'toggle' && gestureAction({}, 'hold', true).action === 'more-info');
+check('Aktionen: ausdrückliche Angabe gilt vor dem Standard', gestureAction({ ha: { tap: 'none' } }, 'tap', true).action === 'none'
+  && gestureAction({ ha: { double_tap: { action: 'service', service: 'script.x', confirm: 'Sicher?' } } }, 'double_tap').confirm === 'Sicher?');
+check('Zustandsanzeige: info oder geschaltetes Gerät, Leuchten nur mit info, badge überschreibt',
+  showsBadge({ ha: { entities: { info: 'sensor.a' } } }) && showsBadge({ ha: { entities: { power: 'switch.a' } } })
+  && !showsBadge({ ha: { entities: { power: 'light.a' } } }, true) && !showsBadge({ ha: { entities: { info: 'sensor.a' }, badge: false } }) && !showsBadge({}));
+check('ha aufräumen: leere Rollen weg, nichts übrig -> undefined', cleanHa({ entities: { power: [], info: undefined } }) === undefined
+  && JSON.stringify(cleanHa({ entities: { power: ['a'] }, badge: false })) === '{"entities":{"power":"a"},"badge":false}');
 check('Aktionen: ohne Entities nichts, Doppeltippen standardmäßig nichts', act(undefined, 'tap') === 'none' && act({ entities: { power: 'light.a' } }, 'double_tap') === 'none');
 check('Aktionen: Kurzform und ausführliche Form', act({ tap: 'more-info' }, 'tap') === 'more-info' && gestureAction({ ha: { tap: { action: 'service', service: 'script.x' } } }, 'tap').service === 'script.x');
 

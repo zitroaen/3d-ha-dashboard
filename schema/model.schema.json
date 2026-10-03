@@ -176,7 +176,8 @@
         },
         "tap": { "$ref": "#/$defs/action" },
         "double_tap": { "$ref": "#/$defs/action" },
-        "hold": { "$ref": "#/$defs/action" }
+        "hold": { "$ref": "#/$defs/action" },
+        "badge": { "type": "boolean" }
       }
     },
     "action": {

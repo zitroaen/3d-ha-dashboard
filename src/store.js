@@ -21,8 +21,9 @@ export function layoutValues(type, e) {
   if (e.rot != null || type === 'item') v.rot = e.rot || 0;
   if (type === 'lamp') {
     v.height = e.height;
-    v.entity = e.entity ?? null; // HA-Verknüpfung (Liste)
+    v.entity = e.entity ?? null; // power-Entities (Liste), für das Licht
   } else if (e.elevation != null) v.elevation = e.elevation;
+  v.ha = e.ha ? structuredClone(e.ha) : undefined; // HA-Verknüpfung und Gesten
   return v;
 }
 

@@ -6,7 +6,27 @@ import * as THREE from 'three';
 /** entity einer Leuchte (power-Entities): String, Liste oder leer -> Liste */
 export const entitiesOf = (d) => (d.entity == null ? [] : [].concat(d.entity)).filter(Boolean);
 
-const SWITCHABLE = new Set(['light', 'switch']);
+// Domains mit eigenem turn_on/turn_off; alle anderen schaltet homeassistant.turn_on/turn_off
+const SWITCHABLE = new Set(['light', 'switch', 'fan', 'input_boolean', 'media_player', 'climate', 'humidifier', 'siren', 'automation', 'script']);
+// Zustände, die als „an“ gelten (Waschmaschine läuft, Fernseher spielt, Heizung heizt …)
+const OFF_STATES = new Set(['off', 'unavailable', 'unknown', 'idle', 'standby', 'closed', 'locked', 'docked', 'not_home', 'none', '']);
+
+/** Ist eine Entity „an“? */
+export const isOn = (state) => !!state && !OFF_STATES.has(String(state.state).toLowerCase()) && state.state !== '0';
+
+/** Text für die Zustandsanzeige: Wert mit Einheit (gerundet), sonst übersetzter Zustand */
+export function stateText(state) {
+  if (!state || state.state === 'unavailable' || state.state === 'unknown') return '–';
+  const a = state.attributes || {};
+  const n = Number(state.state);
+  if (state.state !== '' && Number.isFinite(n)) {
+    const v = Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10;
+    return `${v.toLocaleString('de-DE')}${a.unit_of_measurement ? ` ${a.unit_of_measurement}` : ''}`;
+  }
+  const DE = { on: 'An', off: 'Aus', open: 'Offen', closed: 'Zu', playing: 'Spielt', paused: 'Pause', idle: 'Bereit',
+    standby: 'Standby', cleaning: 'Saugt', docked: 'Station', returning: 'Zurück', heating: 'Heizt', home: 'Zuhause', not_home: 'Weg' };
+  return DE[state.state] ?? state.state;
+}
 
 /** Farbtemperatur (Kelvin) -> sRGB 0..1 (Näherung nach Tanner Helland) */
 export function kelvinToRgb(k) {
@@ -52,12 +72,16 @@ export function lampLight(entityIds, states) {
   return { on: true, color, brightness };
 }
 
-/** Dienstaufrufe nach Domain gruppieren (light.turn_on mit allen Lichtern, switch.turn_on mit allen Schaltern) */
+/**
+ * Dienstaufrufe nach Domain gruppieren (light.turn_on mit allen Lichtern, switch.turn_on mit allen Schaltern);
+ * Domains ohne eigenes turn_on/turn_off über homeassistant.turn_on/turn_off.
+ */
 export async function callForEntities(hass, service, entityIds) {
   const byDomain = new Map();
   for (const e of entityIds) {
-    const d = e.split('.')[0];
-    if (!SWITCHABLE.has(d)) continue;
+    let d = e.split('.')[0];
+    if (['sensor', 'binary_sensor', 'weather', 'sun', 'zone', 'person'].includes(d)) continue; // nicht schaltbar
+    if (!SWITCHABLE.has(d)) d = 'homeassistant';
     if (!byDomain.has(d)) byDomain.set(d, []);
     byDomain.get(d).push(e);
   }

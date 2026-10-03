@@ -48,6 +48,7 @@ export function listEntities(hass) {
 const DOMAINS = [
   { key: 'light', label: 'Licht', match: (d) => d === 'light' },
   { key: 'switch', label: 'Steckdosen', match: (d) => d === 'switch' },
+  { key: 'sensor', label: 'Sensoren', match: (d) => d === 'sensor' || d === 'binary_sensor' },
   { key: 'all', label: 'Alle', match: () => true },
 ];
 
@@ -83,19 +84,25 @@ export class EntityPicker {
   }
 
   /**
-   * @param device   Leuchte (intern, aus dem Modell übersetzt)
+   * @param device   Objekt (intern, aus dem Modell übersetzt): { id, name }
+   * @param linked   bereits verknüpfte Entities dieser Rolle
+   * @param role     Rolle (power, info) – bestimmt Titel und Vorfilter
+   * @param light    Objekt ist eine Leuchte (Vorfilter Licht)
    * @param area     HA-Bereich des Raums (oder null)
    * @param usedBy   Map entity_id -> Gerätename (für "bereits verknüpft mit …")
    */
-  open({ hass, device, area, usedBy }) {
+  open({ hass, device, linked = [], role = 'power', light = true, area, usedBy }) {
     this.hass = hass;
     this.device = device;
+    this.role = role;
     this.area = area;
     this.usedBy = usedBy;
-    this.linked = device.entity == null ? [] : [].concat(device.entity);
+    this.linked = [].concat(linked ?? []).filter(Boolean);
     this.onlyArea = !!area;
-    // Filter passend zur bestehenden Verknüpfung (z. B. Lampe an einer Steckdose), sonst Licht
-    this.domain = this.linked.length && this.linked.every((id) => id.startsWith('switch.')) ? 'switch' : 'light';
+    // Filter passend zur Rolle und zur bestehenden Verknüpfung (z. B. Lampe an einer Steckdose)
+    const all = (p) => this.linked.length && this.linked.every((id) => id.startsWith(p));
+    this.domain = role === 'info' ? (all('light.') || all('switch.') ? 'all' : 'sensor')
+      : all('switch.') || (!light && !all('light.')) ? 'switch' : 'light';
     this.search.value = '';
     this.root.classList.add('show');
     this._render();
@@ -120,7 +127,7 @@ export class EntityPicker {
   _render() {
     const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     this.esc = esc;
-    this.root.querySelector('h2').textContent = `Verknüpfen: ${this.device.name || this.device.id}`;
+    this.root.querySelector('h2').textContent = `${this.role === 'info' ? 'Anzeigen' : 'Schalten'}: ${this.device.name || this.device.id}`;
     const st = this.hass?.states || {};
     this.root.querySelector('.linked').innerHTML = this.linked.length
       ? this.linked.map((id) => `<span class="chip on">${esc(st[id]?.attributes?.friendly_name || id)}<small>${esc(id)}${st[id] ? '' : ' · fehlt in HA'}</small>

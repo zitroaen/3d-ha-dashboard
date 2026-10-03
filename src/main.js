@@ -7,10 +7,11 @@ import { loadData, loadShared, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
 import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides, download } from './store.js';
-import { toScene, writeBack } from './model/model.js';
+import { toScene, writeBack, gestureAction, roleEntities, showsBadge, GESTURES } from './model/model.js';
 import { toYaml, yamlHeader } from './model/yaml.js';
-import { entitiesOf, lampLight, callForEntities } from './ha.js';
+import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
 import { EntityPicker, areaForRoom } from './picker.js';
+import { ObjectSettings } from './objsettings.js';
 
 const ICON = {"edit": "M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z", "move": "M13 6v5h5V7.75L22.25 12 18 16.25V13h-5v5h3.25L12 22.25 7.75 18H11v-5H6v3.25L1.75 12 6 7.75V11h5V6H7.75L12 1.75 16.25 6H13z", "align": "M3 2h2v20H3V2zm4 5h14v4H7V7zm0 6h9v4H7v-4z", "undo": "M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62A8 8 0 0 1 20.1 16l2.37-.78A10.5 10.5 0 0 0 12.5 8z", "save": "M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z", "export": "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z", "done": "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"};
 ICON.link = 'M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8v2zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z';
@@ -99,6 +100,43 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .picker .list b { font-weight: 500; font-size: 14px; } .picker .list small { grid-column: 1; font-size: 12px; opacity: 0.6; word-break: break-all; }
 .picker .list .mark { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 20px; text-align: center; color: #f0b45a; }
 .picker .more { padding: 10px; font-size: 13px; opacity: 0.6; text-align: center; }
+/* Einstellungen eines Objekts (Editor): gleiche Stelle wie die Entity-Auswahl, die sich darüberlegt */
+.objcfg { position: absolute; top: 10px; right: 80px; bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 100px)); display: none; flex-direction: column;
+  border-radius: 16px; background: #12151bf5; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
+.objcfg.show { display: flex; }
+.picker.show ~ .objcfg { display: none; }
+.objcfg header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
+.objcfg header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
+.objcfg header button, .objcfg .chip button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
+.objcfg .body { overflow-y: auto; padding: 0 12px 12px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.objcfg h3 { margin: 12px 0 2px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
+.objcfg .hint { margin: 0 0 6px; font-size: 12px; opacity: 0.6; }
+.objcfg .linked { display: flex; flex-wrap: wrap; gap: 6px; }
+.objcfg .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 0 0 12px; border-radius: 20px; flex-wrap: wrap;
+  background: #2b3a30; border: 1px solid #6cc28a; font-size: 13px; }
+.objcfg .chip small { font-size: 11px; opacity: 0.7; }
+.objcfg button.add { min-height: 48px; padding: 0 16px; border-radius: 24px; border: 1px dashed #ffffff40; background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.objcfg .gesture { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.objcfg label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.objcfg select, .objcfg input { min-height: 48px; padding: 0 12px; border-radius: 12px; border: 1px solid #ffffff26; background: #0b0d12; color: inherit;
+  font: inherit; font-size: 16px; user-select: text; -webkit-user-select: text; }
+.objcfg label select { flex: 1; }
+.objcfg > .body > section > select { width: 100%; }
+/* Zustand über Objekten (Waschmaschine: Restzeit …): folgt der Kamera, lässt Taps durch */
+.badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+:host([editing]) .badges { display: none; }
+.badge { position: absolute; left: 0; top: 0; padding: 3px 9px; border-radius: 12px; background: #12151bd9; border: 1px solid #ffffff26;
+  font-size: 12px; font-weight: 600; white-space: nowrap; will-change: transform; }
+.badge.on { background: #f0b45ae6; color: #1a1408; border-color: #f0b45a; }
+.badge[hidden] { display: none; }
+/* Rückfrage vor einer Aktion */
+.confirm { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #0008; }
+.confirm.show { display: flex; }
+.confirm > div { max-width: min(360px, calc(100% - 32px)); padding: 18px; border-radius: 16px; background: #12151bf5; border: 1px solid #ffffff1a; }
+.confirm p { margin: 0 0 14px; font-size: 15px; }
+.confirm .row { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm button { min-width: 96px; min-height: 48px; border-radius: 12px; border: 1px solid #ffffff26; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.confirm button.yes { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
 :host([readonly]) .edit-toggle { display: none; } /* gemeinsames Modell: nur Administratoren bearbeiten */
 :host([editing]) .edit-toggle { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
 /* volle Breite (mit left: 50% stünde nur die halbe Breite zur Verfügung und die Knöpfe brächen zu früh um);
@@ -144,6 +182,7 @@ class Ha3dDashboard extends HTMLElement {
       <style>${STYLE}</style>
       <div id="stage"></div>
       <div class="vignette"></div>
+      <div class="badges"></div>
       <div class="bar">
         <button class="menu" title="Menü"><svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg></button>
         <span class="title"></span><span class="floor"></span>
@@ -171,6 +210,7 @@ class Ha3dDashboard extends HTMLElement {
         </div>
       </div>
       <div class="picker"></div>
+      <div class="objcfg"></div>
       <div class="editbar">
         <div class="editinfo"></div>
         <div class="tools">
@@ -185,6 +225,7 @@ class Ha3dDashboard extends HTMLElement {
       </div>
       <button class="demo-note" hidden aria-label="Hinweis ausblenden"></button>
       <div class="toast"></div>
+      <div class="confirm"><div><p></p><div class="row"><button class="no">Abbrechen</button><button class="yes">OK</button></div></div></div>
       <div class="error"></div>`;
     this.shadowRoot.querySelector('button.menu').addEventListener('click', () => {
       this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
@@ -387,30 +428,43 @@ class Ha3dDashboard extends HTMLElement {
     this.view = new HouseScene(this.shadowRoot.getElementById('stage'), data.house, { devices: data.devices, items: data.items }, {
       assetBase: this.dataUrl,
       onRoomTap: (id) => this._onRoomTap(id),
-      onLampTap: (id) => this._onLampTap(id),
-      onLampHold: (id) => this._onLampHold(id),
+      onObjectGesture: (ref, g) => this._onGesture(ref, g),
+      objectGestures: (ref) => this._gesturesOf(ref),
       onViewChange: () => this._updateCompass(),
+      onRender: () => this._placeBadges(),
     });
     this._updateCompass();
     this.areaMap = data.areaMap || {};
     this.editor = new Editor(this.view, {
       onChange: (info) => this._renderEditBar(info),
       // neue Verknüpfung: Zustand der Leuchte sofort aus HA übernehmen
-      onLinkChange: (id) => {
+      onLinkChange: ({ type, id }) => {
         // Verknüpfung gelöst -> Leuchte aus; sonst Zustand sofort aus HA übernehmen
-        const s = this.view.lamps.get(id);
+        const s = type === 'lamp' && this.view.lamps.get(id);
         if (s && !entitiesOf(s.lamp).length) this.view.setLamp(id, false);
         else if (this._hass) this._applyHass();
+        this.settings?.render();
       },
     });
     this.picker ??= new EntityPicker(this.shadowRoot.querySelector('.picker'), {
-      onChange: (ent) => this.editor?.setEntity(ent),
+      onChange: (ent) => {
+        const role = this.picker.role;
+        const ha = structuredClone(this.editor?.sel?.entry.ha || {});
+        ha.entities = { ...(ha.entities || {}), [role]: ent ?? undefined };
+        this.editor?.setHa(ha);
+      },
+      onClose: () => this.editor?._emit(),
+    });
+    this.settings ??= new ObjectSettings(this.shadowRoot.querySelector('.objcfg'), {
+      onChange: (ha) => this.editor?.setHa(ha),
+      onPick: (role) => this._openPicker(role),
       onClose: () => this.editor?._emit(),
     });
     if (this.hasAttribute('editing')) this.editor.setEnabled(true);
     this.shadowRoot.querySelector('.title').textContent = data.house.name || '';
     this._renderLevel();
     if (this._hass) this._applyHass();
+    else this._updateBadges();
     this._resolveReady(this);
   }
 
@@ -450,6 +504,7 @@ class Ha3dDashboard extends HTMLElement {
 
   _leaveEditing() {
     this.picker?.close();
+    this.settings?.close();
     this.toggleAttribute('editing', false);
     this.editor.setEnabled(false);
     if (this._reloadOnLeave) {
@@ -483,7 +538,7 @@ class Ha3dDashboard extends HTMLElement {
     const ed = this.editor;
     if (!ed) return;
     if (act === 'move' || act === 'align') ed.setTool(act);
-    else if (act === 'link') this._openPicker();
+    else if (act === 'link') this._toggleSettings();
     else if (act === 'undo') ed.undo();
     else if (act === 'done') await this.finishEditing();
     else if (act === 'cancel') this.cancelEditing();
@@ -500,25 +555,42 @@ class Ha3dDashboard extends HTMLElement {
     }
   }
 
-  /** Entity-Auswahl für die gewählte Leuchte öffnen, vorgefiltert auf den HA-Bereich ihres Raums. */
-  _openPicker() {
+  /** Einstellungen des gewählten Objekts (Verknüpfungen, Gesten, Zustandsanzeige) öffnen bzw. schließen */
+  _toggleSettings(show = !this.settings?.isOpen) {
     const s = this.editor?.sel;
-    if (!s || s.type !== 'lamp') return;
+    this.picker.close();
+    if (!show || !s) return this.settings.close();
+    this.settings.open({ entry: s.entry, light: s.type === 'lamp', hass: this._hass });
+    this.editor._emit();
+  }
+
+  /**
+   * Entity-Auswahl für eine Rolle des gewählten Objekts öffnen, vorgefiltert auf den HA-Bereich seines Raums.
+   * @param role  power (Standard) oder info
+   */
+  _openPicker(role = 'power') {
+    const s = this.editor?.sel;
+    if (!s) return;
     const fm = this.view.floors.find((f) => f.floor.id === s.entry.floor);
     const room = fm?.rooms.get(s.entry.room)?.room;
     const area = room ? areaForRoom(this._hass, s.entry.floor, room, this.areaMap) : null;
     const usedBy = new Map();
-    for (const d of this.view.furnishingData.devices) {
-      if (d.id !== s.id) for (const e of entitiesOf(d)) usedBy.set(e, d.name || d.id);
+    const d = this.view.furnishingData;
+    for (const o of [...d.devices, ...d.items]) {
+      if (o.id !== s.id) for (const e of roleEntities(o, role)) usedBy.set(e, o.name || o.id);
     }
-    this.picker.open({ hass: this._hass, device: s.entry, area, usedBy });
+    this.picker.open({ hass: this._hass, device: s.entry, linked: roleEntities(s.entry, role), role, light: s.type === 'lamp', area, usedBy });
     this.editor._emit();
   }
 
   _renderEditBar(info) {
-    // Auswahl gewechselt -> Entity-Auswahl schließen
+    // Auswahl gewechselt -> Einstellungen und Entity-Auswahl schließen
     if (this.picker?.isOpen && info.selection?.id !== this.picker.device?.id) this.picker.close();
-    if (!info.enabled) this.picker?.close();
+    if (this.settings?.isOpen && info.selection?.id !== this.settings.entry?.id) this.settings.close();
+    if (!info.enabled) {
+      this.picker?.close();
+      this.settings?.close();
+    }
     const root = this.shadowRoot;
     for (const b of root.querySelectorAll('.tools button')) {
       const act = b.dataset.act;
@@ -527,8 +599,8 @@ class Ha3dDashboard extends HTMLElement {
       if (act === 'done') b.classList.toggle('dirty', info.dirty);
       if (act === 'export') b.hidden = this.demo || this.store.mode === 'files';
       if (act === 'link') {
-        b.hidden = info.selection?.type !== 'lamp';
-        b.classList.toggle('active', !!this.picker?.isOpen);
+        b.hidden = !info.selection;
+        b.classList.toggle('active', !!(this.picker?.isOpen || this.settings?.isOpen));
       }
     }
     const s = info.selection;
@@ -538,10 +610,8 @@ class Ha3dDashboard extends HTMLElement {
     else {
       const y = s.height ?? s.elevation;
       text = `<b>${s.name}</b> · x ${s.pos[0].toFixed(2)} · y ${s.pos[1].toFixed(2)}${y != null ? ` · Höhe ${y.toFixed(2)}` : ''} · ${(s.rot || 0).toFixed(0)}°`;
-      if (s.type === 'lamp') {
-        const n = s.entity == null ? 0 : [].concat(s.entity).length;
-        text += ` · ${n ? `${n} Entit${n === 1 ? 'y' : 'ies'} verknüpft` : 'nicht verknüpft'}`;
-      }
+      const n = Object.values(s.ha?.entities || {}).reduce((k, v) => k + [].concat(v).length, 0);
+      if (n || s.type === 'lamp') text += ` · ${n ? `${n} Entit${n === 1 ? 'y' : 'ies'} verknüpft` : 'nicht verknüpft'}`;
       if (info.tool === 'align') text += `<br>Anlegen mit <b>${FACE[info.alignFace]}</b> – andere Fläche am Objekt antippen oder Wand/Boden antippen`;
     }
     root.querySelector('.editinfo').innerHTML = text;
@@ -596,6 +666,7 @@ class Ha3dDashboard extends HTMLElement {
       if (!l) continue;
       this.view.setLamp(id, l.on, { color: l.color ?? s.baseColor, brightness: l.on ? l.brightness : undefined });
     }
+    this._updateBadges();
     if (this.shadowRoot.querySelector('.links.show')) this._renderLinks();
   }
 
@@ -604,9 +675,148 @@ class Ha3dDashboard extends HTMLElement {
    * verknüpfte echte Lampe); ohne HA-Verbindung keine.
    */
   _liveEntities(lamp) {
+    return this._live(entitiesOf(lamp));
+  }
+
+  /** Entities, die HA bedient (Demo-Modus: nur in HA vorhandene; ohne HA-Verbindung keine) */
+  _live(ents) {
     if (!this._hass) return [];
-    const ents = entitiesOf(lamp);
     return this.demo ? ents.filter((e) => e in (this._hass.states || {})) : ents;
+  }
+
+  /** Internes Objekt (Möbel/Gerät oder Leuchte) zu einer Referenz { type, id } */
+  _objEntry({ type, id }) {
+    const d = this.view?.furnishingData;
+    return (type === 'lamp' ? d?.devices : d?.items)?.find((e) => e.id === id) ?? null;
+  }
+
+  /** Gesten, auf die ein Objekt reagiert (Aktion nicht „nichts“) */
+  _gesturesOf(ref) {
+    const e = this._objEntry(ref);
+    const out = new Set();
+    if (e) for (const g of GESTURES) if (gestureAction(e, g, ref.type === 'lamp').action !== 'none') out.add(g);
+    return out;
+  }
+
+  /** Geste auf einem Objekt: Aktion nach `ha` (docs/DATA_MODEL.md → Aktionen) ausführen */
+  async _onGesture(ref, gesture) {
+    const e = this._objEntry(ref);
+    if (!e) return;
+    const light = ref.type === 'lamp';
+    const act = gestureAction(e, gesture, light);
+    const name = e.name || e.id;
+    this.dispatchEvent(new CustomEvent('object-gesture', { detail: { ...ref, gesture, action: act.action } }));
+    if (act.action === 'none') return;
+    if (act.confirm && !(await this._confirm(act.confirm))) return;
+    try {
+      if (act.action === 'toggle') return light ? await this._onLampTap(ref.id) : await this._toggleObject(e);
+      if (act.action === 'more-info') return this._moreInfo(e, act.entity, light);
+      if (act.action === 'service') return await this._callServiceAction(e, act);
+      if (act.action === 'navigate') {
+        if (!act.path) return this._toast(`${name}: keine Seite angegeben`);
+        history.pushState(null, '', act.path);
+        window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }));
+      }
+    } catch (err) {
+      console.error('ha-3d-dashboard:', err);
+      this._toast(`${name}: ${err.message || err}`);
+    }
+  }
+
+  /** Objekt (keine Leuchte) umschalten: an, sobald eine power-Entity an ist -> alle aus, sonst alle an */
+  async _toggleObject(e) {
+    const ents = this._live(roleEntities(e, 'power'));
+    if (!ents.length) return this._toast(`${e.name || e.id}: nichts zum Schalten verknüpft – im Editor (Stift) verknüpfen`);
+    const on = !ents.some((id) => isOn(this._hass.states[id]));
+    this._toast(`${e.name || e.id}: ${on ? 'an' : 'aus'}`);
+    await this._call(on ? 'turn_on' : 'turn_off', ents);
+  }
+
+  /** HA-eigenen Dialog öffnen: angegebene, sonst erste power-, sonst erste info-Entity */
+  _moreInfo(e, entity, light) {
+    const entityId = entity || this._live(roleEntities(e, 'power'))[0] || this._live(roleEntities(e, 'info'))[0];
+    if (!entityId) return this._toast(`${e.name || e.id}: nicht mit HA verknüpft – im Editor (Stift) verknüpfen`);
+    this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId }, bubbles: true, composed: true }));
+  }
+
+  /** HA-Dienst aufrufen; ohne entity_id in data gelten die power-Entities */
+  async _callServiceAction(e, act) {
+    const [domain, service] = String(act.service || '').split('.');
+    if (!domain || !service) return this._toast(`${e.name || e.id}: kein Dienst angegeben`);
+    if (!this._hass) return this._toast(`${e.name || e.id}: ${act.service} (Vorschau)`);
+    const data = { ...(act.data || {}) };
+    const power = this._live(roleEntities(e, 'power'));
+    if (data.entity_id == null && power.length) data.entity_id = power;
+    await this._hass.callService(domain, service, data);
+    this._toast(`${e.name || e.id}: ${act.service}`);
+  }
+
+  /** Rückfrage im Panel (große Knöpfe); true = bestätigt */
+  _confirm(text) {
+    const el = this.shadowRoot.querySelector('.confirm');
+    el.querySelector('p').textContent = text;
+    el.classList.add('show');
+    return new Promise((resolve) => {
+      const done = (ok) => (ev) => {
+        ev.stopPropagation();
+        el.classList.remove('show');
+        el.querySelector('.yes').onclick = el.querySelector('.no').onclick = null;
+        resolve(ok);
+      };
+      el.querySelector('.yes').onclick = done(true);
+      el.querySelector('.no').onclick = done(false);
+    });
+  }
+
+  // ------------------------------------------------------------------ Zustandsanzeige
+
+  /** Zustand über Objekten (info-Werte, An/Aus geschalteter Geräte) – nur Text, keine Animation */
+  _updateBadges() {
+    const box = this.shadowRoot.querySelector('.badges');
+    this._badges ??= new Map();
+    const want = new Map();
+    const d = this.view?.furnishingData;
+    const states = this._hass?.states || {};
+    for (const [type, list] of [['item', d?.items || []], ['lamp', d?.devices || []]]) {
+      for (const e of list) {
+        const light = type === 'lamp';
+        if (!showsBadge(e, light)) continue;
+        const info = this._live(roleEntities(e, 'info')), power = this._live(roleEntities(e, 'power'));
+        const on = power.some((id) => isOn(states[id]));
+        const text = info.length ? info.map((id) => stateText(states[id])).join(' · ') : power.length ? (on ? 'An' : 'Aus') : null;
+        if (text != null) want.set(`${type}:${e.id}`, { ref: { type, id: e.id }, text, on, name: e.name || e.id });
+      }
+    }
+    for (const [k, el] of this._badges) {
+      if (want.has(k)) continue;
+      el.remove();
+      this._badges.delete(k);
+    }
+    for (const [k, b] of want) {
+      let el = this._badges.get(k);
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'badge';
+        el.ref = b.ref;
+        box.append(el);
+        this._badges.set(k, el);
+      }
+      if (el.textContent !== b.text) el.textContent = b.text;
+      el.title = b.name;
+      el.classList.toggle('on', b.on);
+    }
+    this._placeBadges();
+  }
+
+  /** Anzeigen der Kamera nachführen (nach jedem Bild) */
+  _placeBadges() {
+    if (!this._badges?.size || !this.view) return;
+    for (const el of this._badges.values()) {
+      const p = this.view.objectTop(el.ref);
+      const s = p && this.view.toScreen(p);
+      el.hidden = !s;
+      if (s) el.style.transform = `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) translate(-50%, -100%)`;
+    }
   }
 
   /** Leuchten eines Raums mit HA-Entities */
@@ -650,16 +860,6 @@ class Ha3dDashboard extends HTMLElement {
     }
   }
 
-  /**
-   * Leuchte lange drücken: HA-eigenen Dialog der verknüpften Entity öffnen (Farbe, Helligkeit, Verlauf …).
-   * Bei mehreren Entities (z. B. drei Spots) die erste.
-   */
-  _onLampHold(lampId) {
-    const s = this.view.lamps.get(lampId);
-    const [entityId] = this._liveEntities(s.lamp);
-    if (!entityId) return this._toast(`${s.lamp.name ?? lampId}: nicht mit HA verknüpft – im Editor (Stift) verknüpfen`);
-    this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId }, bubbles: true, composed: true }));
-  }
 
   async _call(service, entityIds) {
     try {

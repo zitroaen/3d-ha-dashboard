@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { refKey, anchorOf } from './furnishing.js';
 import { layoutValues } from './store.js';
+import { cleanHa, roleEntities } from './model/model.js';
 
 const ACCENT = 0xf0b45a;
 const r2 = (v) => Math.round(v * 100) / 100;           // cm
@@ -186,20 +187,35 @@ export class Editor {
     if (this.undoStack.length > 50) this.undoStack.shift();
   }
 
-  /** HA-Verknüpfung der gewählten Leuchte setzen (String, Liste oder null). */
+  /** Schalt-Entities (Rolle power) des gewählten Objekts setzen (String, Liste oder null). */
   setEntity(entity) {
+    const ha = structuredClone(this.sel?.entry.ha || {});
+    ha.entities = { ...(ha.entities || {}), power: entity ?? undefined };
+    this.setHa(ha);
+  }
+
+  /** HA-Einstellungen (`ha`: Entities nach Rolle, Gesten, Zustandsanzeige) des gewählten Objekts setzen. */
+  setHa(ha) {
     const s = this.sel;
-    if (!s || s.type !== 'lamp') return;
+    if (!s) return;
     this._pushUndo();
-    s.entry.entity = entity;
-    const st = this.view.lamps.get(s.id);
-    if (st) {
-      st.lamp.entity = entity; // Kopie in der Szene mitführen
-      st.haRefs = null;        // Zustand beim nächsten hass-Update neu übernehmen
-    }
+    this._applyHa(s.type, s.id, s.entry, cleanHa(ha));
     this.changes.set(refKey(s.type, s.id), { type: s.type, id: s.id, values: layoutValues(s.type, s.entry) });
-    this.onLinkChange?.(s.id);
     this._emit();
+  }
+
+  _applyHa(type, id, e, ha) {
+    e.ha = ha;
+    if (type === 'lamp') {
+      e.entity = roleEntities(e, 'power');
+      const st = this.view.lamps.get(id);
+      if (st) {
+        st.lamp.entity = e.entity; // Kopie in der Szene mitführen
+        st.lamp.ha = ha;
+        st.haRefs = null;          // Zustand beim nächsten hass-Update neu übernehmen
+      }
+    }
+    this.onLinkChange?.({ type, id });
   }
 
   undo() {
@@ -207,11 +223,7 @@ export class Editor {
     if (!u) return;
     const e = this._entry(u);
     Object.assign(e, u.values);
-    if (u.type === 'lamp' && this.view.lamps.get(u.id)) {
-      this.view.lamps.get(u.id).lamp.entity = e.entity;
-      this.view.lamps.get(u.id).haRefs = null;
-      this.onLinkChange?.(u.id);
-    }
+    this._applyHa(u.type, u.id, e, e.ha);
     this.changes.set(refKey(u.type, u.id), { type: u.type, id: u.id, values: layoutValues(u.type, e) });
     // neu auswählen = Proxy an der alten Lage neu aufbauen
     this.select({ type: u.type, id: u.id });
