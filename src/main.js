@@ -20,6 +20,8 @@ const MODULE_BASE = new URL('./', import.meta.url);
 
 const STYLE = `
 :host { display: block; position: relative; width: 100%; height: 100%; background: #07090d; overflow: hidden;
+  /* Ab HA 2026.9 hat der Panel-Container keine Höhe mehr (height: 100% ergäbe 0) – das Panel füllt den Bildschirm */
+  min-height: 100vh; min-height: 100dvh;
   font-family: var(--paper-font-body1_-_font-family, 'Segoe UI', Roboto, sans-serif); color: #e8e2d8;
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
 button { touch-action: manipulation; }

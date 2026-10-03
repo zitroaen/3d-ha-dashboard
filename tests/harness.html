@@ -5,10 +5,12 @@
   <link rel="icon" href="data:,">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>3D-HA-Dashboard – Test-Harness</title>
-  <style>html, body { margin: 0; height: 100%; background: #000; } ha-3d-dashboard { position: fixed; inset: 0; }</style>
+  <style>html, body { margin: 0; height: 100%; background: #000; } body:not(.ha) ha-3d-dashboard { position: fixed; inset: 0; }
+    /* ?ha=1: eingebettet wie in HA ab 2026.9 – partial-panel-resolver ist inline, ha-panel-custom ein Block ohne Höhe */
+    .resolver { display: inline; } .panel-custom { display: block; }</style>
 </head>
 <body>
-  <ha-3d-dashboard></ha-3d-dashboard>
+  <span class="resolver"><div class="panel-custom"><ha-3d-dashboard></ha-3d-dashboard></div></span>
   <script type="module">
     import '../dist/ha-3d-dashboard.js';
     import { createMockHass, statesFromDevices } from './mock-hass.js';
@@ -19,6 +21,7 @@
     // save_url: der Dev-Server (npm run serve) schreibt Editor-Änderungen direkt nach data/
     // Varianten für die Demo-Tests: ?demo=1 (config.demo) bzw. ?nodata=1 (Daten nicht erreichbar -> Demo-Fallback)
     const q = new URLSearchParams(location.search);
+    document.body.classList.toggle('ha', q.has('ha'));
     el.panel = { config: q.has('demo') ? { demo: true } : q.has('nodata') ? { data_url: '/fehlt' } : { data_url: '/data/', save_url: '/__save/' } };
 
     // Simuliertes HA wie die echte Installation: alle Entities aus dem HA-Export (reference/entities.txt) mit
