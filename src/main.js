@@ -3,10 +3,10 @@
 // Das Modell (model.yaml, docs/DATA_MODEL.md) wird zur Laufzeit geladen – standardmäßig aus
 // demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url.
 import { HouseScene } from './scene.js';
-import { loadData, DataUnavailableError } from './data.js';
+import { loadData, loadShared, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
-import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, applyOverrides, download } from './store.js';
+import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides, download } from './store.js';
 import { toScene, writeBack } from './model/model.js';
 import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities } from './ha.js';
@@ -99,6 +99,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .picker .list b { font-weight: 500; font-size: 14px; } .picker .list small { grid-column: 1; font-size: 12px; opacity: 0.6; word-break: break-all; }
 .picker .list .mark { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 20px; text-align: center; color: #f0b45a; }
 .picker .more { padding: 10px; font-size: 13px; opacity: 0.6; text-align: center; }
+:host([readonly]) .edit-toggle { display: none; } /* gemeinsames Modell: nur Administratoren bearbeiten */
 :host([editing]) .edit-toggle { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
 /* volle Breite (mit left: 50% stünde nur die halbe Breite zur Verfügung und die Knöpfe brächen zu früh um);
    die leeren Ränder lassen Taps zur 3D-Ansicht durch */
@@ -206,6 +207,7 @@ class Ha3dDashboard extends HTMLElement {
     new ResizeObserver(([e]) => e.contentRect.height && this.style.setProperty('--ha3d-editbar-h', `${Math.round(e.contentRect.height)}px`))
       .observe(this.shadowRoot.querySelector('.editbar'));
     this._ready = new Promise((res) => (this._resolveReady = res));
+    this._hassReady = new Promise((res) => (this._resolveHass = res));
   }
 
   connectedCallback() {
@@ -225,6 +227,8 @@ class Ha3dDashboard extends HTMLElement {
     document.removeEventListener('visibilitychange', this._onVisible);
     window.removeEventListener('resize', this._onResize);
     window.visualViewport?.removeEventListener('resize', this._onResize);
+    this._unsubShared?.then((un) => un()).catch(() => {});
+    this._unsubShared = null;
     this.editor?.dispose();
     this.editor = null;
     this.view?.dispose();
@@ -245,6 +249,11 @@ class Ha3dDashboard extends HTMLElement {
     return configured ? new URL(configured.endsWith('/') ? configured : `${configured}/`, location.href) : MODULE_BASE;
   }
 
+  /** Gemeinsames Modell über die Integration (panel config `shared`): für alle Benutzer gleich */
+  get shared() {
+    return this._panel?.config?.shared === true;
+  }
+
   /** Demo-Modus aktiv (config.demo oder Fallback ohne erreichbare Daten): lokal schalten, nichts speichern */
   get demo() {
     return this.hasAttribute('demo');
@@ -255,6 +264,12 @@ class Ha3dDashboard extends HTMLElement {
     const el = this.shadowRoot.querySelector('.demo-note');
     el.innerHTML = on ? `Demo-Haus – eigene Daten: siehe Anleitung${note ? `<small>${note}</small>` : ''}` : '';
     el.hidden = !on;
+    this._updateReadonly();
+  }
+
+  /** Gemeinsames Modell bearbeiten dürfen nur Administratoren (das Demo-Haus speichert jeder für sich) */
+  _updateReadonly() {
+    this.toggleAttribute('readonly', this.shared && !this.demo && this._hass?.user?.is_admin === false);
   }
 
   /** Daten laden: eingebettetes Demo-Haus (config.demo) oder aus data_url bzw. neben dem Modul, sonst Demo-Fallback */
@@ -264,8 +279,10 @@ class Ha3dDashboard extends HTMLElement {
       return loadDemoData();
     }
     try {
-      const data = await loadData(this.dataUrl);
+      const data = this.shared ? await loadShared(await this._hassReady, this.dataUrl) : await loadData(this.dataUrl);
+      this._shared = this.shared ? { revision: data.revision, fileHash: data.fileHash } : null;
       this._setDemo(false);
+      if (this.shared) this._subscribeShared();
       return data;
     } catch (e) {
       // nur bei unerreichbaren Daten (404, Netzwerk) und nur, solange noch nichts angezeigt wird;
@@ -325,7 +342,22 @@ class Ha3dDashboard extends HTMLElement {
   get store() {
     // Demo-Haus: nie in Dateien, nur in eigene Benutzerdaten – die Daten des eigenen Hauses bleiben unberührt
     if (this.demo) return new LayoutStore({ hass: this._hass, key: DEMO_USER_DATA_KEY });
-    return new LayoutStore({ saveUrl: this._panel?.config?.save_url || null, hass: this._hass });
+    return new LayoutStore({ saveUrl: this._panel?.config?.save_url || null, hass: this._hass, shared: this._shared });
+  }
+
+  /** Speichert ein anderer Administrator das gemeinsame Modell, laden alle anderen Panels neu (nicht im Editor) */
+  _subscribeShared() {
+    if (this._unsubShared || !this._hass?.connection?.subscribeMessage) return;
+    this._unsubShared = this._hass.connection.subscribeMessage((ev) => {
+      if (ev.revision === this._shared?.revision) return;
+      // im Editor nicht unter den Händen austauschen: nach dem Schließen nachladen (beim Speichern: Konflikt)
+      if (this.hasAttribute('editing')) this._reloadOnLeave = true;
+      else this.reloadData();
+    }, { type: `${SHARED_WS}/subscribe` });
+    this._unsubShared.catch((e) => {
+      console.warn('ha-3d-dashboard: Aktualisierungen des gemeinsamen Modells nicht abonnierbar', e);
+      this._unsubShared = null;
+    });
   }
 
   /** Ebene wechseln (Stockwerk); im Editiermodus wird die Auswahl aufgehoben */
@@ -407,18 +439,23 @@ class Ha3dDashboard extends HTMLElement {
     const ed = this.editor;
     if (!ed) return;
     const discard = ed.changes.size > 0;
+    if (discard) {
+      ed.changes.clear();
+      this._keys = null; // Daten neu laden = Stand vor den Änderungen
+      this._reloadOnLeave = true;
+    }
     this._leaveEditing();
-    if (!discard) return;
-    ed.changes.clear();
-    this._keys = null; // Daten neu laden = Stand vor den Änderungen
-    this.reloadData();
-    this._toast('Änderungen verworfen');
+    if (discard) this._toast('Änderungen verworfen');
   }
 
   _leaveEditing() {
     this.picker?.close();
     this.toggleAttribute('editing', false);
     this.editor.setEnabled(false);
+    if (this._reloadOnLeave) {
+      this._reloadOnLeave = false;
+      this.reloadData();
+    }
   }
 
   /** Änderungen speichern (Dev-Server: Dateien; HA: Benutzerdaten; Demo-Haus: eigene Demo-Benutzerdaten). */
@@ -432,7 +469,8 @@ class Ha3dDashboard extends HTMLElement {
       ed.changes.clear();
       ed._emit();
       this._toast(this.demo ? 'Gespeichert – Demo-Haus, für diesen HA-Benutzer'
-        : this.store.mode === 'files' ? 'Gespeichert (model.yaml)' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Datei');
+        : this.store.mode === 'files' ? 'Gespeichert (model.yaml)'
+          : this.store.mode === 'shared' ? 'Gespeichert – für alle Benutzer' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Datei');
       return true;
     } catch (e) {
       console.error('ha-3d-dashboard:', e);
@@ -522,6 +560,8 @@ class Ha3dDashboard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    this._resolveHass?.(hass);
+    this._updateReadonly();
     if (this.view) this._applyHass();
   }
   get hass() {
