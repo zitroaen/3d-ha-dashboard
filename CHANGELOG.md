@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.10.0
+
+- **Ebenen gestapelt:** Das Obergeschoss steht jetzt auf dem Erdgeschoss – darunterliegende Geschosse und der Garten
+  bleiben sichtbar. Auf einer unteren Ebene sind die Geschosse darüber ausgeblendet. Die Geschossdecke schließt an
+  die Wände darunter an.
+- **Version im Panel:** Der Link-Check (Ketten-Symbol) zeigt die laufende Version und woher das Modell kommt
+  (Demo-Haus, gespeichertes Modell oder `model.yaml`); die Browser-Konsole meldet die Version beim Laden.
+
 ## 0.9.0
 
 - **Gelände:** Außenbereiche können Höhen je Eckpunkt haben (`[x, y, z]`) – z. B. ein Garten als Hang. Objekte stehen

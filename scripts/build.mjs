@@ -6,6 +6,8 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const watch = process.argv.includes('--watch');
+// Version im Panel anzeigen (Link-Check, Konsole): zeigt, ob der Browser wirklich das neue Bundle hat
+const { version } = JSON.parse(await readFile(resolve('package.json'), 'utf8'));
 
 const DEMO_MODEL = resolve('examples/demo/model.yaml');
 const demoPlugin = {
@@ -30,6 +32,7 @@ const options = {
   sourcemap: watch ? 'inline' : false,
   outfile: 'dist/ha-3d-dashboard.js',
   legalComments: 'none',
+  define: { __HA3D_VERSION__: JSON.stringify(version) },
   logLevel: 'info',
 };
 

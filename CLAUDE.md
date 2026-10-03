@@ -160,3 +160,8 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Objekte bekommen die Höhe an ihrer Position als `base` (der Editor folgt ihr nach dem Verschieben). Der Boden
   (`site.ground`) ist dann ein Gitter, das tiefer liegendes Gelände nach außen fortsetzt (sonst sähe ein Hang wie eine
   Grube aus); höheres Gelände bekommt Erdkanten. Pflanzen (`tree`, `shrub`, `flowers`) prozedural wie Möbel.
+- Ebenen gestapelt (0.10.0): Eine Ebene zeigt ihre Etagen auf allen darunter (samt Garten), höhere Ebenen sind
+  ausgeblendet. `activeFloors` = alle sichtbaren Etagen (Antippen, Editor, Bildausschnitt), `levelFloors` = genau die
+  gewählte Ebene. Die Bodenplatte einer oberen Etage reicht als Geschossdecke bis auf die Wände darunter.
+- Version im Bundle (`__HA3D_VERSION__`, esbuild define aus package.json): Konsole und Link-Check zeigen Version und
+  Datenquelle – zum Prüfen, ob nach einem Update wirklich das neue Bundle läuft.
