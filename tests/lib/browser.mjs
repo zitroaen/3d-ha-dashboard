@@ -20,9 +20,19 @@ export async function launchBrowser() {
   }
 }
 
+/**
+ * Neue Seite mit großzügigem Standard-Timeout: Software-WebGL (SwiftShader) ist auf CI-Runnern so langsam, dass ein
+ * einzelnes Bild (z. B. für page.screenshot) die Playwright-Vorgabe von 30 s überschreiten kann.
+ */
+export async function newPage(browser, opts) {
+  const page = await browser.newPage(opts);
+  page.setDefaultTimeout(120000);
+  return page;
+}
+
 /** Seite mit Fehler- und Request-Wächtern: JS-Fehler und externe Requests landen in errors */
 export async function guardedPage(browser, base, errors, { viewport, label, query = '', allowConsole = null }) {
-  const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+  const page = await newPage(browser, { viewport, deviceScaleFactor: 1 });
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && !allowConsole?.test(m.text()) && errors.push(`${label}: ${m.text()}`));
   // Externe Requests sind verboten – das Panel muss offline funktionieren
