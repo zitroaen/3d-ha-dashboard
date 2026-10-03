@@ -1,17 +1,20 @@
 // Headless-Screenshots gegen das simulierte HA – für beliebige Daten (Demo-Haus oder eigenes Haus).
-//   node tests/screenshots.mjs [szenario …]          -> tests/output/<etage>_<szenario>_<viewport>.png
-// Standard-Szenarien beleuchten Räume nach ihrer Reihenfolge in house.json; eigene Ansichten (z. B. Zoom
-// auf einen Raum) kommen aus einer JSON-Datei in VIEWS:
+//   node tests/screenshots.mjs [szenario …]          -> tests/output/ebene<n>_<szenario>_<viewport>.png
+// Standard-Szenarien beleuchten Räume nach ihrer Reihenfolge im Modell (erste Gebäude-Etage); weitere Ebenen
+// (Stockwerke) bekommen je ein Bild "abend". Eigene Ansichten (z. B. Zoom auf einen Raum) kommen aus VIEWS:
 //   { "wohnzimmer-abend": { "rooms": ["wohnzimmer"], "outdoor": true, "view": { "at": [3, 7.5], "zoom": 1.9, "az": 0 } } }
 // rooms: Raum-IDs oder "all"; sun: { azimuth, elevation } (sonst Nacht); view.at: Plan-Punkt [x, y].
 import { mkdir, readFile } from 'node:fs/promises';
+import { parseModel } from '../src/model/model.js';
 import { join } from 'node:path';
 import { DATA_DIR, ENTITIES, VIEWS, OUT, restArgs } from './lib/config.mjs';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser, guardedPage } from './lib/browser.mjs';
 
-const house = JSON.parse(await readFile(join(DATA_DIR, 'house.json'), 'utf8'));
-const firstRooms = (n) => house.floors[0].rooms.slice(0, n).map((r) => r.id);
+const model = parseModel(await readFile(join(DATA_DIR, 'model.yaml'), 'utf8'));
+const firstFloor = model.buildings[0].floors.find((f) => f.level === 0) || model.buildings[0].floors[0];
+const firstRooms = (n) => firstFloor.rooms.slice(0, n).map((r) => r.id);
+const levels = [...new Set(model.buildings.flatMap((b) => b.floors.map((f) => f.level)))].sort((a, b) => a - b);
 
 const SCENARIOS = {
   'alles-aus': { rooms: [], outdoor: false },
@@ -32,21 +35,29 @@ const errors = [];
 try {
   for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
     const page = await guardedPage(browser, base, errors, { viewport, label: vpName });
-    for (const [name, sc] of Object.entries(SCENARIOS)) {
+    // Ebene 0 mit allen Szenarien, weitere Ebenen nur "abend" (alle Räume an)
+    const runs = [
+      ...Object.entries(SCENARIOS).map(([name, sc]) => [sc.level ?? firstFloor.level, name, sc]),
+      ...levels.filter((l) => l !== firstFloor.level).map((l) => [l, 'abend', { rooms: 'all', outdoor: false }]),
+    ];
+    for (const [level, name, sc] of runs) {
       if (only.length && !only.includes(name)) continue;
-      if (vpName !== 'desktop' && name !== 'abend') continue; // andere Größen nur im Hauptszenario
-      await page.evaluate((sc) => {
+      if (vpName !== 'desktop' && (name !== 'abend' || level !== firstFloor.level)) continue; // andere Größen nur im Hauptszenario
+      await page.evaluate(([level, sc]) => {
         // Sonnenstand über das simulierte HA setzen (wie im echten Betrieb über hass.states)
         const sun = sc.sun || { azimuth: 330, elevation: -25 };
         const mh = window.mockHass;
         mh.states = { ...mh.states, 'sun.sun': { state: sun.elevation > 0 ? 'above_horizon' : 'below_horizon', attributes: { ...sun } } };
         window.panel.hass = mh;
+        window.panel.setLevel(level);
         const v = window.panel.view;
-        for (const id of v.activeFloor.rooms.keys()) v.setRoomLight(id, sc.rooms === 'all' || sc.rooms.includes(id));
+        for (const f of v.activeFloors) for (const id of f.rooms.keys()) v.setRoomLight(id, sc.rooms === 'all' || sc.rooms.includes(id));
         v.setOutdoorLight(sc.outdoor);
         // Kamera für Detailansichten verschieben (danach wiederherstellen)
-        if (!v._home) v._home = { pos: v.camera.position.clone(), target: v.controls.target.clone(), zoom: v.camera.zoom };
-        const h = v._home;
+        // Ausgangslage je Ebene (der Ebenenwechsel passt den Bildausschnitt neu ein)
+        v._homes ??= {};
+        if (!v._homes[level]) v._homes[level] = { pos: v.camera.position.clone(), target: v.controls.target.clone(), zoom: v.camera.zoom };
+        const h = v._homes[level];
         v.camera.position.copy(h.pos);
         v.controls.target.copy(h.target);
         v.camera.zoom = h.zoom;
@@ -67,9 +78,9 @@ try {
         v.camera.updateProjectionMatrix();
         v.renderer.shadowMap.needsUpdate = true;
         v.renderNow();
-      }, sc);
+      }, [level, sc]);
       await page.waitForTimeout(150);
-      const file = join(OUT, `${house.floors[0].id}_${name}_${vpName}.png`);
+      const file = join(OUT, `ebene${level}_${name}_${vpName}.png`);
       await page.screenshot({ path: file });
       console.log('📸', file);
     }

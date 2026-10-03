@@ -1,9 +1,10 @@
-// Bauwerk einer Etage aus house.json: Böden, Wände, Fensterbrüstungen/-stürze, Glas, Türen.
+// Bauwerk einer Etage (aus dem Modell übersetzt, src/model/model.js): Böden, Wände, Fensterbrüstungen/-stürze, Glas,
+// Türen. Auch die Außenbereiche sind eine solche Etage (ohne Wände).
 // Enthält bewusst keine Einrichtung und keine Geräte (siehe furnishing.js) – das Haus ändert sich nie.
 import * as THREE from 'three';
 import { Builder, pointInPoly } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
-import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture } from './textures.js';
+import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
 
 const DOOR_HEIGHT = 2.05;
@@ -13,7 +14,7 @@ const FLOOR_STEP = 0.0008;
 
 export class FloorModel {
   /**
-   * @param floor          Etagen-Objekt aus house.json
+   * @param floor          Etage aus toScene() (house.floors[])
    * @param roomIndexBase  Raum-Indizes dieser Etage beginnen hier (global über alle Etagen)
    */
   constructor(floor, roomIndexBase, shared) {
@@ -56,8 +57,8 @@ export class FloorModel {
 
     // --- Böden pro Raum (Hit-Meshes zum Antippen + gemeinsame Geometrie je Bodenbelag)
     for (const r of this.rooms.values()) {
-      const y = r.order * FLOOR_STEP;
-      const kind = this.shared.mat[r.room.floor] ? r.room.floor : 'parkett';
+      const y = (r.room.elevation || 0) + r.order * FLOOR_STEP;
+      const kind = this.shared.mat[r.room.floor] ? r.room.floor : 'parquet';
       const fb = (floors[kind] ??= new Builder());
       const uvStart = fb.uv.length;
       fb.polyH(r.room.polygon, y, r.idx);
@@ -71,7 +72,7 @@ export class FloorModel {
         }
       }
       const hit = new Builder();
-      hit.polyH(r.room.polygon, 0.01, r.idx);
+      hit.polyH(r.room.polygon, (r.room.elevation || 0) + 0.01, r.idx);
       const mesh = new THREE.Mesh(hit.geometry(), this.shared.hitMaterial); // Material unsichtbar, Mesh raycastbar
       mesh.userData.roomId = r.room.id;
       r.hitMesh = mesh;
@@ -146,34 +147,44 @@ export class FloorModel {
     add(B.glass, S.mat.glass, { receive: false, order: 2 });
   }
 
-  /** Weiche Abdunklung des Bodens an Wänden (Ambient Occlusion), einmal als Canvas berechnet. */
   makeFloorAO(pxPerMeter = 48) {
-    const pts = this.floor.walls.flat();
-    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-    const pad = 1;
-    const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
-    const w = Math.max(...xs) - x0 + pad, h = Math.max(...ys) - y0 + pad;
-    const c = document.createElement('canvas');
-    c.width = Math.ceil(w * pxPerMeter);
-    c.height = Math.ceil(h * pxPerMeter);
-    const g = c.getContext('2d');
-    g.fillStyle = '#fff';
-    g.fillRect(0, 0, c.width, c.height);
-    g.filter = `blur(${Math.round(pxPerMeter * 0.22)}px)`;
-    g.fillStyle = '#000';
-    for (const wall of this.floor.walls) {
-      g.beginPath();
-      wall.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo']((x - x0) * pxPerMeter, (y - y0) * pxPerMeter));
-      g.closePath();
-      g.fill();
-    }
-    g.filter = 'none';
-    const tex = new THREE.CanvasTexture(c);
-    tex.flipY = false;
-    lightUniforms.uFloorAO.value = tex;
-    lightUniforms.uFloorAOBox.value.set(x0, y0, w, h);
-    return tex;
+    return makeFloorAO(this.floor.walls, pxPerMeter);
   }
+}
+
+/**
+ * Weiche Abdunklung des Bodens an Wänden (Ambient Occlusion) für alle Wände der gezeigten Ebene, einmal als
+ * Canvas berechnet. Bei großen Grundstücken wird die Auflösung begrenzt.
+ */
+export function makeFloorAO(walls, pxPerMeter = 48) {
+  if (!walls.length) return null;
+  const pts = walls.flat();
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const pad = 1;
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  const w = Math.max(...xs) - x0 + pad, h = Math.max(...ys) - y0 + pad;
+  pxPerMeter = Math.min(pxPerMeter, 2048 / Math.max(w, h));
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(w * pxPerMeter);
+  c.height = Math.ceil(h * pxPerMeter);
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, c.width, c.height);
+  g.filter = `blur(${Math.round(pxPerMeter * 0.22)}px)`;
+  g.fillStyle = '#000';
+  for (const wall of walls) {
+    g.beginPath();
+    wall.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo']((x - x0) * pxPerMeter, (y - y0) * pxPerMeter));
+    g.closePath();
+    g.fill();
+  }
+  g.filter = 'none';
+  const tex = new THREE.CanvasTexture(c);
+  tex.flipY = false;
+  lightUniforms.uFloorAO.value?.dispose?.();
+  lightUniforms.uFloorAO.value = tex;
+  lightUniforms.uFloorAOBox.value.set(x0, y0, w, h);
+  return tex;
 }
 
 /** Materialien und Texturen, einmal pro Szene. */
@@ -185,12 +196,25 @@ export function createSharedMaterials() {
   const cubes = cubeParquetTexture();
   cubes.repeat.set(1 / cubes.userData.metersPerRepeat, 1 / cubes.userData.metersPerRepeat);
   const lit = (params, opts = {}) => withRoomLight(new THREE.MeshStandardMaterial(params), opts);
+  const lawn = groundTexture();
+  lawn.repeat.set(1 / lawn.userData.metersPerRepeat, 1 / lawn.userData.metersPerRepeat);
+  // Pflaster: graue Platten (Fliesen-Textur in Steingrau, größeres Raster)
+  const paving = tileTexture(7, [0, 0, 58]);
+  paving.repeat.set(0.5 / paving.userData.metersPerRepeat, 0.5 / paving.userData.metersPerRepeat);
 
   const mat = {
-    parkett: withRoomLight(new THREE.MeshStandardMaterial({ map: parquet, roughness: 0.55, metalness: 0 }), { floorAO: true }),
-    fliesen: withRoomLight(new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.35, metalness: 0 }), { floorAO: true }),
+    // Bodenbeläge und Oberflächen (`surface` im Modell, docs/DATA_MODEL.md)
+    parquet: withRoomLight(new THREE.MeshStandardMaterial({ map: parquet, roughness: 0.55, metalness: 0 }), { floorAO: true }),
+    tiles: withRoomLight(new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.35, metalness: 0 }), { floorAO: true }),
     // Würfelparkett: 35-cm-Quadrate aus je 4 Eichenstäben, Richtung wechselt
-    parkett_wuerfel: lit({ map: cubes, roughness: 0.42, metalness: 0 }, { floorAO: true }),
+    parquet_cube: lit({ map: cubes, roughness: 0.42, metalness: 0 }, { floorAO: true }),
+    concrete: lit({ color: 0x9a968f, roughness: 0.9 }, { floorAO: true }),
+    lawn: lit({ map: lawn, roughness: 1 }),
+    paving: lit({ map: paving, roughness: 0.85 }),
+    gravel: lit({ color: 0xa69d8c, roughness: 1 }),
+    soil: lit({ color: 0x4a3626, roughness: 1 }),
+    wood: lit({ color: 0x8a6440, roughness: 0.7 }),
+    water: lit({ color: 0x2f5468, roughness: 0.15, metalness: 0.1 }),
     pvc: lit({ color: 0xf1f0eb, roughness: 0.45 }),
     board: lit({ color: 0xb48650, roughness: 0.5 }),
     doorDark: lit({ color: 0x3a2a1e, roughness: 0.7 }),

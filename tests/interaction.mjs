@@ -3,6 +3,7 @@
 // Kompass, Editiermodus (Auswahl, Drehung, Anlegen, Rückgängig, Fertig = Speichern, Abbrechen, Verknüpfen).
 //   node tests/interaction.mjs
 import { readFile, mkdir } from 'node:fs/promises';
+import * as yaml from 'js-yaml';
 import { join } from 'node:path';
 import { DATA_DIR, ENTITIES, OUT, IS_DEMO } from './lib/config.mjs';
 import { startServer } from './lib/server.mjs';
@@ -123,15 +124,15 @@ try {
   ok(moved.houseUnchanged && moved.layers === 1 && moved.stillOn, 'Leuchte umziehen baut nur die Einrichtung neu, Zustand bleibt', `Umzug: ${JSON.stringify(moved)}`);
 
   // ---------------- Daten zur Laufzeit ----------------
-  const original = await readFile(join(DATA_DIR, 'devices.yaml'), 'utf8');
-  await page.route('**/data/devices.yaml', (route) => route.fulfill({ contentType: 'text/yaml', body: original.replace(/name: Decke Schlafzimmer/, 'name: Testlampe') }));
+  const original = await readFile(join(DATA_DIR, 'model.yaml'), 'utf8');
+  await page.route('**/data/model.yaml', (route) => route.fulfill({ contentType: 'text/yaml', body: original.replace(/name: Decke Schlafzimmer/, 'name: Testlampe') }));
   const reload = await page.evaluate(async () => {
     const v = window.panel.view;
     await window.panel.reloadData();
     return { sameView: v === window.panel.view, name: window.panel.view.lamps.get('eg_schlafen_decke')?.lamp.name };
   });
-  await page.unroute('**/data/devices.yaml');
-  ok(reload.sameView && reload.name === 'Testlampe', 'Geänderte devices.yaml wird ohne Build übernommen', `Daten-Reload: ${JSON.stringify(reload)}`);
+  await page.unroute('**/data/model.yaml');
+  ok(reload.sameView && reload.name === 'Testlampe', 'Geändertes model.yaml (nur Objekte) wird ohne Build und ohne Neuaufbau des Hauses übernommen', `Daten-Reload: ${JSON.stringify(reload)}`);
 
   // ---------------- Kompass ----------------
   const before = await page.evaluate(() => window.panel.view.northScreenAngle());
@@ -140,6 +141,27 @@ try {
   const after = await page.evaluate(() => window.panel.view.northScreenAngle());
   ok(Math.abs(after) < 1, `Kompass nordet ein (${before.toFixed(0)}° -> ${after.toFixed(1)}°)`, `Kompass: vorher ${before}, nachher ${after}`);
   await page.screenshot({ path: join(OUT, 'demo_genordet.png') });
+
+  // ---------------- Ebenen (Stockwerke) ----------------
+  await clickShadow('.levels button[data-level="1"]');
+  const og = await page.evaluate(() => {
+    const v = window.panel.view;
+    return {
+      level: v.level,
+      shown: v.floors.filter((f) => f.group.visible).map((f) => f.floor.id),
+      label: window.panel.shadowRoot.querySelector('.floor').textContent,
+    };
+  });
+  ok(og.level === 1 && og.shown.join() === 'haus/og' && og.label === 'Obergeschoss', `Ebene 1. OG zeigt nur das Obergeschoss (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
+  await page.evaluate(() => (window.mockHass.calls.length = 0));
+  pt = await toScreen(page, [1.5, 2.85, 2.0]);
+  await page.mouse.click(pt.x, pt.y);
+  await settle(page, () => window.mockHass.calls.some((c) => c.domain));
+  const studio = await page.evaluate(() => window.mockHass.calls.filter((c) => c.domain).map((c) => `${c.domain}.${c.service}:${[].concat(c.data.entity_id)}`));
+  ok(studio.join() === 'light.turn_on:light.demo_studio', 'Raum im Obergeschoss antippen schaltet dessen Licht über HA', `Studio: ${studio}`);
+  await clickShadow('.levels button[data-level="0"]');
+  const eg = await page.evaluate(() => window.panel.view.floors.filter((f) => f.group.visible).map((f) => f.floor.id).sort());
+  ok(eg.join() === '__aussen,garage/eg,haus/eg', `Ebene EG zeigt Wohnhaus, Garage und Außenbereiche (${eg})`, `Ebene EG: ${eg}`);
 
   // ---------------- Editiermodus ----------------
   await page.reload();
@@ -197,16 +219,16 @@ try {
   const un = await page.evaluate(() => window.panel.editor._entry({ type: 'item', id: 'sideboard' }).pos);
   ok(Math.abs(un[0] - 4.4) < 0.01, 'Editor: Rückgängig stellt die vorige Lage wieder her', `Rückgängig: ${JSON.stringify(un)}`);
 
-  // Fertig speichert: Endpunkt abfangen (der Test ändert keine Dateien), nur Werte ersetzt, Kommentare bleiben
+  // Fertig speichert das Modell: Endpunkt abfangen (der Test ändert keine Dateien), Kopfkommentar bleibt
   let saved = null;
   await page.route('**/__save/**', async (route) => { saved = { url: route.request().url(), body: route.request().postData() }; await route.fulfill({ status: 204 }); });
   await clickShadow('.tools button[data-act=done]');
   await until(() => saved);
   await page.unroute('**/__save/**');
-  const line = saved?.body.split(/\r?\n/).find((l) => l.includes('id: sideboard'));
+  const savedSofa = saved && yaml.load(saved.body).objects.find((o) => o.id === 'sideboard');
   const offAfterSave = await page.evaluate(() => !window.panel.hasAttribute('editing'));
-  ok(saved?.url.endsWith('furniture.yaml') && saved.body.includes('# --- Wohnzimmer: Sitzecke') && line?.includes('pos: [4.4, 3.8]') && offAfterSave,
-    `Editor: Fertig speichert (nur Werte ersetzt: ${line?.trim()}) und beendet den Editiermodus`, `Fertig: ${saved?.url} ${line} aus=${offAfterSave}`);
+  ok(saved?.url.endsWith('model.yaml') && saved.body.startsWith('# Erfundenes Demo-Haus') && savedSofa?.pos.join() === '4.4,3.8' && offAfterSave,
+    `Editor: Fertig speichert das Modell (sideboard: ${JSON.stringify(savedSofa?.pos)}) und beendet den Editiermodus`, `Fertig: ${saved?.url} ${JSON.stringify(savedSofa)} aus=${offAfterSave}`);
 
   // Abbrechen verwirft: verschieben, Abbrechen -> nichts gespeichert, alte Lage wieder da
   await clickShadow('.edit-toggle');
@@ -227,8 +249,7 @@ try {
   }));
   await page.unroute('**/__save/**');
   // Erwartet: Stand der Datei (das Speichern oben wurde abgefangen, die Datei ist unverändert)
-  const filePos = (await readFile(join(DATA_DIR, 'furniture.yaml'), 'utf8')).split(/\r?\n/).find((l) => l.includes('id: sideboard'))
-    .match(/pos: \[([\d.]+), ([\d.]+)\]/).slice(1).map(Number);
+  const filePos = yaml.load(await readFile(join(DATA_DIR, 'model.yaml'), 'utf8')).objects.find((o) => o.id === 'sideboard').pos;
   ok(!cancel.editing && !savedOnCancel && Math.abs(cancel.pos[0] - filePos[0]) < 0.01 && Math.abs(cancel.pos[1] - filePos[1]) < 0.01,
     'Editor: Abbrechen verwirft die Änderungen und speichert nichts', `Abbrechen: ${JSON.stringify(cancel)} gespeichert=${savedOnCancel}`);
   await clickShadow('.edit-toggle');
@@ -269,11 +290,12 @@ try {
   ok(ln.entity === 'light.demo_fernsehkugel' && ln.on, 'Entity antippen verknüpft die Leuchte, sie folgt sofort dem HA-Zustand', `Verknüpfen: ${JSON.stringify(ln)}`);
   // Fertig -> Verknüpfung gespeichert, Editiermodus aus
   let savedDev = null;
-  await page.route('**/__save/**', async (route) => { if (route.request().url().endsWith('devices.yaml')) savedDev = route.request().postData(); await route.fulfill({ status: 204 }); });
+  await page.route('**/__save/**', async (route) => { if (route.request().url().endsWith('model.yaml')) savedDev = route.request().postData(); await route.fulfill({ status: 204 }); });
   await clickShadow('.tools button[data-act=done]');
   await until(() => savedDev);
   await page.unroute('**/__save/**');
-  ok(savedDev?.includes('entity: light.demo_fernsehkugel') && savedDev.includes('# Geräte im Haus'), 'Fertig speichert die Verknüpfung in devices.yaml (Kommentare bleiben)');
+  const kugel = savedDev && yaml.load(savedDev).objects.find((o) => o.id === 'eg_wohnen_kugel');
+  ok(kugel?.ha?.entities?.power === 'light.demo_fernsehkugel' && savedDev.startsWith('# Erfundenes Demo-Haus'), 'Fertig speichert die Verknüpfung im Modell (ha.entities.power)', `Verknüpfung gespeichert: ${JSON.stringify(kugel?.ha)}`);
   const off = await page.evaluate(() => !window.panel.hasAttribute('editing') && !window.panel.editor.sel);
   ok(off, 'Fertig beendet den Editiermodus');
   await page.close();

@@ -23,3 +23,9 @@ light.demo_terrasse | Terrassenleuchte
 light.demo_garten | Gartenstrahler
 ## Ohne Bereich
 light.demo_ohne_bereich | Lampe ohne Bereich
+## Studio
+light.demo_studio | Deckenlicht Studio
+## Garage
+light.demo_garage | Deckenlicht Garage
+switch.demo_waschmaschine | Waschmaschine
+sensor.demo_waschmaschine_restzeit | Waschmaschine Restzeit

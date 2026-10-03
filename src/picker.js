@@ -11,7 +11,7 @@ export const normName = (s) =>
 
 /**
  * HA-Bereich zu einem Raum des Modells.
- * @param areaMap  aus devices.yaml `areas:` – { "eg/bad": "bad_eg", ... } (area_id), hat Vorrang
+ * @param areaMap  Bereich -> HA-Bereich aus dem Modell (ha_area) – { bad: "bad_eg", ... } (area_id), hat Vorrang
  */
 export function areaForRoom(hass, floorId, room, areaMap = {}) {
   const areas = hass?.areas || {};
@@ -83,7 +83,7 @@ export class EntityPicker {
   }
 
   /**
-   * @param device   Eintrag aus devices.yaml
+   * @param device   Leuchte (intern, aus dem Modell übersetzt)
    * @param area     HA-Bereich des Raums (oder null)
    * @param usedBy   Map entity_id -> Gerätename (für "bereits verknüpft mit …")
    */

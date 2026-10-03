@@ -21,7 +21,7 @@ for (const f of files) {
   if (IMAGES.has(ext) && !f.startsWith('docs/')) errors.push(`${f}: Bild außerhalb von docs/ (Fotos/Texturen gehören in die private Instanz)`);
   if (/^(data|reference|Fotos|photos)\//i.test(f)) errors.push(`${f}: Ordner für private Daten`);
   if (/entities\.txt$/.test(f) && f !== 'examples/demo/entities.txt') errors.push(`${f}: HA-Export außerhalb des Demo-Hauses`);
-  if (/(^|\/)(house\.json|furniture\.yaml|devices\.yaml)$/.test(f) && !f.startsWith('examples/demo/') && !f.startsWith('templates/'))
+  if (/(^|\/)(model\.yaml|house\.json|furniture\.yaml|devices\.yaml)$/.test(f) && !f.startsWith('examples/demo/') && !f.startsWith('templates/'))
     errors.push(`${f}: Hausdaten außerhalb von examples/demo`);
 }
 

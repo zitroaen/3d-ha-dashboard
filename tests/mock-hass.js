@@ -1,5 +1,5 @@
 // Simuliertes hass-Objekt: Zustände + callService mit Zustandswechsel (wie Home Assistant).
-// Die Zustände werden aus data/devices.yaml erzeugt: jede dort verknüpfte Entity existiert, Lichter sind aus.
+// Die Zustände werden aus dem Modell (model.yaml) erzeugt: jede dort verknüpfte Entity existiert, Lichter sind aus.
 export function createMockHass(initialStates = {}, onChange = () => {}) {
   const hass = {
     language: 'de',
@@ -36,18 +36,21 @@ export function createMockHass(initialStates = {}, onChange = () => {}) {
   return hass;
 }
 
-/** Zustände für alle Entities aus devices.yaml (Lichter aus, warmweiß, dimmbar). */
-export function statesFromDevices(devices) {
+/** Zustände für alle im Modell verknüpften Entities (alle Rollen): Lichter/Schalter aus, Sensoren unbekannt. */
+export function statesFromModel(model) {
   const states = {};
-  for (const d of devices) {
-    for (const e of d.entity == null ? [] : [].concat(d.entity)) {
-      states[e] = {
-        entity_id: e,
-        state: 'off',
-        attributes: e.startsWith('light.')
-          ? { friendly_name: d.name || e, color_mode: 'color_temp', color_temp_kelvin: 2700, supported_color_modes: ['color_temp', 'xy'] }
-          : { friendly_name: d.name || e },
-      };
+  for (const o of model.objects || []) {
+    for (const v of Object.values(o.ha?.entities || {})) {
+      for (const e of [].concat(v)) {
+        const dom = e.split('.')[0];
+        states[e] = {
+          entity_id: e,
+          state: ['light', 'switch', 'fan', 'input_boolean'].includes(dom) ? 'off' : 'unknown',
+          attributes: dom === 'light'
+            ? { friendly_name: o.name || e, color_mode: 'color_temp', color_temp_kelvin: 2700, supported_color_modes: ['color_temp', 'xy'] }
+            : { friendly_name: o.name || e },
+        };
+      }
     }
   }
   return states;

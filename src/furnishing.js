@@ -1,4 +1,4 @@
-// Einrichtungs-Schicht: Möbel (furniture.yaml) und Leuchten (devices.yaml).
+// Einrichtungs-Schicht: Objekte des Modells – Möbel/Geräte (items) und Leuchten (lamps).
 // Unabhängig vom Hausmodell: lässt sich jederzeit verwerfen und neu aufbauen, ohne das Haus anzufassen.
 // Bezug zum Haus nur über Raum-IDs und Plan-Koordinaten.
 import * as THREE from 'three';
@@ -17,7 +17,8 @@ export const refKey = (type, id) => `${type}:${id}`;
  * Möbel: am Boden (bzw. auf `elevation` bei Bildern, TV, Vorhängen); Leuchten: an der Lichtquelle.
  */
 export function anchorOf(type, e) {
-  const y = type === 'lamp' ? e.height : e.elevation ?? 0;
+  // base: Bodenhöhe des Außenbereichs (Terrasse höher, Garten tiefer); in Räumen 0 (Etagenhöhe kommt von der Gruppe)
+  const y = (type === 'lamp' ? e.height : e.elevation ?? 0) + (e.base || 0);
   return { x: e.pos[0], y, z: e.pos[1], rot: e.rot || 0 };
 }
 
@@ -47,13 +48,14 @@ export class FurnishingLayer {
     for (const lamp of lamps) {
       const box = this._buildLamp(P, lamp, anchorOf('lamp', lamp), exclude.has(refKey('lamp', lamp.id)));
       if (box) this.boxes.set(refKey('lamp', lamp.id), box);
-      if (lamp.room === 'aussen' && lamp.kind === 'wall') {
+      if (lamp.outdoor && lamp.kind === 'wall') {
+        // Lichtschein auf dem Boden: freies Gelände liegt unter den Flächen, Außenbereiche auf ihrer Höhe
         const [fx, fz] = lamp.facing || [0, 0];
-        quad(pools, lamp.pos[0] + fx * 1.2, lamp.pos[1] + fz * 1.2, 1.6, 1.6, lamp.idx, -0.1);
+        quad(pools, lamp.pos[0] + fx * 1.2, lamp.pos[1] + fz * 1.2, 1.6, 1.6, lamp.idx, lamp.room === 'aussen' ? -0.1 : (lamp.base || 0) + 0.004);
       }
       // Trefferfläche zum Antippen (größer als der Leuchtkörper)
       const hit = new THREE.Mesh(shared.lampHitGeometry, shared.hitMaterial);
-      hit.position.set(lamp.pos[0], lamp.height, lamp.pos[1]);
+      hit.position.set(lamp.pos[0], lamp.height + (lamp.base || 0), lamp.pos[1]);
       hit.userData.lampId = lamp.id;
       hit.userData.ref = { type: 'lamp', id: lamp.id };
       this.lampHits.push(hit);

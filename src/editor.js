@@ -116,7 +116,9 @@ export class Editor {
     const entry = this._entry(ref);
     if (!entry) return;
     v.setFurnishing(v.furnishingData, { exclude: new Set([refKey(ref.type, ref.id)]) });
-    const layer = v.activeLayer;
+    // Etage des Objekts (eine Ebene kann mehrere Gebäude-Etagen und die Außen-Etage zeigen)
+    const fm = v.floorModel(entry.floor) || v.activeFloor;
+    const layer = v.furnishing[v.floors.indexOf(fm)];
     const buildEntry = ref.type === 'lamp' ? { ...entry, idx: v.lamps.get(ref.id)?.idx ?? 0 } : entry;
     const { group, box } = layer.buildSingle(ref.type, buildEntry);
     const proxy = group;
@@ -131,10 +133,10 @@ export class Editor {
     frame.renderOrder = 10;
     proxy.add(frame);
     const at = anchorOf(ref.type, entry);
-    proxy.position.set(at.x, at.y + v.activeFloor.group.position.y, at.z);
+    proxy.position.set(at.x, at.y + fm.group.position.y, at.z);
     setYaw(proxy, -THREE.MathUtils.degToRad(at.rot));
     v.scene.add(proxy);
-    this.sel = { ...ref, entry, proxy, box };
+    this.sel = { ...ref, entry, proxy, box, floorY: fm.group.position.y };
     this.alignFace = 'back';
     this._showGizmo();
     this._updateFaceMarker();
@@ -166,7 +168,7 @@ export class Editor {
     const s = this.sel;
     if (!s) return;
     const p = s.proxy.position, e = s.entry;
-    const y = Math.max(0, p.y - this.view.activeFloor.group.position.y);
+    const y = Math.max(0, p.y - s.floorY - (e.base || 0));
     e.pos = [r2(p.x), r2(p.z)];
     const rot = rDeg(-THREE.MathUtils.radToDeg(getYaw(s.proxy)));
     if (e.rot != null || rot !== 0) e.rot = rot; // Leuchten ohne Drehung bekommen kein "rot: 0"
@@ -230,7 +232,7 @@ export class Editor {
         return true;
       }
       // 2. Fläche des Hauses antippen
-      const house = v.activeFloor.group.children.filter((c) => c.isMesh && c.material !== v.shared.hitMaterial);
+      const house = v.activeFloors.flatMap((f) => f.group.children).filter((c) => c.isMesh && c.material !== v.shared.hitMaterial);
       const hit = ray.intersectObjects(house, false)[0];
       if (hit) {
         this._pushUndo();
@@ -241,8 +243,7 @@ export class Editor {
       return true;
     }
     // Objekt wählen (Leuchten vor Möbeln)
-    const layer = v.activeLayer;
-    const hit = ray.intersectObjects([...(layer?.lampHits || []), ...(layer?.itemHits || [])], false)[0];
+    const hit = ray.intersectObjects(v.activeLayers.flatMap((l) => [...l.lampHits, ...l.itemHits]), false)[0];
     if (hit) this.select(hit.object.userData.ref);
     else if (s) this.select(null);
     return true;

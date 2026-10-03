@@ -1,12 +1,12 @@
-// Link-Check gegen einen HA-Export (ENTITIES, erzeugt mit dem Template aus docs/DATA_FORMAT.md):
-// Jede Entity in devices.yaml muss im Export existieren; Lichter im Export ohne Zuordnung werden gelistet.
+// Link-Check gegen einen HA-Export (ENTITIES, erzeugt mit dem Template aus docs/DATA_MODEL.md):
+// Jede im Modell (model.yaml) verknüpfte Entity muss im Export existieren; Lichter im Export ohne Zuordnung werden gelistet.
 //   node tests/link-check.mjs [--all]   (--all: alle Bereiche, sonst nur Bereiche mit passendem Raumnamen)
 // Im Panel selbst gibt es denselben Check live gegen HA (Ketten-Knopf).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import * as yaml from 'js-yaml';
 import { DATA_DIR, ENTITIES } from './lib/config.mjs';
 import { normName } from '../src/picker.js';
+import { parseModel, spacesOf } from '../src/model/model.js';
 
 const EXPORT = ENTITIES;
 if (!EXPORT) {
@@ -20,18 +20,19 @@ for (const line of readFileSync(EXPORT, 'utf8').split(/\r?\n/)) {
   const [id, name] = line.split('|').map((s) => s?.trim());
   if (id && /^[a-z_]+\.[a-z0-9_]+$/.test(id)) exported.set(id, { name, area });
 }
-const devices = yaml.load(readFileSync(join(DATA_DIR, 'devices.yaml'), 'utf8')).devices || [];
-const house = JSON.parse(readFileSync(join(DATA_DIR, 'house.json'), 'utf8'));
+const model = parseModel(readFileSync(join(DATA_DIR, 'model.yaml'), 'utf8'));
 const used = new Map();
 const missing = [];
-for (const d of devices) {
-  for (const e of d.entity == null ? [] : [].concat(d.entity)) {
-    used.set(e, d.id);
-    if (!exported.has(e)) missing.push(`${d.id}: ${e}`);
+for (const o of model.objects || []) {
+  for (const [role, v] of Object.entries(o.ha?.entities || {})) {
+    for (const e of [].concat(v)) {
+      used.set(e, o.id);
+      if (!exported.has(e)) missing.push(`${o.id} (${role}): ${e}`);
+    }
   }
 }
 // Relevant: Bereiche, die wie ein Raum des Modells heißen, außerdem Außen und Lichter ohne Bereich
-const roomNames = new Set(house.floors.flatMap((f) => f.rooms.flatMap((r) => [normName(r.name), normName(r.id)])));
+const roomNames = new Set([...spacesOf(model).values()].flatMap((s) => [normName(s.room.name), normName(s.room.id)]));
 const relevant = (area) => roomNames.has(normName(area)) || /^(außen|aussen|ohne bereich)$/i.test(area);
 const all = process.argv.includes('--all');
 const free = [...exported].filter(([e, x]) => e.startsWith('light.') && !used.has(e) && (all || relevant(x.area)));
