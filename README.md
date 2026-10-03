@@ -17,10 +17,15 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 - **Ohne YAML:** HACS-Integration, die das Panel selbst in die Seitenleiste einträgt.
 - **Licht:** Raum antippen schaltet alle Lichter des Raums, Leuchte antippen nur diese, Leuchte **lange drücken**
   öffnet den HA-Dialog der Lampe (Farbe, Helligkeit, Farbtemperatur). Farbe und Helligkeit kommen aus HA. Das Licht wirkt nur im eigenen Raum (kein Durchscheinen durch Wände) und ist mobil-tauglich.
+- **Geräte und Möbel:** Jedes Objekt lässt sich mit HA-Entities verknüpfen (Schalten, Anzeigen) – z. B.
+  Waschmaschine, Kamin, PV, Staubsauger. Antippen, Doppeltippen und langes Drücken lösen wählbare Aktionen aus
+  (Umschalten, HA-Dialog, Dienst, Seite, optional mit Rückfrage); ein Schild über dem Objekt zeigt den Zustand
+  (z. B. „42 min“).
 - **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden.
 - **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,
-  mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), speichern.
+  mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), Gesten und Zustandsanzeige je
+  Objekt einstellen, speichern.
 - **Link-Check:** zeigt verknüpfte und fehlende Entities.
 - **Daten statt Code:** Ein Modell (`model.yaml`) beschreibt Gebäude mit Etagen, Außenbereiche (Terrasse, Garten,
   Einfahrt) und alle Objekte; es wird zur Laufzeit geladen – Änderungen brauchen keinen Build. Versioniertes Format

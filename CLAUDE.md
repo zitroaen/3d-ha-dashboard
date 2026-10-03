@@ -79,7 +79,8 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE`
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
 - `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (ganzes Modell
-  über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl · `src/ha.js` Zustand/Dienste
+  über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
+  · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige) · `src/ha.js` Zustand/Dienste
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
   (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
@@ -128,8 +129,13 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Wischgesten ab, seitliches Scrollen ginge auf dem iPhone nicht); Lampenauswahl/Meldungen richten sich nach ihrer Höhe
   (`--ha3d-editbar-h`).
 - `data_url` wird als Ordner behandelt (fehlender `/` wird ergänzt).
-- Langes Drücken (500 ms ruhig) auf eine Leuchte: `hass-more-info` mit der (ersten) Entity – HA öffnet seinen Dialog
-  (Farbe, Helligkeit). Nicht im Editiermodus; Kontextmenü/iOS-Callout unterdrückt.
+- Gesten auf Objekten (0.8.0): Antippen, Doppeltippen (zweites Antippen binnen 300 ms; nur Objekte mit
+  Doppeltippen-Aktion warten), langes Drücken (500 ms ruhig). Aktionen aus `ha` mit Standards
+  (`gestureAction()`); Leuchten reagieren immer, andere Objekte nur mit Aktion – sonst geht das Antippen an den Raum.
+  `more-info` = `hass-more-info`-Ereignis (HA öffnet seinen Dialog), `navigate` = `history.pushState` +
+  `location-changed`, Rückfrage als eigener Dialog im Panel. Nicht im Editiermodus; Kontextmenü/iOS-Callout unterdrückt.
+- Zustandsanzeige als HTML-Schilder über den Objekten (scharf, ohne Texturen), nach jedem Bild per `onRender`
+  nachgeführt; Weltpunkte zwischengespeichert bis zur nächsten Einrichtung/Ebene. Keine Animationen.
 - Panel-Höhe nicht vom Container erben: ab HA 2026.9 ist `partial-panel-resolver` inline und `ha-panel-custom` ohne
   Höhe, `height: 100%` ergibt 0 (weiße Seite). `100dvh` reicht nicht: In der iOS-App beginnt das Panel unter der
   Statusleiste und ragte unten hinaus. Daher misst `_fitHeight()` den Abstand vom oberen Panelrand bis zum unteren

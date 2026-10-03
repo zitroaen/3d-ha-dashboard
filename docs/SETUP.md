@@ -69,8 +69,12 @@ Prüfen: `npm run validate`, dann `npm run serve` und http://127.0.0.1:8123/test
    `data/model.yaml` anpassen (Katalog und Felder: `docs/DATA_MODEL.md`).
 3. Optional den HA-Export (Template in `docs/DATA_MODEL.md`) als `reference/entities.txt` speichern – dann prüft
    `npm test` alle Verknüpfungen, und die Vorschau simuliert HA mit den echten Entities.
-4. Verknüpfen im Panel: Stift → Leuchte antippen → **Verknüpfen** → Entity wählen → **Fertig** (speichert; **Abbrechen** verwirft). In der lokalen
-   Vorschau schreibt das direkt nach `data/model.yaml`.
+4. Verknüpfen im Panel: Stift → Objekt antippen → **Verknüpfen** öffnet seine Einstellungen: unter **Schalten** bzw.
+   **Anzeigen** „+ Entity“ → Entity wählen; darunter, was Antippen, Doppeltippen und langes Drücken tun und ob der
+   Zustand über dem Objekt erscheint → **Fertig** (speichert; **Abbrechen** verwirft). In der lokalen Vorschau schreibt
+   das direkt nach `data/model.yaml`.
+5. Geräte, die keine Leuchten sind (Waschmaschine, Kamin, PV-Wechselrichter, Saugroboter), als Objekt anlegen –
+   als Möbelmodell oder als neutrale Box/Markierung (`box`, `marker`) – und genauso verknüpfen.
 
 ## 4. Möbel
 

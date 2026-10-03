@@ -1,5 +1,17 @@
 # Änderungen
 
+## 0.8.0
+
+- **Entities an allen Objekten:** Nicht nur Leuchten – jedes Möbel und Gerät lässt sich mit HA verknüpfen: Rolle
+  **Schalten** (An/Aus, z. B. Steckdose, Kamin) und **Anzeigen** (Werte wie Restzeit oder Leistung).
+- **Gesten je Objekt:** Antippen, Doppeltippen und langes Drücken lösen wählbare Aktionen aus – Umschalten, HA-Dialog,
+  Dienst aufrufen (z. B. ein Skript), Seite öffnen oder nichts, auf Wunsch mit Rückfrage. Ohne Angabe gelten sinnvolle
+  Standards (Leuchten wie bisher).
+- **Einstellungen im Editor:** „Verknüpfen“ öffnet für das gewählte Objekt einen Bildschirm mit Entities, Gesten und
+  Zustandsanzeige. Die Entity-Auswahl hat einen neuen Filter „Sensoren“.
+- **Zustandsanzeige:** Ein kleines Schild über dem Objekt zeigt den Wert (z. B. „42 min“) bzw. An/Aus, hervorgehoben
+  solange das Gerät läuft. Keine Animationen.
+
 ## 0.7.0
 
 - **Gemeinsames Modell für alle Benutzer:** Mit der Integration speichert „Fertig“ das Modell in Home Assistant
