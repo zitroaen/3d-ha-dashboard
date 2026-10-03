@@ -20,6 +20,43 @@ So bleiben alle Daten des Hauses privat, und Engine-Updates kommen per `npm run 
   `npx --prefix engine playwright-core install chromium` (Linux ggf. mit `--with-deps`).
 - Home Assistant mit Zugriff auf den Ordner `/config/www` (SSH-Add-on, Samba oder File-Editor)
 
+## Vorab: Demo-Haus über HACS ausprobieren
+
+Das Panel enthält das Demo-Haus im Bundle – ohne eigene Daten, ohne Node und ohne Build:
+
+1. HACS → ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/zitroaen/3d-ha-dashboard`, Typ **Dashboard** →
+   hinzufügen, dann das Repository in HACS **herunterladen** (die Datei liegt danach unter
+   `/hacsfiles/3d-ha-dashboard/ha-3d-dashboard.js`).
+2. In der `configuration.yaml`:
+```yaml
+panel_custom:
+  - name: ha-3d-dashboard
+    url_path: haus-3d
+    sidebar_title: Haus 3D
+    sidebar_icon: mdi:home-floor-3
+    module_url: /hacsfiles/3d-ha-dashboard/ha-3d-dashboard.js
+    config:
+      demo: true   # zum Ausprobieren; für das eigene Haus stattdessen data_url: /local/ha-3d-dashboard/
+```
+3. Home Assistant neu starten.
+
+HACS registriert Dashboard-Dateien nur als Ressource; das Seitenleisten-Panel entsteht über `panel_custom`.
+Mit `demo: true` schaltet Antippen von Räumen und Leuchten **lokal** (die Demo-Entities gibt es in HA nicht), Sonne und
+Mond kommen weiter aus `sun.sun`. Der Editor lässt sich ausprobieren, **Speichern, Export und Verknüpfen sind
+ausgeblendet** – im Demo-Modus wird nichts dauerhaft geschrieben und nie ein Layout eigener Daten überlagert.
+
+**Eigenes Haus mit HACS:** die Daten (`house.json`, `furniture.yaml`, `devices.yaml`, `textures/`) liegen in
+`/config/www/ha-3d-dashboard/` (Abschnitt 5, ohne die JS-Datei), und das Panel bekommt `data_url`:
+```yaml
+    module_url: /hacsfiles/3d-ha-dashboard/ha-3d-dashboard.js
+    config:
+      data_url: /local/ha-3d-dashboard/
+```
+`data_url` darf absolut (`/local/…`) oder relativ zur Seite sein; ein fehlendes `/` am Ende wird ergänzt. Ist unter
+`data_url` (oder neben dem Modul) keine `house.json` ladbar, zeigt das Panel das Demo-Haus mit dem Hinweis „Demo-Haus –
+eigene Daten: siehe Anleitung“ (antippen blendet ihn aus). Fehlerhafte eigene Daten werden dagegen als Fehler
+angezeigt, nicht durch das Demo-Haus ersetzt. Updates der Engine kommen dann über HACS.
+
 ## 1. Instanz anlegen
 
 Im leeren Ordner für das Haus:
@@ -93,7 +130,8 @@ nicht in `engine/` der Instanz ändern.
        sidebar_icon: mdi:home-floor-3
        module_url: /local/ha-3d-dashboard/ha-3d-dashboard.js?v=1
    ```
-3. Home Assistant neu starten. Nach jedem Code-Update `?v=` erhöhen (Browser-Cache); Daten-Updates brauchen das
+3. Home Assistant neu starten. (Mit HACS stattdessen `module_url: /hacsfiles/3d-ha-dashboard/ha-3d-dashboard.js` und
+   `config: { data_url: /local/ha-3d-dashboard/ }`, siehe oben.) Nach jedem Code-Update `?v=` erhöhen (Browser-Cache); Daten-Updates brauchen das
    nicht, das Panel lädt sie beim Öffnen neu.
 
 **Datenschutz:** Was unter `/config/www` liegt, liefert HA unter `/local/` **ohne Anmeldung** aus. Grundriss und

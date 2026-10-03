@@ -65,9 +65,11 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
 - `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (YAML-Patch,
   Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl · `src/ha.js` Zustand/Dienste
+- `src/demo.js` eingebettetes Demo-Haus (aus `examples/demo`, beim Build eingebettet) für den Demo-Modus
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
-  (Demo-IDs), `validate-data.mjs`, `link-check.mjs`, `store.test.mjs`, `privacy-guard.mjs`, `lib/`
+  (Demo-IDs), `validate-data.mjs`, `link-check.mjs`, `store.test.mjs`, `data.test.mjs`, `demo-mode.mjs` (Demo-Modus/Fallback),
+  `privacy-guard.mjs`, `lib/`
 - `scripts/` Build, Magicplan-Import, `house_fixes.py`, Platzhalter-Leuchten, Deploy, `init-instance.mjs`
 
 ## Lichtmodell
@@ -86,3 +88,11 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Weiterentwicklung.
 - Drehwinkel aus der Quaternion lesen (nicht `rotation.y`, das ist über 90° gespiegelt).
 - YAML-Patch erhält das Zeilenende (CRLF-Dateien unter Windows).
+- Vertrieb über HACS (Kategorie Dashboard, `hacs.json`): Release-Asset `ha-3d-dashboard.js`, gebaut vom Workflow
+  `release.yml` (Tag `v*` oder manuell mit Version; Version = `package.json`). Tags/Releases legt der Besitzer an.
+  Die HACS-Validierungsaktion ist bewusst nicht eingebunden (braucht Release und Repo-Topics, lokal nicht prüfbar).
+- Demo-Modus (`config: { demo: true }`, Fallback bei nicht ladbarer `house.json`): Demo-Haus ist im Bundle (esbuild-
+  Import, YAML als Text). Antippen schaltet lokal (`_local`), HA-Leuchtenzustände werden ignoriert, nur `sun.sun` gilt;
+  Speichern/Export/Verknüpfen/Link-Check sind aus und HA-Benutzerdaten werden weder gelesen noch geschrieben, damit
+  eigene Daten nie überlagert oder überschrieben werden. Fallback nur bei Ladefehlern, nicht bei defekten Daten.
+- `data_url` wird mit abschließendem `/` normalisiert (`resolveDataUrl`).

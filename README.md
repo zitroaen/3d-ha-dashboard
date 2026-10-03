@@ -24,6 +24,30 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 - **Daten statt Code:** Haus (`house.json`), Möbel (`furniture.yaml`) und Geräte (`devices.yaml`) werden zur
   Laufzeit geladen – Änderungen brauchen keinen Build. Grundriss-Import aus Magicplan-PDF-Reports.
 
+## Schnell ausprobieren: Demo-Haus über HACS
+
+Ohne eigene Daten und ohne Build auf deinem Rechner:
+
+1. In Home Assistant **HACS → ⋮ → Benutzerdefinierte Repositories** → `https://github.com/zitroaen/3d-ha-dashboard`,
+   Typ **Dashboard** → hinzufügen und **herunterladen**.
+2. In der `configuration.yaml`:
+```yaml
+panel_custom:
+  - name: ha-3d-dashboard
+    url_path: haus-3d
+    sidebar_title: Haus 3D
+    sidebar_icon: mdi:home-floor-3
+    module_url: /hacsfiles/3d-ha-dashboard/ha-3d-dashboard.js
+    config:
+      demo: true   # zum Ausprobieren; für das eigene Haus stattdessen data_url: /local/ha-3d-dashboard/
+```
+3. Home Assistant neu starten – in der Seitenleiste erscheint **Haus 3D** mit dem erfundenen Demo-Haus.
+
+HACS legt die Datei nur als Dashboard-Ressource ab; das Seitenleisten-Panel entsteht erst durch `panel_custom`.
+Im Demo-Modus schaltet Antippen nur lokal (die Demo-Leuchten gibt es in HA nicht), der Editor speichert nichts.
+Sonne und Mond kommen weiter aus `sun.sun`. Fehlen die Daten unter `data_url`, zeigt das Panel ebenfalls das
+Demo-Haus mit einem Hinweis. Für das eigene Haus siehe unten und [docs/SETUP.md](docs/SETUP.md).
+
 ## Mit Claude für das eigene Haus einrichten
 
 Lege einen leeren Ordner für dein Haus an, öffne darin [Claude Code](https://claude.com/claude-code) und gib diesen
