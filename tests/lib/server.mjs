@@ -2,7 +2,7 @@
 //   /data/*                  -> Datenordner (DATA_DIR)
 //   /reference/entities.txt  -> HA-Export (ENTITIES), falls vorhanden
 //   alles andere             -> Engine (dist/, tests/, node_modules/ …)
-//   POST /__save/<datei>     -> schreibt furniture.yaml / devices.yaml in den Datenordner (nur wenn writable)
+//   POST /__save/model.yaml  -> schreibt das Modell in den Datenordner (nur wenn writable)
 import http from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
@@ -13,7 +13,7 @@ const TYPES = {
   '.yaml': 'text/yaml', '.txt': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.png': 'image/png', '.svg': 'image/svg+xml', '.webp': 'image/webp',
 };
-const WRITABLE = new Set(['furniture.yaml', 'devices.yaml']);
+const WRITABLE = new Set(['model.yaml']);
 
 /** Pfad sicher unter einem Basisordner auflösen (kein ../ hinaus) */
 function inside(base, rel) {

@@ -20,7 +20,7 @@
           "data_url": "Ordner mit den Hausdaten"
         },
         "data_description": {
-          "data_url": "Enthält house.json, furniture.yaml, devices.yaml und textures/. /local/ha-3d-dashboard/ entspricht dem Ordner /config/www/ha-3d-dashboard/. Fehlt er, wird das Demo-Haus angezeigt."
+          "data_url": "Enthält model.yaml und textures/. /local/ha-3d-dashboard/ entspricht dem Ordner /config/www/ha-3d-dashboard/. Fehlt er, wird das Demo-Haus angezeigt."
         }
       }
     }

@@ -2,7 +2,7 @@
 // Bestehende Dateien werden nie überschrieben.
 //   node engine/scripts/init-instance.mjs --name "Mein Haus" [--demo]
 //     --demo   mit dem Demo-Haus starten (zum Ausprobieren, später durch den eigenen Grundriss ersetzen)
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { ENGINE_ROOT } from '../tests/lib/config.mjs';
 
@@ -34,20 +34,19 @@ put('views.json', readFileSync(join(T, 'views.json'), 'utf8'));
 put('.gitignore', readFileSync(join(T, 'gitignore'), 'utf8'));
 mkdirSync(join(cwd, 'reference', 'photos'), { recursive: true });
 
-// Datenordner: Kopf (Feldbeschreibung) aus dem Demo-Haus, Listen leer – oder komplett das Demo-Haus
-const header = (file) => readFileSync(join(D, file), 'utf8').split(/\n(?=items:|devices:)/)[0].replace('des Demo-Hauses', '');
+// Datenordner: komplett das Demo-Haus – oder ein leeres Modell (Bauwerk kommt per npm run import-plan)
 if (demo) {
-  for (const f of ['house.json', 'furniture.yaml', 'devices.yaml']) {
-    if (!existsSync(join(cwd, 'data', f))) {
-      mkdirSync(join(cwd, 'data'), { recursive: true });
-      copyFileSync(join(D, f), join(cwd, 'data', f));
-      done.push(`data/${f}`);
-    }
-  }
+  put('data/model.yaml', readFileSync(join(D, 'model.yaml'), 'utf8'));
   put('reference/entities.txt', readFileSync(join(D, 'entities.txt'), 'utf8'));
 } else {
-  put('data/furniture.yaml', `${header('furniture.yaml')}\nitems: []\n`);
-  put('data/devices.yaml', `${header('devices.yaml')}\ndevices: []\n`);
+  put('data/model.yaml', `# Modell von ${name}. Format: engine/docs/DATA_MODEL.md
+schema: ha3d
+version: 2
+site: { name: ${JSON.stringify(name)}, north_deg: 0, ground: { surface: lawn } }
+buildings: []
+outdoor: []
+objects: []
+`);
 }
 mkdirSync(join(cwd, 'data', 'textures'), { recursive: true });
 

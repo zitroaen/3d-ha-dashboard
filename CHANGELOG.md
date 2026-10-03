@@ -1,5 +1,20 @@
 # Änderungen
 
+## 0.6.0
+
+- **Neues Datenmodell (Version 2):** Ein Dokument `model.yaml` ersetzt `house.json`, `furniture.yaml` und
+  `devices.yaml`. Es beschreibt das Grundstück, mehrere Gebäude (Haus, Garage, Gartenhaus) mit Etagen und Ebenen,
+  Außenbereiche (Terrasse, Einfahrt, Beete, „Gartenräume“) und alle Objekte in einer Liste. Jedes Objekt kann
+  Entities tragen (Rollen `power`, `info`) und Aktionen für Tippen, Doppeltippen und langes Drücken festlegen.
+  Spezifikation für Menschen und KI-Agenten: `docs/DATA_MODEL.md`, JSON-Schema: `schema/model.schema.json`.
+- **Bitte umstellen:** Daten im alten Format werden nicht mehr geladen. Der Grundriss lässt sich mit
+  `npm run import-plan` neu importieren (legt `model.yaml` an); Objekte nach `docs/DATA_MODEL.md` übertragen.
+  Künftige Formatänderungen werden beim Laden automatisch migriert.
+- **Ebenen:** Knöpfe unten links schalten zwischen den Stockwerken (UG, EG, 1. OG …); die Kamera richtet sich neu aus.
+- Neue Bodenbeläge für außen und Nebengebäude: `concrete`, `paving`, `gravel`, `soil`, `wood`, `water`; neue
+  Geräte-Modelle `box` und `marker`.
+- Demo-Haus mit Obergeschoss, Garage, Terrasse, Einfahrt und Beet.
+
 ## 0.5.1
 
 - **Filter „Steckdosen“** in der Entity-Auswahl: „Licht“ zeigt nur `light.*`, „Steckdosen“ nur `switch.*` (z. B. Lampen

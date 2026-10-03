@@ -5,7 +5,7 @@ import { FloorModel, createSharedMaterials } from './house.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
 import { pointInPoly } from './geometry.js';
-import { groundTexture } from './textures.js';
+import { makeFloorAO } from './house.js';
 
 // Warmweiß ~2700 K
 const DEFAULT_LIGHT = new THREE.Color().setRGB(1.0, 0.8, 0.6, THREE.SRGBColorSpace);
@@ -13,8 +13,9 @@ const LAMP_INTENSITY = { ceiling: 1.7, pendant: 1.6, floor: 1.2, table: 0.9, wal
 
 export class HouseScene {
   /**
-   * @param house        data/house.json (Bauwerk)
-   * @param furnishing   { devices, items } aus data/devices.yaml und data/furniture.yaml
+   * @param house        Bauwerk (aus dem Modell übersetzt, src/model/model.js toScene): Etagen aller Gebäude
+   *                     plus Außen-Etage; jede Etage hat eine Ebene (level), gezeigt wird jeweils eine Ebene
+   * @param furnishing   { devices, items } (Leuchten und übrige Objekte)
    */
   /** assetBase: Ordner der Daten (für Texturen wie textures/…), wie data_url */
   constructor(container, house, furnishing, { onRoomTap, onLampTap, onLampHold, onViewChange, assetBase = null } = {}) {
@@ -85,8 +86,45 @@ export class HouseScene {
       this.scene.add(fm.group);
       this.floors.push(fm);
     }
-    this.activeFloor = this.floors[0];
-    this.activeFloor.makeFloorAO();
+    this.levels = [...new Set(this.floors.map((f) => f.floor.level ?? 0))].sort((a, b) => a - b);
+    this.setLevel(this.levels.includes(0) ? 0 : this.levels[0], { silent: true });
+  }
+
+  /**
+   * Ebene zeigen (0 = Erdgeschoss mit Außenbereichen, 1 = 1. OG, -1 = Keller …). Etagen verschiedener Gebäude
+   * mit derselben Ebene erscheinen zusammen; alle anderen werden ausgeblendet.
+   */
+  setLevel(level, { silent = false } = {}) {
+    if (!this.levels.includes(level)) return false;
+    this.level = level;
+    this.activeFloors = this.floors.filter((f) => (f.floor.level ?? 0) === level);
+    // "Haupt"-Etage der Ebene (Titel, Editor-Standard): die erste echte Gebäude-Etage
+    this.activeFloor = this.activeFloors.find((f) => !f.floor.outdoor) || this.activeFloors[0];
+    for (const f of this.floors) f.group.visible = this.activeFloors.includes(f);
+    for (const slab of this.slabs || []) slab.visible = slab.userData.level === level;
+    makeFloorAO(this.activeFloors.flatMap((f) => f.floor.walls));
+    if (!silent) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.resize(); // Bildausschnitt auf die Etagen dieser Ebene einpassen (rendert und meldet die Änderung)
+    }
+    return true;
+  }
+
+  /** Name einer Ebene: Namen der Gebäude-Etagen (ohne Doppelungen) */
+  levelName(level = this.level) {
+    const names = this.floors.filter((f) => (f.floor.level ?? 0) === level && !f.floor.outdoor).map((f) => f.floor.name);
+    return [...new Set(names)].join(' · ') || 'Außen';
+  }
+
+  /** Etage (FloorModel) zu einem Etagen-Schlüssel */
+  floorModel(key) {
+    return this.floors.find((f) => f.floor.id === key);
+  }
+
+  /** Raum bzw. Außenbereich nach ID (über alle Etagen) */
+  roomById(id) {
+    for (const f of this.floors) if (f.rooms.has(id)) return f.rooms.get(id).room;
+    return null;
   }
 
   /** Globaler Raum-Index (1-basiert) für Lampen-Zuordnung; "aussen" ist ein Pseudo-Raum. */
@@ -135,7 +173,7 @@ export class HouseScene {
       const layer = new FurnishingLayer(fm, floorLamps, items.filter((i) => i.floor === fm.floor.id), this.shared, { exclude });
       fm.group.add(layer.group);
       for (const l of floorLamps) {
-        this.lightTable.setLampPosition(l.idx - 1, [l.pos[0], l.height + fm.group.position.y, l.pos[1]], l.range);
+        this.lightTable.setLampPosition(l.idx - 1, [l.pos[0], l.height + (l.base || 0) + fm.group.position.y, l.pos[1]], l.range);
         const old = prev.get(l.id);
         this.lamps.set(l.id, {
           idx: l.idx, lamp: l, roomIdx: l.roomIdx, room: l.room, floor: fm,
@@ -152,18 +190,16 @@ export class HouseScene {
   }
 
   _buildEnvironment() {
-    const fm = this.activeFloor;
-    const pts = fm.floor.walls.flat();
+    // Ausdehnung des ganzen Grundstücks: Wände aller Etagen und alle Außenbereiche
+    const pts = this.floors.flatMap((f) => [...f.floor.walls.flat(), ...f.floor.rooms.flatMap((r) => r.polygon)]);
     const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
     this.bounds = { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) };
     const cx = (this.bounds.x0 + this.bounds.x1) / 2, cz = (this.bounds.z0 + this.bounds.z1) / 2;
     this.center = new THREE.Vector3(cx, 0, cz);
 
-    // Rasen
-    const gt = groundTexture();
-    gt.repeat.set(1 / gt.userData.metersPerRepeat, 1 / gt.userData.metersPerRepeat);
-    const groundMat = withRoomLight(new THREE.MeshStandardMaterial({ map: gt, roughness: 1 }), {});
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), groundMat);
+    // Boden außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen (kein Flackern)
+    const groundMat = this.shared.mat[this.house.ground] || this.shared.mat.lawn;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), groundMat);
     const uv = ground.geometry.attributes.uv;
     const pos = ground.geometry.attributes.position;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) + cx, -pos.getY(i) + cz);
@@ -173,15 +209,23 @@ export class HouseScene {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // Bodenplatte unter dem Haus (sichtbare Kante)
+    // Bodenplatte unter jeder Gebäude-Etage (sichtbare Kante); nur auf der eigenen Ebene sichtbar
     const slabMat = new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.95 });
-    const outline = this._houseOutline();
-    const shape = new THREE.Shape(outline.map(([x, z]) => new THREE.Vector2(x, -z)));
-    const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: false }), slabMat);
-    slab.rotation.x = -Math.PI / 2;
-    slab.position.y = -0.141;
-    slab.receiveShadow = true;
-    this.scene.add(slab);
+    this.slabs = [];
+    for (const fm of this.floors) {
+      if (fm.floor.outdoor || !fm.floor.walls.length) continue;
+      const outline = this._houseOutline(fm);
+      if (outline.length < 3) continue;
+      const shape = new THREE.Shape(outline.map(([x, z]) => new THREE.Vector2(x, -z)));
+      const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: false }), slabMat);
+      slab.rotation.x = -Math.PI / 2;
+      slab.position.y = fm.group.position.y - 0.141;
+      slab.receiveShadow = true;
+      slab.userData.level = fm.floor.level ?? 0;
+      slab.visible = slab.userData.level === this.level;
+      this.slabs.push(slab);
+      this.scene.add(slab);
+    }
 
     // Himmel: Halbkugel-Licht (Himmel/Boden) + ein Gestirn mit Schatten – tagsüber die Sonne, nachts der Mond.
     this.hemi = new THREE.HemisphereLight();
@@ -245,10 +289,11 @@ export class HouseScene {
   }
 
   /** Außenkontur für die Bodenplatte: zeilenweise abgetastetes Treppenpolygon aus Räumen und Wänden. */
-  _houseOutline() {
-    const fm = this.activeFloor;
+  _houseOutline(fm) {
     const cell = 0.25;
-    const { x0, x1, z0, z1 } = this.bounds;
+    const pts = [...fm.floor.walls.flat(), ...fm.floor.rooms.flatMap((r) => r.polygon)];
+    const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
     const nx = Math.ceil((x1 - x0) / cell), nz = Math.ceil((z1 - z0) / cell);
     const inside = (x, z) =>
       fm.roomAt([x, z]) > 0 || fm.floor.walls.some((w) => pointInPoly([x, z], w));
@@ -312,10 +357,14 @@ export class HouseScene {
     const cam = this.camera;
     cam.updateMatrixWorld();
     const inv = cam.matrixWorldInverse;
-    const H = this.activeFloor.H;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     const v = new THREE.Vector3();
-    for (const [x, z] of this.activeFloor.floor.walls.flat()) for (const y of [0, H]) {
+    // alle Etagen der gezeigten Ebene samt Außenbereichen (inkl. Wandhöhe)
+    const pts = this.activeFloors.flatMap((f) => {
+      const y0 = f.group.position.y;
+      return [...f.floor.walls.flat(), ...f.floor.rooms.flatMap((r) => r.polygon)].flatMap(([x, z]) => [[x, y0, z], [x, y0 + f.H, z]]);
+    });
+    for (const [x, y, z] of pts) {
       v.set(x, y, z).applyMatrix4(inv);
       minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
       minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
@@ -428,8 +477,13 @@ export class HouseScene {
     return ids.length > 0;
   }
 
+  /** Alle Außenleuchten (in Außenbereichen oder auf freiem Gelände) schalten. */
   setOutdoorLight(on) {
-    return this.setRoomLight('aussen', on);
+    const ids = [...this.lamps.entries()].filter(([, s]) => s.lamp.outdoor).map(([id]) => id);
+    for (const id of ids) this.lamps.get(id).on = on;
+    this._updateLights();
+    this.requestRender();
+    return ids.length > 0;
   }
 
   _updateLights() {
@@ -449,15 +503,16 @@ export class HouseScene {
 
   // ---------- Antippen ----------
 
-  get activeLayer() {
-    return this.furnishing[this.floors.indexOf(this.activeFloor)];
+  /** Einrichtungs-Schichten der gezeigten Ebene */
+  get activeLayers() {
+    return this.activeFloors.map((f) => this.furnishing[this.floors.indexOf(f)]).filter(Boolean);
   }
 
   /** Lampen-Position live setzen (Editor: Leuchte wird verschoben, Licht wandert mit). */
   moveLampLight(lampId, [x, y, z]) {
     const s = this.lamps.get(lampId);
     if (!s) return;
-    this.lightTable.setLampPosition(s.idx - 1, [x, y + s.floor.group.position.y, z], s.lamp.range);
+    this.lightTable.setLampPosition(s.idx - 1, [x, y + (s.lamp.base || 0) + s.floor.group.position.y, z], s.lamp.range);
     this.lightTable.commit();
     this.requestRender();
   }
@@ -476,7 +531,7 @@ export class HouseScene {
       return ray;
     };
     // getroffene Leuchte unter dem zuletzt gesetzten Strahl
-    const lampAt = () => ray.intersectObjects(this.activeLayer?.lampHits || [], false)[0]?.object.userData.lampId;
+    const lampAt = () => ray.intersectObjects(this.activeLayers.flatMap((l) => l.lampHits), false)[0]?.object.userData.lampId;
     el.addEventListener('pointerdown', (e) => {
       pointers++;
       cancelHold();
@@ -515,7 +570,7 @@ export class HouseScene {
       // Lampen haben Vorrang vor Räumen
       const lampId = lampAt();
       if (lampId) return this.onLampTap?.(lampId);
-      const targets = [...this.activeFloor.rooms.values()].map((r) => r.hitMesh);
+      const targets = this.activeFloors.flatMap((f) => [...f.rooms.values()].map((r) => r.hitMesh));
       const hit = ray.intersectObjects(targets, false)[0];
       if (hit) this.onRoomTap?.(hit.object.userData.roomId);
     });

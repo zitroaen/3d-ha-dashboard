@@ -1,4 +1,4 @@
-// Prozedurale Modelle für Möbel (furniture.yaml) und Leuchten (devices.yaml).
+// Prozedurale Geometrie der Katalog-Modelle (src/model/catalog.js): Möbel/Geräte (FURNITURE) und Leuchten (LAMPS).
 // Lokales Koordinatensystem eines Modells: Ursprung = Mitte der Grundfläche auf dem Boden,
 // x = Breite, z = Tiefe (+z = Vorderseite: Sitzfläche, Bildschirm, Regalöffnung, Tastatur), y = Höhe.
 import * as THREE from 'three';
@@ -142,6 +142,20 @@ export class PartCollector {
 // ---------------------------------------------------------------------------------------------
 
 export const FURNITURE = {
+  /** Allgemeiner Quader für Geräte ohne eigenes Modell (Waschmaschine, Wärmepumpe …): size, params.color. */
+  box(P, it) {
+    const [W, D, H] = it.size || [0.6, 0.6, 0.85];
+    const c = it.color || 'white';
+    P.rbox(c, W, H, D, Math.min(0.03, W / 6, D / 6), 0, 0, 0);
+    P.box('black_matte', W * 0.6, 0.02, 0.005, 0, H * 0.82, D / 2 + 0.002); // Bedienblende
+  },
+
+  /** Kleiner Punkt für Sensoren, Taster und Anzeigen: Kugel mit Durchmesser size[0]. */
+  marker(P, it) {
+    const d = it.size?.[0] ?? 0.12;
+    P.sphere(it.color || 'teal', d / 2, 0, d / 2, 0, { seg: 12 });
+  },
+
   /** U-Sofa: Rücken entlang der Breite (hinten), links/rechts je ein Schenkel nach vorn. */
   sofa_u(P, it) {
     const [W, D, H] = it.size || [3.5, 2.4, 0.82];
@@ -390,7 +404,7 @@ export const FURNITURE = {
 };
 
 // ---------------------------------------------------------------------------------------------
-// Leuchten (devices.yaml, type: light, model). Lokaler Ursprung = Boden unter der Lampe;
+// Leuchten (Katalog-Modelle mit Fähigkeit light). Lokaler Ursprung = Boden unter der Lampe;
 // h = Höhe der Lichtquelle (lamp.height). Leuchtende Teile mit kind 'glow'.
 // ---------------------------------------------------------------------------------------------
 

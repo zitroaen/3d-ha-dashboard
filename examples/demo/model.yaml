@@ -1,0 +1,288 @@
+# Erfundenes Demo-Haus (Testdaten und Vorlage). Format: docs/DATA_MODEL.md
+# Bauwerk erzeugt von examples/demo/build-house.mjs, Objekte von Hand bzw. im Editor
+schema: ha3d
+version: 2
+site: { name: Demohaus, north_deg: 20, ground: { surface: lawn } }
+buildings:
+  - id: haus
+    name: Wohnhaus
+    kind: house
+    floors:
+      - id: eg
+        name: Erdgeschoss
+        level: 0
+        elevation: 0
+        height: 2.6
+        rooms:
+          - id: wohnen
+            name: Wohnzimmer
+            polygon: [[0.3, 0.3], [5.94, 0.3], [5.94, 7.7], [0.3, 7.7]]
+            surface: parquet_cube
+            surface_rot: 45
+          - { id: kueche, name: Küche, polygon: [[6.06, 0.3], [9.7, 0.3], [9.7, 3.44], [6.06, 3.44]], surface: tiles }
+          - id: schlafen
+            name: Schlafzimmer
+            polygon: [[6.06, 3.56], [7.94, 3.56], [7.94, 7.7], [6.06, 7.7]]
+            surface: parquet
+          - { id: bad, name: Bad, polygon: [[8.06, 3.56], [9.7, 3.56], [9.7, 7.7], [8.06, 7.7]], surface: tiles }
+        walls:
+          - { polygon: [[0, 0], [1.2, 0], [1.2, 0.3], [0, 0.3]] }
+          - { polygon: [[2.4, 0], [2.6, 0], [2.6, 0.3], [2.4, 0.3]] }
+          - { polygon: [[3.8, 0], [7, 0], [7, 0.3], [3.8, 0.3]] }
+          - { polygon: [[8.2, 0], [8.6, 0], [8.6, 0.3], [8.2, 0.3]] }
+          - { polygon: [[9.5, 0], [10, 0], [10, 0.3], [9.5, 0.3]] }
+          - { polygon: [[0, 7.7], [2, 7.7], [2, 8], [0, 8]] }
+          - { polygon: [[3.6, 7.7], [6.5, 7.7], [6.5, 8], [3.6, 8]] }
+          - { polygon: [[7.5, 7.7], [10, 7.7], [10, 8], [7.5, 8]] }
+          - { polygon: [[0, 0.3], [0.3, 0.3], [0.3, 2], [0, 2]] }
+          - { polygon: [[0, 4], [0.3, 4], [0.3, 7.7], [0, 7.7]] }
+          - { polygon: [[9.7, 0.3], [10, 0.3], [10, 1.2], [9.7, 1.2]] }
+          - { polygon: [[9.7, 2.4], [10, 2.4], [10, 5], [9.7, 5]] }
+          - { polygon: [[9.7, 5.8], [10, 5.8], [10, 7.7], [9.7, 7.7]] }
+          - { polygon: [[5.94, 0.3], [6.06, 0.3], [6.06, 1.4], [5.94, 1.4]] }
+          - { polygon: [[5.94, 2.3], [6.06, 2.3], [6.06, 5.2], [5.94, 5.2]] }
+          - { polygon: [[5.94, 6.1], [6.06, 6.1], [6.06, 7.7], [5.94, 7.7]] }
+          - { polygon: [[6.06, 3.44], [9.7, 3.44], [9.7, 3.56], [6.06, 3.56]] }
+          - { polygon: [[7.94, 3.56], [8.06, 3.56], [8.06, 6.4], [7.94, 6.4]] }
+          - { polygon: [[7.94, 7.2], [8.06, 7.2], [8.06, 7.7], [7.94, 7.7]] }
+        windows:
+          - { sill: 0.9, top: 2.1, rect: [1.2, 0, 2.4, 0.3], room: wohnen, transom: 0.7 }
+          - { sill: 0.9, top: 2.1, rect: [2.6, 0, 3.8, 0.3], room: wohnen, transom: 0.7 }
+          - { sill: 1, top: 2.1, rect: [7, 0, 8.2, 0.3], room: kueche }
+          - { sill: 0.9, top: 2.1, rect: [6.5, 7.7, 7.5, 8], room: schlafen }
+          - { sill: 0.9, top: 2.1, rect: [0, 2, 0.3, 4], room: wohnen, sashes: 4 }
+          - { sill: 0.9, top: 2.1, rect: [9.7, 1.2, 10, 2.4], room: kueche }
+          - { sill: 1.4, top: 2.1, rect: [9.7, 5, 10, 5.8], room: bad }
+        doors:
+          - hinge: [2, 7.85]
+            end: [2.8, 7.85]
+            swing: -1
+            jamb: [-0.15, 0.15]
+            type: exterior
+            leaf: glass
+            rooms: [wohnen]
+            height: 2.1
+          - hinge: [3.6, 7.85]
+            end: [2.8, 7.85]
+            swing: 1
+            jamb: [-0.15, 0.15]
+            type: exterior
+            leaf: glass
+            rooms: [wohnen]
+            height: 2.1
+          - hinge: [8.6, 0.15]
+            end: [9.5, 0.15]
+            swing: 1
+            jamb: [-0.15, 0.15]
+            type: exterior
+            leaf: solid
+            rooms: [kueche]
+            height: 2
+          - hinge: [6, 1.4]
+            end: [6, 2.3]
+            swing: 1
+            jamb: [-0.06, 0.06]
+            type: interior
+            rooms: [wohnen, kueche]
+            height: 2
+          - hinge: [6, 5.2]
+            end: [6, 6.1]
+            swing: 1
+            jamb: [-0.06, 0.06]
+            type: interior
+            rooms: [wohnen, schlafen]
+            height: 2
+          - hinge: [8, 6.4]
+            end: [8, 7.2]
+            swing: 1
+            jamb: [-0.06, 0.06]
+            type: interior
+            rooms: [schlafen, bad]
+            height: 2
+      - id: og
+        name: Obergeschoss
+        level: 1
+        elevation: 2.85
+        height: 2.4
+        rooms:
+          - id: studio
+            name: Studio
+            polygon: [[0.3, 0.3], [5.94, 0.3], [5.94, 7.7], [0.3, 7.7]]
+            surface: parquet
+        walls:
+          - { polygon: [[0, 0], [2, 0], [2, 0.3], [0, 0.3]] }
+          - { polygon: [[3.4, 0], [6.06, 0], [6.06, 0.3], [3.4, 0.3]] }
+          - { polygon: [[0, 7.7], [2, 7.7], [2, 8], [0, 8]] }
+          - { polygon: [[3.6, 7.7], [6.06, 7.7], [6.06, 8], [3.6, 8]] }
+          - { polygon: [[0, 0.3], [0.3, 0.3], [0.3, 7.7], [0, 7.7]] }
+          - { polygon: [[5.94, 0.3], [6.06, 0.3], [6.06, 7.7], [5.94, 7.7]] }
+        windows:
+          - { sill: 0.9, top: 2, rect: [2, 0, 3.4, 0.3], room: studio }
+          - { sill: 0.5, top: 2, rect: [2, 7.7, 3.6, 8], room: studio }
+  - id: garage
+    name: Garage
+    kind: garage
+    floors:
+      - id: eg
+        name: Garage
+        level: 0
+        elevation: 0
+        height: 2.4
+        rooms:
+          - id: garage
+            name: Garage
+            polygon: [[11.7, 0.2], [15.3, 0.2], [15.3, 5.8], [11.7, 5.8]]
+            surface: concrete
+        walls:
+          - { polygon: [[11.5, 0], [15.5, 0], [15.5, 0.2], [11.5, 0.2]] }
+          - { polygon: [[11.5, 5.8], [12, 5.8], [12, 6], [11.5, 6]] }
+          - { polygon: [[15, 5.8], [15.5, 5.8], [15.5, 6], [15, 6]] }
+          - { polygon: [[11.5, 0.2], [11.7, 0.2], [11.7, 2], [11.5, 2]] }
+          - { polygon: [[11.5, 2.9], [11.7, 2.9], [11.7, 5.8], [11.5, 5.8]] }
+          - { polygon: [[15.3, 0.2], [15.5, 0.2], [15.5, 5.8], [15.3, 5.8]] }
+        doors:
+          - hinge: [11.6, 2]
+            end: [11.6, 2.9]
+            swing: 1
+            jamb: [-0.1, 0.1]
+            type: exterior
+            leaf: solid
+            rooms: [garage]
+            height: 2
+outdoor:
+  - { id: terrasse, name: Terrasse, polygon: [[0, 8], [6.5, 8], [6.5, 10.5], [0, 10.5]], surface: paving }
+  - id: einfahrt
+    name: Einfahrt
+    polygon: [[11.5, 6], [15.5, 6], [15.5, 12], [11.5, 12]]
+    surface: gravel
+    elevation: -0.05
+  - { id: beet, name: Beet, polygon: [[7, 9], [10.5, 9], [10.5, 10.5], [7, 10.5]], surface: soil, elevation: -0.04 }
+objects:
+  - id: sofa
+    model: sofa_u
+    space: wohnen
+    pos: [1.55, 3]
+    rot: 270
+    size: [3, 2.2, 0.82]
+    params: { seat_depth: 0.95, left: 2, right: 2.2 }
+  - { id: couchtisch, model: chest_table, space: wohnen, pos: [1.95, 3], rot: 270 }
+  - id: heizkoerper
+    model: radiator
+    space: wohnen
+    pos: [0.36, 3]
+    rot: 270
+    elevation: 0.2
+    size: [1.8, 0.1, 0.55]
+  - id: vorhang_1
+    model: curtain
+    space: wohnen
+    pos: [0.38, 1.82]
+    rot: 270
+    size: [0.3, 0.1, 2.3]
+    params: { color: curtain_green }
+  - id: vorhang_2
+    model: curtain
+    space: wohnen
+    pos: [0.38, 4.18]
+    rot: 270
+    size: [0.3, 0.1, 2.3]
+    params: { color: curtain_green }
+  - { id: teppich, model: rug, space: wohnen, pos: [3.5, 3], rot: 0, size: [1.8, 2.6] }
+  - { id: sessel_1, model: armchair, space: wohnen, pos: [3.7, 2.3], rot: 120 }
+  - { id: sessel_2, model: armchair, space: wohnen, pos: [3.7, 3.7], rot: 60 }
+  - { id: sideboard, model: sideboard, space: wohnen, pos: [5.7, 3.4], rot: 90, size: [1.2, 0.45, 0.58] }
+  - { id: tv, model: tv, space: wohnen, pos: [5.9, 3.4], rot: 90, elevation: 0.95, size: [1.3, 0.05, 0.75] }
+  - { id: ofenplatte, model: hearth, space: wohnen, pos: [5.48, 4.6], rot: 90, size: [0.8, 0.9] }
+  - { id: ofen, model: stove, space: wohnen, pos: [5.66, 4.6], rot: 90, size: [0.6, 0.5, 1.5] }
+  - { id: bild, model: picture, space: wohnen, pos: [4.9, 0.32], rot: 0, elevation: 1, size: [0.7, 0.03, 1] }
+  - { id: regal, model: bookshelf, space: wohnen, pos: [4.8, 7.54], rot: 180, size: [2, 0.3, 2] }
+  - { id: fluegel, model: grand_piano, space: wohnen, pos: [4.4, 6], rot: 180, size: [1.48, 1.6] }
+  - { id: spielzeug, model: toy_storage, space: wohnen, pos: [1, 6.6], rot: 0 }
+  - { id: stuhl, model: chair, space: kueche, pos: [7.5, 2.4], rot: 0 }
+  - id: eg_wohnen_stehlampe
+    name: Stehlampe
+    model: floor_spots
+    space: wohnen
+    pos: [0.65, 0.7]
+    light: { height: 1.45, range: 2.8 }
+    ha: { entities: { power: [light.demo_stehlampe_1, light.demo_stehlampe_2, light.demo_stehlampe_3] } }
+  - id: eg_wohnen_kronleuchter
+    name: Kronleuchter
+    model: chandelier_tulip
+    space: wohnen
+    pos: [2.2, 3]
+    light: { height: 1.85, range: 4 }
+  - id: eg_wohnen_wandleuchte
+    name: Wandleuchte
+    model: sconce
+    space: wohnen
+    pos: [4.2, 0.32]
+    rot: 0
+    light: { height: 1.75, range: 2.2 }
+    ha: { entities: { power: light.demo_wandleuchte } }
+  - id: eg_wohnen_kugel
+    name: Leuchtkugel
+    model: ball
+    space: wohnen
+    pos: [5.6, 6.9]
+    light: { height: 0.14, range: 1.6, color: "#3aa0ff" }
+  - id: eg_kueche_decke
+    name: Decke Küche
+    model: disc
+    space: kueche
+    pos: [7.9, 1.9]
+    light: { height: 2.3, range: 4.5 }
+    ha: { entities: { power: light.demo_kueche } }
+  - id: eg_schlafen_decke
+    name: Decke Schlafzimmer
+    model: disc
+    space: schlafen
+    pos: [7, 5.6]
+    light: { height: 2.3, range: 4.5 }
+  - id: eg_bad_decke
+    name: Decke Bad
+    model: disc
+    space: bad
+    pos: [8.9, 5.6]
+    light: { height: 2.3, range: 4.5 }
+    ha: { entities: { power: light.demo_bad } }
+  - id: eg_aussen_terrasse
+    name: Terrassenleuchte
+    model: wall_box
+    space: terrasse
+    pos: [1.7, 8.06]
+    light: { height: 2.1, range: 3.5, facing: [0, 1] }
+    ha: { entities: { power: light.demo_terrasse } }
+  - id: og_studio_decke
+    name: Decke Studio
+    model: disc
+    space: studio
+    pos: [3, 4]
+    light: { height: 2.15, range: 4.5 }
+    ha: { entities: { power: light.demo_studio } }
+  - { id: studio_regal, model: bookshelf, space: studio, pos: [3, 7.54], rot: 180, size: [2, 0.3, 2] }
+  - { id: studio_teppich, model: rug, space: studio, pos: [3, 4], size: [2, 2.8], params: { color: teal } }
+  - id: garage_decke
+    name: Decke Garage
+    model: disc
+    space: garage
+    pos: [13.5, 3]
+    light: { height: 2.2, range: 4.5 }
+    ha: { entities: { power: light.demo_garage } }
+  - id: waschmaschine
+    name: Waschmaschine
+    model: box
+    space: garage
+    pos: [15, 0.55]
+    rot: 0
+    size: [0.6, 0.6, 0.85]
+    params: { color: white }
+    ha: { entities: { power: switch.demo_waschmaschine, info: sensor.demo_waschmaschine_restzeit }, tap: more-info }
+  - id: gartenstrahler
+    name: Gartenstrahler
+    model: ball
+    space: beet
+    pos: [8.8, 9.8]
+    params: { radius: 0.12 }
+    light: { height: 0.12, range: 2.5, color: "#9fd0ff" }
+    ha: { entities: { power: light.demo_garten } }

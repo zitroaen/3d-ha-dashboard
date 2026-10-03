@@ -1,9 +1,10 @@
 """Grundriss-Import aus einem Magicplan-PDF-Report (deutschsprachiger Export): liest Wände, Räume, Fenster
-und Türen als Vektordaten und schreibt house.json. Danach ist house.json die Quelle der Wahrheit und wird von
-Hand (oder im Panel) gepflegt – das Skript nur erneut laufen lassen, wenn man von vorn anfangen will, denn es
-überschreibt die Datei.
+und Türen als Vektordaten und schreibt ein Gebäude im Datenmodell v2 (docs/DATA_MODEL.md, buildings[]) als JSON.
+Danach fügt scripts/import-building.mjs es in model.yaml ein (ein Gebäude gleicher ID wird ersetzt, Objekte und
+andere Gebäude bleiben). Mehrere Gebäude (Garage, Gartenhaus): je ein Report mit eigener "building"-ID.
 
-    python scripts/extract_plan.py <report.pdf> --out <datenordner>/house.json [--config plan.json] [--debug]
+    python scripts/extract_plan.py <report.pdf> --out <ordner>/building.json [--config plan.json] [--debug]
+    node scripts/import-building.mjs <ordner>/building.json        (Datenordner: DATA_DIR bzw. ha3d.config.json)
 
 Etagen- und Raumseiten werden automatisch erkannt: Eine Etagenseite hat eine Überschrift "▼<Etage>" mit
 "RÄUME:" darunter, die folgenden Raumseiten "▼<Raum>" mit der Etage darunter. Maßstab ("1:95") und
@@ -11,15 +12,15 @@ Deckenhöhen ("DECKENHÖHE: 2.50 m") kommen aus dem Seitentext.
 
 Optionale Konfiguration (JSON), alles optional:
     {
-      "name": "Mein Haus",
-      "north_deg": 0,                                   # Norden im Plan, Grad im Uhrzeigersinn von oben
-      "floors": { "Erdgeschoss": { "id": "eg", "elevation": 0, "offset": [0, 0] } },
+      "building": { "id": "haus", "name": "Wohnhaus", "kind": "house" },
+      "floors": { "Erdgeschoss": { "id": "eg", "level": 0, "elevation": 0, "offset": [0, 0] } },
       "room_ids": { "Badezimmer": "bad" },              # Magicplan-Name -> Raum-ID (sonst aus dem Namen)
-      "floor_material": { "bad": "fliesen" },           # Raum-ID -> Bodenbelag (sonst nach Raumname geraten)
+      "surface": { "bad": "tiles" },                    # Raum-ID -> Bodenbelag (sonst nach Raumname geraten)
       "front_door_rooms": ["diele"]                     # Außentüren dieser Räume massiv (sonst verglast)
     }
 Mehrere Etagen: Jede Etage bekommt ihren eigenen Ursprung (linke obere Ecke ihrer Außenwände); die Lage der
-Etagen zueinander ("offset": [dx, dy] je Etage) und die Höhe ("elevation") bitte in der Konfiguration setzen.
+Etagen zueinander ("offset": [dx, dy] je Etage, in Grundstückskoordinaten), Ebene ("level", sonst Reihenfolge im
+Report) und Höhe ("elevation") bitte in der Konfiguration setzen. Raum-IDs müssen im ganzen Modell eindeutig sein.
 
 Benötigt: pip install pymupdf
 """
@@ -152,7 +153,7 @@ def signed_area(poly):
 def extract_floor(doc, fid, cfg, conf):
     M_PER_PT = cfg["scale"] or 25.4 / 72 / 1000 * 95
     room_ids = conf.get("room_ids", {})
-    floor_material = conf.get("floor_material", {})
+    floor_material = conf.get("surface", conf.get("floor_material", {}))
     front_rooms = set(conf.get("front_door_rooms", []))
     plan = doc[cfg["plan_page"]].get_drawings()
     floor_main = next(d for d in plan if fill_is(d, FLOOR_RGB))
@@ -296,7 +297,7 @@ def extract_floor(doc, fid, cfg, conf):
         hs = cfg["ceilings"].get(name, [])
         h = hs[ceil_seen[name]] if ceil_seen[name] < len(hs) else floor_ceiling
         ceil_seen[name] += 1
-        material = floor_material.get(rid) or ("fliesen" if TILED.search(name) else "parkett")
+        material = floor_material.get(rid) or ("tiles" if TILED.search(name) else "parquet")
         rooms.append({"id": rid, "name": name, "polygon": [list(p) for p in pm],
                       "floor": material, "ceiling": None if abs(h - floor_ceiling) < 0.005 else h})
 
@@ -371,6 +372,26 @@ def debug_svg(floor, path):
     Path(path).write_text("\n".join(out), encoding="utf-8")
 
 
+def to_v2_floor(f):
+    """Interne Etage -> Etage im Datenmodell v2 (docs/DATA_MODEL.md)"""
+    rooms = []
+    for r in f["rooms"]:
+        room = {"id": r["id"], "name": r["name"], "polygon": r["polygon"], "surface": r["floor"]}
+        if r.get("ceiling"):
+            room["height"] = r["ceiling"]
+        rooms.append(room)
+    doors = []
+    for d in f["doors"]:
+        d = dict(d)
+        d["rooms"] = [x for x in d.get("rooms", []) if x]
+        doors.append(d)
+    return {
+        "id": f["id"], "name": f["name"], "level": f["level"], "elevation": f.get("elevation", 0),
+        "height": f["ceiling"], "rooms": rooms, "walls": [{"polygon": w} for w in f["walls"]],
+        "windows": [{k: v for k, v in w.items() if v is not None} for w in f["windows"]], "doors": doors,
+    }
+
+
 def main():
     args = sys.argv[1:]
     if not args or args[0].startswith("-"):
@@ -378,7 +399,7 @@ def main():
         sys.exit(1)
     opt = lambda name, default=None: args[args.index(name) + 1] if name in args else default
     pdf = Path(args[0])
-    out = Path(opt("--out", "house.json"))
+    out = Path(opt("--out", "building.json"))
     conf = json.loads(Path(opt("--config")).read_text(encoding="utf-8")) if opt("--config") else {}
     floor_conf = conf.get("floors", {})
 
@@ -390,23 +411,22 @@ def main():
     for level, cfg in enumerate(detected):
         fc = floor_conf.get(cfg["name"], {})
         fid = fc.get("id") or FLOOR_IDS.get(cfg["name"].lower()) or slug(cfg["name"])
-        cfg.update(level=level, elevation=fc.get("elevation", 0.0), offset=fc.get("offset", [0, 0]))
+        cfg.update(level=fc.get("level", level), elevation=fc.get("elevation", 0.0), offset=fc.get("offset", [0, 0]))
         floors.append(extract_floor(doc, fid, cfg, conf))
         floors[-1]["ceiling"] = cfg["ceiling"]
-    house = {
-        "name": conf.get("name", pdf.stem),
-        "units": "m",
-        "coordinates": "x nach rechts, y nach unten wie im Magicplan-Plan (three.js: x -> x, y -> z). "
-                       "Ursprung: linke obere Ecke der Außenwände je Etage (+ offset).",
-        "source": pdf.name,
-        "north_deg": conf.get("north_deg", 0),
-        "floors": floors,
-    }
+    house = {"floors": floors}
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from house_fixes import fix_house  # Fensterbänder zusammenfassen, Wandstreifen entfernen
     fix_house(house)
+    b = conf.get("building", {})
+    building = {
+        "id": b.get("id", "haus"),
+        "name": b.get("name", conf.get("name", "Wohnhaus")),
+        "kind": b.get("kind", "house"),
+        "floors": [to_v2_floor(f) for f in floors],
+    }
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(house, ensure_ascii=False, indent=1), encoding="utf-8")
+    out.write_text(json.dumps(building, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"-> {out}")
     for f in floors:
         print(f["id"], f["name"], len(f["rooms"]), "Räume", len(f["walls"]), "Wände", len(f["windows"]), "Fenster", len(f["doors"]), "Türen")

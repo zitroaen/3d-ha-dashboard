@@ -1,6 +1,6 @@
 // Gemeinsame Konfiguration aller Werkzeuge: Welcher Datenordner, welcher HA-Export, wohin mit Ausgaben.
 // Standard ist das Demo-Haus der Engine; eine Instanz (dein eigenes Haus) setzt die Umgebungsvariablen:
-//   DATA_DIR   Ordner mit house.json, furniture.yaml, devices.yaml, textures/   (Standard: examples/demo)
+//   DATA_DIR   Ordner mit model.yaml und textures/   (Standard: examples/demo)
 //   ENTITIES   HA-Export (Entwicklerwerkzeuge → Template) für Link-Check und Harness (Standard: DATA_DIR/entities.txt)
 //   VIEWS      optionale JSON-Datei mit zusätzlichen Screenshot-Ansichten (siehe tests/screenshots.mjs)
 //   OUT        Ausgabeordner für Screenshots (Standard: tests/output der Engine)

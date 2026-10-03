@@ -13,7 +13,7 @@
   <span class="resolver"><div class="panel-custom"><ha-3d-dashboard></ha-3d-dashboard></div></span>
   <script type="module">
     import '../dist/ha-3d-dashboard.js';
-    import { createMockHass, statesFromDevices } from './mock-hass.js';
+    import { createMockHass, statesFromModel } from './mock-hass.js';
     import { load as parseYaml } from '../node_modules/js-yaml/dist/js-yaml.mjs';
 
     const el = document.querySelector('ha-3d-dashboard');
@@ -27,9 +27,9 @@
     el.panel = { config: q.has('demo') ? { demo: true } : q.has('nodata') ? { data_url: '/fehlt' } : { data_url: '/data/', save_url: '/__save/' } };
 
     // Simuliertes HA wie die echte Installation: alle Entities aus dem HA-Export (reference/entities.txt) mit
-    // Bereich (wie hass.states + Entity-/Bereichs-Registry) plus jede in devices.yaml verknüpfte Entity –
+    // Bereich (wie hass.states + Entity-/Bereichs-Registry) plus jede im Modell verknüpfte Entity –
     // alles aus, Nacht als Ausgangszustand
-    const devices = parseYaml(await (await fetch('/data/devices.yaml')).text()).devices || [];
+    const model = parseYaml(await (await fetch('/data/model.yaml')).text()) || {};
     const exported = {}, entities = {}, areas = {};
     try {
       let area = null;
@@ -51,7 +51,7 @@
     } catch { /* ohne Export geht es auch */ }
     const hass = createMockHass({
       ...exported,
-      ...statesFromDevices(devices),
+      ...statesFromModel(model),
       'sun.sun': { state: 'below_horizon', attributes: { azimuth: 330, elevation: -25, friendly_name: 'Sun' } },
     }, (h) => { el.hass = h; });
     Object.assign(hass, { entities, areas, devices: {} });

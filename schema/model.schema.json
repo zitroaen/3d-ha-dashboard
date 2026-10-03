@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zitroaen/3d-ha-dashboard/schema/model.schema.json",
+  "title": "3D-HA-Dashboard Modell",
+  "description": "Datenmodell Version 2. Beschreibung der Felder: docs/DATA_MODEL.md",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "site", "buildings"],
+  "properties": {
+    "schema": { "const": "ha3d" },
+    "version": { "const": 2 },
+    "site": { "$ref": "#/$defs/site" },
+    "buildings": { "type": "array", "items": { "$ref": "#/$defs/building" } },
+    "outdoor": { "type": "array", "items": { "$ref": "#/$defs/outdoor" } },
+    "objects": { "type": "array", "items": { "$ref": "#/$defs/object" } },
+    "connections": { "type": "array", "description": "reserviert für spätere Versionen", "maxItems": 0 }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "num": { "type": "number" },
+    "pos": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "polygon": { "type": "array", "items": { "$ref": "#/$defs/pos" }, "minItems": 3 },
+    "surface": { "enum": ["parquet", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water"] },
+    "entityId": { "type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$" },
+    "entityList": {
+      "oneOf": [
+        { "$ref": "#/$defs/entityId" },
+        { "type": "array", "items": { "$ref": "#/$defs/entityId" }, "minItems": 1 }
+      ]
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "north_deg": { "type": "number" },
+        "ground": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "surface": { "$ref": "#/$defs/surface" } }
+        }
+      }
+    },
+    "building": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "floors"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "kind": { "enum": ["house", "garage", "garden_house", "carport", "other"] },
+        "floors": { "type": "array", "items": { "$ref": "#/$defs/floor" }, "minItems": 1 }
+      }
+    },
+    "floor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "level", "height", "rooms", "walls"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "level": { "type": "integer" },
+        "elevation": { "type": "number" },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "ha_floor": { "type": "string" },
+        "rooms": { "type": "array", "items": { "$ref": "#/$defs/room" } },
+        "walls": { "type": "array", "items": { "$ref": "#/$defs/wall" } },
+        "windows": { "type": "array", "items": { "$ref": "#/$defs/window" } },
+        "doors": { "type": "array", "items": { "$ref": "#/$defs/door" } }
+      }
+    },
+    "room": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "polygon"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "polygon": { "$ref": "#/$defs/polygon" },
+        "surface": { "$ref": "#/$defs/surface" },
+        "surface_rot": { "type": "number" },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "ha_area": { "type": "string" }
+      }
+    },
+    "wall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["polygon"],
+      "properties": { "polygon": { "$ref": "#/$defs/polygon" } }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rect"],
+      "properties": {
+        "rect": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 },
+        "room": { "$ref": "#/$defs/id" },
+        "sill": { "type": "number" },
+        "top": { "type": "number" },
+        "sashes": { "type": "integer", "minimum": 1 },
+        "transom": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "door": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hinge", "end", "swing", "jamb"],
+      "properties": {
+        "hinge": { "$ref": "#/$defs/pos" },
+        "end": { "$ref": "#/$defs/pos" },
+        "swing": { "enum": [1, -1] },
+        "jamb": { "$ref": "#/$defs/pos" },
+        "type": { "enum": ["interior", "exterior"] },
+        "leaf": { "enum": ["glass", "solid"] },
+        "rooms": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "open_deg": { "type": "number" }
+      }
+    },
+    "outdoor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "polygon"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "polygon": { "$ref": "#/$defs/polygon" },
+        "surface": { "$ref": "#/$defs/surface" },
+        "elevation": { "type": "number" },
+        "ha_area": { "type": "string" }
+      }
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "model", "pos"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "model": { "type": "string" },
+        "space": { "$ref": "#/$defs/id" },
+        "pos": { "$ref": "#/$defs/pos" },
+        "rot": { "type": "number" },
+        "elevation": { "type": "number" },
+        "size": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 1, "maxItems": 3 },
+        "params": { "type": "object" },
+        "light": { "$ref": "#/$defs/light" },
+        "ha": { "$ref": "#/$defs/ha" }
+      }
+    },
+    "light": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["height", "range"],
+      "properties": {
+        "mount": { "enum": ["ceiling", "pendant", "floor", "table", "wall", "spot"] },
+        "height": { "type": "number" },
+        "range": { "type": "number", "exclusiveMinimum": 0 },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "facing": { "$ref": "#/$defs/pos" }
+      }
+    },
+    "ha": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "power": { "$ref": "#/$defs/entityList" },
+            "info": { "$ref": "#/$defs/entityList" }
+          }
+        },
+        "tap": { "$ref": "#/$defs/action" },
+        "double_tap": { "$ref": "#/$defs/action" },
+        "hold": { "$ref": "#/$defs/action" }
+      }
+    },
+    "action": {
+      "oneOf": [
+        { "enum": ["toggle", "more-info", "none"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action"],
+          "properties": {
+            "action": { "enum": ["toggle", "more-info", "service", "navigate", "none"] },
+            "entity": { "$ref": "#/$defs/entityId" },
+            "service": { "type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$" },
+            "data": { "type": "object" },
+            "path": { "type": "string", "pattern": "^/" },
+            "confirm": { "type": "string" }
+          },
+          "allOf": [
+            { "if": { "properties": { "action": { "const": "service" } } }, "then": { "required": ["service"] } },
+            { "if": { "properties": { "action": { "const": "navigate" } } }, "then": { "required": ["path"] } }
+          ]
+        }
+      ]
+    }
+  }
+}

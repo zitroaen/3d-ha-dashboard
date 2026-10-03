@@ -25,7 +25,7 @@ DATA_DIR="$(cd "$DATA_DIR" && pwd)"
 DEST="$HA_CONFIG/www/ha-3d-dashboard"
 
 DATA_DIR="$DATA_DIR" node "$ENGINE/tests/validate-data.mjs"
-FILES=("$DATA_DIR/house.json" "$DATA_DIR/furniture.yaml" "$DATA_DIR/devices.yaml")
+FILES=("$DATA_DIR/model.yaml")
 if [[ "${1:-}" != "--data" ]]; then
   (cd "$ENGINE" && npm run build)
   FILES+=("$ENGINE/dist/ha-3d-dashboard.js")

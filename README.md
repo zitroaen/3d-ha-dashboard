@@ -22,8 +22,10 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,
   mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), speichern.
 - **Link-Check:** zeigt verknüpfte und fehlende Entities.
-- **Daten statt Code:** Haus (`house.json`), Möbel (`furniture.yaml`) und Geräte (`devices.yaml`) werden zur
-  Laufzeit geladen – Änderungen brauchen keinen Build. Grundriss-Import aus Magicplan-PDF-Reports.
+- **Daten statt Code:** Ein Modell (`model.yaml`) beschreibt Gebäude mit Etagen, Außenbereiche (Terrasse, Garten,
+  Einfahrt) und alle Objekte; es wird zur Laufzeit geladen – Änderungen brauchen keinen Build. Versioniertes Format
+  mit Schema, künftige Versionen werden automatisch migriert. Grundriss-Import aus Magicplan-PDF-Reports.
+- **Mehrere Gebäude und Ebenen:** Haus, Garage, Gartenhaus; Ebenen-Knöpfe schalten zwischen den Stockwerken.
 
 ## Über HACS installieren und ausprobieren
 
@@ -41,7 +43,7 @@ antippen → **Verknüpfen** → eigene Lampe wählen – dann schaltet sie übe
 **Fertig** speichert Änderungen am Demo-Haus in deinem HA-Benutzerkonto, getrennt von den Daten deines eigenen Hauses;
 **Abbrechen** verwirft sie.
 
-**Eigenes Haus:** `house.json`, `furniture.yaml`, `devices.yaml` und `textures/` nach `/config/www/ha-3d-dashboard/`
+**Eigenes Haus:** `model.yaml` und `textures/` nach `/config/www/ha-3d-dashboard/`
 legen – das Panel findet sie dort automatisch (Seite neu laden). Titel, Symbol und Datenordner lassen sich unter
 **Einstellungen → Geräte & Dienste → 3D-HA-Dashboard → Konfigurieren** ändern. Wie die Daten entstehen:
 [docs/SETUP.md](docs/SETUP.md).
@@ -83,7 +85,7 @@ npm test             # Datenschutz-Check, Datenprüfung, Unit-Tests, Build, Scre
 ```
 
 Unter Linux/macOS einmalig `npx playwright-core install chromium` (Linux: `--with-deps`); Windows nutzt Edge.
-Architektur und Regeln für Beiträge: [CLAUDE.md](CLAUDE.md). Datenformat: [docs/DATA_FORMAT.md](docs/DATA_FORMAT.md).
+Architektur und Regeln für Beiträge: [CLAUDE.md](CLAUDE.md). Datenmodell: [docs/DATA_MODEL.md](docs/DATA_MODEL.md) (Schema: [schema/model.schema.json](schema/model.schema.json)).
 
 ## Lizenz
 

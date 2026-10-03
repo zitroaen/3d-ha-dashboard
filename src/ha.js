@@ -3,7 +3,7 @@
 // eine davon an ist, und leuchtet in deren Farbe/Helligkeit (Mittelwert).
 import * as THREE from 'three';
 
-/** entity aus devices.yaml: String, Liste oder leer -> Liste */
+/** entity einer Leuchte (power-Entities): String, Liste oder leer -> Liste */
 export const entitiesOf = (d) => (d.entity == null ? [] : [].concat(d.entity)).filter(Boolean);
 
 const SWITCHABLE = new Set(['light', 'switch']);

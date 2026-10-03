@@ -40,19 +40,24 @@ npm run setup
 **A) Magicplan-PDF-Report (deutschsprachig):** nach `reference/plan.pdf` legen, dann
 
 ```bash
-npm run import-plan     # -> data/house.json (überschreibt!) + data/plan_debug_<etage>.svg
+npm run import-plan     # -> reference/building.json + data/plan_debug_<etage>.svg, dann als Gebäude in data/model.yaml
 ```
 
-Etagen, Räume, Wände, Fenster, Türen, Maßstab und Deckenhöhen werden automatisch erkannt. In `plan.json` lässt sich
-nachsteuern: Raum-IDs (`room_ids`), Bodenbeläge (`floor_material`), Räume mit massiver Haustür (`front_door_rooms`),
-Etagen-ID, -Höhe und -Versatz (`floors`). Danach die Debug-Grafik ansehen und mit dem Besitzer abgleichen.
+Etagen, Räume, Wände, Fenster, Türen, Maßstab und Deckenhöhen werden automatisch erkannt. Der Import **ersetzt** das
+Gebäude gleicher ID in `data/model.yaml`; andere Gebäude, Außenbereiche und Objekte bleiben. In `plan.json` lässt sich
+nachsteuern: Gebäude-ID, -Name und -Art (`building`), Raum-IDs (`room_ids`), Bodenbeläge (`surface`), Räume mit
+massiver Haustür (`front_door_rooms`), Etagen-ID, -Ebene, -Höhe und -Versatz (`floors`). Weitere Gebäude (Garage,
+Gartenhaus) als eigene PDFs mit eigener `building.id` importieren oder von Hand ergänzen. Danach die Debug-Grafik ansehen und mit dem Besitzer abgleichen.
 Mehrere Räume gleichen Namens werden durchnummeriert (`schlafzimmer_2`) – nach richtigen Namen fragen.
 
-**B) Ohne Magicplan:** `house.json` nach `docs/DATA_FORMAT.md` erstellen, am einfachsten per Skript nach dem Vorbild
-`engine/examples/demo/build-house.mjs` (Räume als Rechtecke, Wände mit ausgesparten Öffnungen).
+**B) Ohne Magicplan:** Gebäude in `data/model.yaml` nach `docs/DATA_MODEL.md` beschreiben, am einfachsten per Skript nach
+dem Vorbild `engine/examples/demo/build-house.mjs` (Räume als Rechtecke, Wände mit ausgesparten Öffnungen). Das Kapitel
+„Anleitung für Agenten“ dort beschreibt die Reihenfolge.
 
-**Nordrichtung:** Besitzer fragen, welcher Raum in welche Himmelsrichtung liegt (oder Luftbild), und `north_deg` in
-`house.json` setzen (Norden im Plan, Grad im Uhrzeigersinn von oben). Beispiel: Wohnzimmer links im Plan liegt im
+**Außenbereiche** (Terrasse, Einfahrt, Beete, „Gartenräume“) stehen unter `outdoor` in `data/model.yaml`.
+
+**Nordrichtung:** Besitzer fragen, welcher Raum in welche Himmelsrichtung liegt (oder Luftbild), und `site.north_deg`
+in `data/model.yaml` setzen (Norden im Plan, Grad im Uhrzeigersinn von oben). Beispiel: Wohnzimmer links im Plan liegt im
 Süden → Norden zeigt nach rechts → 90.
 
 Prüfen: `npm run validate`, dann `npm run serve` und http://127.0.0.1:8123/tests/harness.html öffnen.
@@ -60,17 +65,17 @@ Prüfen: `npm run validate`, dann `npm run serve` und http://127.0.0.1:8123/test
 ## 3. Leuchten und HA-Verknüpfung
 
 1. `npm run placeholders` legt pro Raum eine Platzhalter-Deckenleuchte und Außenleuchten an Außentüren an.
-2. Mit dem Besitzer klären, welche Leuchten es wirklich gibt (Fotos helfen), und `data/devices.yaml` anpassen
-   (Modelle und Felder: `docs/DATA_FORMAT.md`).
-3. Optional den HA-Export (Template in `docs/DATA_FORMAT.md`) als `reference/entities.txt` speichern – dann prüft
+2. Mit dem Besitzer klären, welche Leuchten es wirklich gibt (Fotos helfen), und die Objekte in
+   `data/model.yaml` anpassen (Katalog und Felder: `docs/DATA_MODEL.md`).
+3. Optional den HA-Export (Template in `docs/DATA_MODEL.md`) als `reference/entities.txt` speichern – dann prüft
    `npm test` alle Verknüpfungen, und die Vorschau simuliert HA mit den echten Entities.
 4. Verknüpfen im Panel: Stift → Leuchte antippen → **Verknüpfen** → Entity wählen → **Fertig** (speichert; **Abbrechen** verwirft). In der lokalen
-   Vorschau schreibt das direkt nach `data/devices.yaml`.
+   Vorschau schreibt das direkt nach `data/model.yaml`.
 
 ## 4. Möbel
 
-Fotos pro Raum nach `reference/photos/<raum>/` (gitignored). Daraus die Möbel in `data/furniture.yaml` anlegen –
-Modelle und Parameter in `docs/DATA_FORMAT.md`. Feinjustieren geht im Panel: Stift → Möbel antippen → verschieben,
+Fotos pro Raum nach `reference/photos/<raum>/` (gitignored). Daraus die Möbel als Objekte in `data/model.yaml`
+anlegen – Katalog und Parameter in `docs/DATA_MODEL.md`. Feinjustieren geht im Panel: Stift → Möbel antippen → verschieben,
 drehen, **Anlegen** an Wand oder Boden → **Fertig**. Bilder an der Wand können eine Textur bekommen
 (`data/textures/`, Feld `texture`). Fehlt ein Modell, ein generisches Modell in der Engine vorschlagen (Issue/PR),
 nicht in `engine/` der Instanz ändern.
@@ -85,7 +90,7 @@ nicht in `engine/` der Instanz ändern.
    **3D-HA-Dashboard** herunterladen → Home Assistant neu starten.
 2. Einstellungen → Geräte & Dienste → **Integration hinzufügen** → **3D-HA-Dashboard** → OK. Das Panel **Haus 3D**
    erscheint in der Seitenleiste (Adresse `/haus-3d`).
-3. Daten des Hauses nach `/config/www/ha-3d-dashboard/` kopieren: `house.json`, `furniture.yaml`, `devices.yaml`,
+3. Daten des Hauses nach `/config/www/ha-3d-dashboard/` kopieren: `model.yaml` und
    `textures/*` (`npm run deploy:data` bzw. von Hand). Das ist der voreingestellte Datenordner
    (`/local/ha-3d-dashboard/`); ein anderer lässt sich unter Geräte & Dienste → 3D-HA-Dashboard → **Konfigurieren**
    einstellen, ebenso Titel und Symbol in der Seitenleiste.
@@ -103,8 +108,8 @@ Kaputte eigene Daten zeigen dagegen eine Fehlermeldung und werden nie durch das 
 1. Bauen und Dateien nach `/config/www/ha-3d-dashboard/` bringen:
    - per SSH: in `ha3d.config.json` unter `ha.ssh` z. B. `root@homeassistant.local` eintragen, dann `npm run deploy`
      (nur Daten: `npm run deploy:data`);
-   - oder von Hand: `engine/dist/ha-3d-dashboard.js` (nach `npm run build`), `data/house.json`,
-     `data/furniture.yaml`, `data/devices.yaml` und `data/textures/*` in diesen Ordner kopieren.
+   - oder von Hand: `engine/dist/ha-3d-dashboard.js` (nach `npm run build`), `data/model.yaml`
+     und `data/textures/*` in diesen Ordner kopieren.
 2. In der `configuration.yaml`:
    ```yaml
    panel_custom:

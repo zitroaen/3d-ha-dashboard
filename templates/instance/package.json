@@ -11,8 +11,8 @@
     "build": "npm --prefix engine run build",
     "screens": "node engine/tests/screenshots.mjs",
     "test": "npm run validate && npm run link-check && npm run build && npm run screens",
-    "import-plan": "python engine/scripts/extract_plan.py reference/plan.pdf --out data/house.json --config plan.json --debug",
-    "fix-house": "python engine/scripts/house_fixes.py data/house.json",
+    "import-plan": "python engine/scripts/extract_plan.py reference/plan.pdf --out reference/building.json --config plan.json --debug && node engine/scripts/import-building.mjs reference/building.json",
+    "fix-house": "python engine/scripts/house_fixes.py reference/building.json && node engine/scripts/import-building.mjs reference/building.json",
     "placeholders": "node engine/scripts/default_devices.mjs",
     "deploy": "bash engine/scripts/deploy.sh",
     "deploy:data": "bash engine/scripts/deploy.sh --data"

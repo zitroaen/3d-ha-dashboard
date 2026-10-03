@@ -1,8 +1,7 @@
 {
-  "name": "Mein Haus",
-  "north_deg": 0,
+  "building": { "id": "haus", "name": "Wohnhaus", "kind": "house" },
   "floors": {},
   "room_ids": {},
-  "floor_material": {},
+  "surface": {},
   "front_door_rooms": []
 }

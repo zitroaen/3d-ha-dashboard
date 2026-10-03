@@ -1,12 +1,14 @@
 // Custom Panel <ha-3d-dashboard> für Home Assistant (panel_custom).
 // HA setzt die Properties hass, narrow, route und panel. Keine Tokens, keine externen Requests.
-// Die Daten (house.json, furniture.yaml, devices.yaml) werden zur Laufzeit geladen – standardmäßig aus
+// Das Modell (model.yaml, docs/DATA_MODEL.md) wird zur Laufzeit geladen – standardmäßig aus
 // demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url.
 import { HouseScene } from './scene.js';
 import { loadData, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
-import { LayoutStore, DEMO_USER_DATA_KEY, applyOverrides, patchYamlText, layoutValues, download } from './store.js';
+import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, applyOverrides, download } from './store.js';
+import { toScene, writeBack } from './model/model.js';
+import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities } from './ha.js';
 import { EntityPicker, areaForRoom } from './picker.js';
 
@@ -35,6 +37,14 @@ button { touch-action: manipulation; }
 .bar > * { pointer-events: auto; }
 .title { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
 .floor { font-size: 13px; opacity: 0.55; }
+/* Ebenen (Stockwerke): unten links (im Editor über der Werkzeugleiste), obere Ebenen oben; nur bei mehr als einer
+   Ebene. Touch-Ziele 48 px */
+.levels { position: absolute; left: 12px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; }
+:host([editing]) .levels { bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); }
+.levels[hidden] { display: none; }
+.levels button { min-width: 48px; height: 48px; padding: 0 8px; border-radius: 24px; border: 1px solid #ffffff22; background: #12151bcc;
+  color: #e8e2d8; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; backdrop-filter: blur(6px); }
+.levels button.on { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
 button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
 /* Kompass: zeigt, wo Norden im Bild liegt; antippen = einnorden. Touch-Ziel 56 px */
 .compass { position: absolute; top: 10px; right: 12px; width: 56px; height: 56px; padding: 0; border-radius: 50%;
@@ -137,6 +147,7 @@ class Ha3dDashboard extends HTMLElement {
         <button class="menu" title="Menü"><svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg></button>
         <span class="title"></span><span class="floor"></span>
       </div>
+      <div class="levels" hidden></div>
       <button class="compass" title="Ansicht einnorden" aria-label="Ansicht einnorden">
         <svg viewBox="0 0 56 56">
           <circle cx="28" cy="28" r="22" fill="none" stroke="#ffffff1f" stroke-width="1"/>
@@ -178,6 +189,10 @@ class Ha3dDashboard extends HTMLElement {
       this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
     });
     this.shadowRoot.querySelector('.demo-note').addEventListener('click', (e) => (e.currentTarget.hidden = true));
+    this.shadowRoot.querySelector('.levels').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-level]');
+      if (b) this.setLevel(Number(b.dataset.level));
+    });
     this.shadowRoot.querySelector('.compass').addEventListener('click', () => this.view?.faceNorth());
     // Stift: Bearbeiten beginnen bzw. wie „Fertig“ beenden (speichert)
     this.shadowRoot.querySelector('.edit-toggle').addEventListener('click', () => (this.hasAttribute('editing') ? this.finishEditing() : this.setEditing(true)));
@@ -214,7 +229,7 @@ class Ha3dDashboard extends HTMLElement {
     this.editor = null;
     this.view?.dispose();
     this.view = null;
-    this._dataText = null;
+    this._keys = null;
   }
 
   /** Höhe vom oberen Rand des Panels bis zum unteren Bildschirmrand (siehe :host im STYLE) */
@@ -226,7 +241,7 @@ class Ha3dDashboard extends HTMLElement {
 
   get dataUrl() {
     const configured = this._panel?.config?.data_url;
-    // Ordner: ohne abschließenden Schrägstrich würde der letzte Teil beim Auflösen von house.json ersetzt
+    // Ordner: ohne abschließenden Schrägstrich würde der letzte Teil beim Auflösen von model.yaml ersetzt
     return configured ? new URL(configured.endsWith('/') ? configured : `${configured}/`, location.href) : MODULE_BASE;
   }
 
@@ -273,17 +288,27 @@ class Ha3dDashboard extends HTMLElement {
         const data = await this._fetchData();
         // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen
         // (Demo-Haus: aus eigenen Demo-Benutzerdaten, siehe store)
-        applyOverrides(data, await this.store.loadOverrides());
-        const old = this._dataText;
-        this._dataText = data.text;
+        applyOverrides(data.model, await this.store.loadOverrides());
+        const scene = toScene(data.model);
+        if (!scene.house.floors.length) throw new Error('Das Modell enthält noch keine Gebäude – Grundriss importieren (docs/SETUP.md)');
+        // Was hat sich geändert? Bauwerk -> ganze Szene; nur Objekte -> nur die Einrichtungs-Schicht
+        const { site, buildings, outdoor, objects } = data.model;
+        const keys = { structure: JSON.stringify([site, buildings, outdoor]), objects: JSON.stringify(objects) };
+        const old = this._keys;
+        this._keys = keys;
+        this.model = data.model;
+        this._modelHeader = yamlHeader(data.text);
         this._showError(null);
-        if (!this.view || old?.house !== data.text.house) {
+        if (!this.view || old?.structure !== keys.structure) {
           const states = this.view ? new Map([...this.view.lamps].map(([id, s]) => [id, s])) : null;
+          const level = this.view?.level;
           this.view?.dispose();
-          this._createView(data);
+          this._createView(scene);
+          if (level != null && this.view.setLevel(level)) this._renderLevel();
           if (states) for (const [id, s] of states) this.view.setLamp(id, s.on, s);
-        } else if (old.devices !== data.text.devices || old.furniture !== data.text.furniture) {
-          this.view.setFurnishing({ devices: data.devices, items: data.items });
+        } else if (old.objects !== keys.objects) {
+          this.view.setFurnishing({ devices: scene.devices, items: scene.items });
+          this.areaMap = scene.areaMap;
           if (this._hass) this._applyHass(); // neue Leuchten-Objekte -> Zustand aus HA neu setzen
         }
       } catch (e) {
@@ -301,6 +326,27 @@ class Ha3dDashboard extends HTMLElement {
     // Demo-Haus: nie in Dateien, nur in eigene Benutzerdaten – die Daten des eigenen Hauses bleiben unberührt
     if (this.demo) return new LayoutStore({ hass: this._hass, key: DEMO_USER_DATA_KEY });
     return new LayoutStore({ saveUrl: this._panel?.config?.save_url || null, hass: this._hass });
+  }
+
+  /** Ebene wechseln (Stockwerk); im Editiermodus wird die Auswahl aufgehoben */
+  setLevel(level) {
+    if (!this.view || level === this.view.level) return;
+    if (this.editor?.sel) this.editor.select(null);
+    if (this.view.setLevel(level)) this._renderLevel();
+  }
+
+  /** Kürzel einer Ebene: UG, EG, 1. OG … */
+  static levelLabel(l) {
+    return l === 0 ? 'EG' : l < 0 ? `${l === -1 ? '' : `${-l}. `}UG` : `${l}. OG`;
+  }
+
+  _renderLevel() {
+    const v = this.view;
+    this.shadowRoot.querySelector('.floor').textContent = v.levelName();
+    const el = this.shadowRoot.querySelector('.levels');
+    el.hidden = v.levels.length < 2;
+    el.innerHTML = [...v.levels].reverse().map((l) =>
+      `<button data-level="${l}" class="${l === v.level ? 'on' : ''}" aria-label="Ebene ${Ha3dDashboard.levelLabel(l)}">${Ha3dDashboard.levelLabel(l)}</button>`).join('');
   }
 
   _createView(data) {
@@ -331,7 +377,7 @@ class Ha3dDashboard extends HTMLElement {
     });
     if (this.hasAttribute('editing')) this.editor.setEnabled(true);
     this.shadowRoot.querySelector('.title').textContent = data.house.name || '';
-    this.shadowRoot.querySelector('.floor').textContent = this.view.activeFloor.floor.name;
+    this._renderLevel();
     if (this._hass) this._applyHass();
     this._resolveReady(this);
   }
@@ -364,7 +410,7 @@ class Ha3dDashboard extends HTMLElement {
     this._leaveEditing();
     if (!discard) return;
     ed.changes.clear();
-    this._dataText = null; // Daten neu laden = Stand vor den Änderungen
+    this._keys = null; // Daten neu laden = Stand vor den Änderungen
     this.reloadData();
     this._toast('Änderungen verworfen');
   }
@@ -379,12 +425,14 @@ class Ha3dDashboard extends HTMLElement {
   async _save() {
     const ed = this.editor;
     try {
-      const texts = await this.store.save(ed.changes, { furniture: this._dataText.furniture, devices: this._dataText.devices });
-      this._dataText = { ...this._dataText, ...texts };
+      // Änderungen ins Modell übernehmen und das Modell speichern
+      for (const { type, id } of ed.changes.values()) writeBack(type, ed._entry({ type, id }));
+      await this.store.save(this.model, [...ed.changes.values()].map((c) => c.id), this._modelHeader);
+      this._keys = { ...this._keys, objects: JSON.stringify(this.model.objects) };
       ed.changes.clear();
       ed._emit();
       this._toast(this.demo ? 'Gespeichert – Demo-Haus, für diesen HA-Benutzer'
-        : this.store.mode === 'files' ? 'Gespeichert (furniture.yaml / devices.yaml)' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Dateien');
+        : this.store.mode === 'files' ? 'Gespeichert (model.yaml)' : 'Gespeichert – gilt für diesen HA-Benutzer, Export für die Datei');
       return true;
     } catch (e) {
       console.error('ha-3d-dashboard:', e);
@@ -403,17 +451,14 @@ class Ha3dDashboard extends HTMLElement {
     else if (act === 'cancel') this.cancelEditing();
     else if (act === 'export') {
       if (this.demo) return this._toast('Demo-Haus: kein Export');
-      // fertige Dateien mit allen aktuellen Lagen
+      // fertiges Modell mit allen aktuellen Lagen (auch ungespeicherten)
+      const model = structuredClone(this.model);
+      const byId = new Map(model.objects.map((o) => [o.id, o]));
       const d = this.view.furnishingData;
-      let furniture = this._dataText.furniture, devices = this._dataText.devices;
-      try {
-        for (const it of d.items) furniture = patchYamlText(furniture, it.id, layoutValues('item', it));
-        for (const dv of d.devices) devices = patchYamlText(devices, dv.id, layoutValues('lamp', dv));
-      } catch (e) {
-        return this._toast(`Export fehlgeschlagen: ${e.message}`);
+      for (const [type, list] of [['item', d.items], ['lamp', d.devices]]) {
+        for (const e of list) if (byId.has(e.id)) writeBack(type, { ...e, src: byId.get(e.id) });
       }
-      download('furniture.yaml', furniture);
-      download('devices.yaml', devices);
+      download(MODEL_FILE, toYaml(model, this._modelHeader));
     }
   }
 
@@ -535,7 +580,7 @@ class Ha3dDashboard extends HTMLElement {
    * (Vorschau ohne hass) wird nur lokal geschaltet.
    */
   async _onRoomTap(roomId) {
-    const room = this.view.activeFloor.rooms.get(roomId)?.room;
+    const room = this.view.roomById(roomId);
     const ids = this.view.lampsInRoom(roomId);
     const linked = this._linkedLamps(ids);
     const on = !this.view.isRoomLit(roomId);

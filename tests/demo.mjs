@@ -69,7 +69,7 @@ async function checkDemo(label, query, allowConsole, noteRe) {
   // Das Demo-Haus ist unverknüpft; eine (im Editor) mit einer echten Entity verknüpfte Leuchte schaltet über HA
   const real = await page.evaluate(async () => {
     const v = window.panel.view;
-    const unlinked = [...v.lamps.values()].every((s) => s.lamp.entity == null);
+    const unlinked = [...v.lamps.values()].every((s) => !s.lamp.entity?.length);
     const s = v.lamps.get('eg_wohnen_wandleuchte');
     s.lamp.entity = 'light.demo_wandleuchte'; // existiert im simulierten HA wie eine echte Lampe
     window.mockHass.calls.length = 0;
@@ -97,15 +97,15 @@ async function checkDemo(label, query, allowConsole, noteRe) {
   await page.evaluate(() => window.panel._editAction('done'));
   const saved = await page.evaluate(() => {
     const keys = window.mockHass.calls.filter((c) => c.ws?.type === 'frontend/set_user_data').map((c) => c.ws.key);
-    return { keys, entity: window.mockHass._userData?.ha_3d_dashboard_layout_demo?.devices?.eg_wohnen_wandleuchte?.entity };
+    return { keys, entity: window.mockHass._userData?.ha_3d_dashboard_layout_demo?.objects?.eg_wohnen_wandleuchte?.ha?.entities?.power };
   });
   ok(saved.keys.length === 1 && saved.keys[0] === 'ha_3d_dashboard_layout_demo' && saved.entity === 'light.demo_wandleuchte' && !writes.length,
     `${label}: Fertig speichert nur in Demo-Benutzerdaten (keine Dateien, eigene Daten unberührt)`, `${label}: Speichern ${JSON.stringify(saved)} ${writes}`);
   // nach dem Neuladen ist die Verknüpfung wieder da
   const after = await page.evaluate(async () => {
-    window.panel._dataText = null;
+    window.panel._keys = null; // ganz neu aufbauen: Modell + gespeicherte Demo-Benutzerdaten
     await window.panel.reloadData();
-    return window.panel.view.lamps.get('eg_wohnen_wandleuchte').lamp.entity;
+    return [].concat(window.panel.view.lamps.get('eg_wohnen_wandleuchte').lamp.entity).join();
   });
   ok(after === 'light.demo_wandleuchte', `${label}: gespeicherte Demo-Verknüpfung bleibt nach dem Neuladen`, `${label}: nach Neuladen ${after}`);
   // Speichern scheitert -> Editiermodus bleibt offen, Änderungen bleiben erhalten
@@ -122,7 +122,7 @@ async function checkDemo(label, query, allowConsole, noteRe) {
     return r;
   });
   ok(failed.editing && failed.changes > 0, `${label}: Speichern scheitert -> Editor bleibt offen, nichts geht verloren`, `${label}: Fehlschlag ${JSON.stringify(failed)}`);
-  await page.evaluate(async () => { window.mockHass._userData = {}; window.panel._dataText = null; await window.panel.reloadData(); });
+  await page.evaluate(async () => { window.mockHass._userData = {}; window.panel._keys = null; await window.panel.reloadData(); });
   await page.evaluate(() => window.panel.setEditing(false));
 
   // Hinweis lässt sich wegtippen

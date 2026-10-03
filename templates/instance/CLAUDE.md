@@ -24,17 +24,18 @@ https://github.com/zitroaen/3d-ha-dashboard).
 | `npm run setup` | Engine-Submodul holen und ihre Abhängigkeiten installieren |
 | `npm run serve` | Vorschau: http://127.0.0.1:8123/tests/harness.html (Editor speichert direkt nach `data/`) |
 | `npm test` | Datenprüfung, Link-Check gegen `reference/entities.txt`, Build, Screenshots (inkl. `views.json`) |
-| `npm run import-plan` | Grundriss aus `reference/plan.pdf` (Magicplan) nach `data/house.json` – **überschreibt** die Datei |
-| `npm run placeholders` | fehlende Platzhalter-Leuchten in `data/devices.yaml` ergänzen |
+| `npm run import-plan` | Grundriss aus `reference/plan.pdf` (Magicplan) als Gebäude in `data/model.yaml` – **ersetzt** das Gebäude gleicher ID (Objekte bleiben) |
+| `npm run placeholders` | fehlende Platzhalter-Leuchten in `data/model.yaml` ergänzen |
 | `npm run deploy` / `deploy:data` | nach Home Assistant kopieren (nur mit Freigabe) |
 | `npm run update-engine` | neueste Engine holen, danach `npm test` |
 
-Datenformat, Modelle und Felder: `engine/docs/DATA_FORMAT.md`. Einrichtung Schritt für Schritt: `engine/docs/SETUP.md`.
+Datenmodell (alle Felder, Katalog, Beispiel, Anleitung für Agenten): `engine/docs/DATA_MODEL.md`, maschinenlesbar
+`engine/schema/model.schema.json`. Einrichtung Schritt für Schritt: `engine/docs/SETUP.md`.
 
 ## Haus
 
-(Hier hält Claude fest, was über das Haus bekannt ist: Etagen, Deckenhöhen, Nordrichtung, Besonderheiten,
-offene Fragen an den Besitzer.)
+(Hier hält Claude fest, was über das Haus bekannt ist: Gebäude, Etagen und Ebenen, Deckenhöhen, Nordrichtung,
+Außenbereiche, Besonderheiten, offene Fragen an den Besitzer.)
 
 ## Entscheidungslog
 
