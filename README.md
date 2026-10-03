@@ -38,7 +38,7 @@ Ohne Build, ohne YAML und ohne eigene Hausdaten – das Panel bringt das erfunde
 In der Seitenleiste erscheint **Haus 3D**. Ohne eigene Daten zeigt es das Demo-Haus: Seine Leuchten sind mit nichts
 verknüpft und schalten **lokal**; Sonne und Mond folgen `sun.sun`. Zum Ausprobieren mit echten Lampen: Stift → Leuchte
 antippen → **Verknüpfen** → eigene Lampe wählen – dann schaltet sie über HA, und langes Drücken öffnet ihren HA-Dialog.
-Im Demo-Haus wird nichts gespeichert.
+**Speichern** legt Änderungen am Demo-Haus in deinem HA-Benutzerkonto ab, getrennt von den Daten deines eigenen Hauses.
 
 **Eigenes Haus:** `house.json`, `furniture.yaml`, `devices.yaml` und `textures/` nach `/config/www/ha-3d-dashboard/`
 legen – das Panel findet sie dort automatisch (Seite neu laden). Titel, Symbol und Datenordner lassen sich unter

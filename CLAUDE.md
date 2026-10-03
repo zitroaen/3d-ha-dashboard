@@ -109,8 +109,12 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   `config.demo: true` oder als Fallback, wenn die Daten unerreichbar sind (`DataUnavailableError`, nur ohne
   vorhandene Ansicht). Die erfundenen Entities werden beim Laden entfernt (`src/demo.js`; `examples/demo` behält sie
   für die Tests). Dann: unverknüpfte Leuchten lokal schalten, im Editor mit einer in HA vorhandenen Entity
-  verknüpfte über HA (`_liveEntities`), Sonne weiter aus `sun.sun`, kein Speichern/Export, keine
-  Benutzerdaten-Overrides – eigene Daten werden nie überschrieben, kaputte eigene Daten nie durch die Demo ersetzt.
+  verknüpfte über HA (`_liveEntities`), Sonne weiter aus `sun.sun`, kein Export. Speichern nur in eigene
+  Benutzerdaten `ha_3d_dashboard_layout_demo` (`DEMO_USER_DATA_KEY`), nie in Dateien oder `ha_3d_dashboard_layout` –
+  eigene Daten werden nie überschrieben, kaputte eigene Daten nie durch die Demo ersetzt.
+- Werkzeugleiste des Editors: volle Breite, bricht auf schmalen Bildschirmen in eine zweite Zeile um (das Panel fängt
+  Wischgesten ab, seitliches Scrollen ginge auf dem iPhone nicht); Lampenauswahl/Meldungen richten sich nach ihrer Höhe
+  (`--ha3d-editbar-h`).
 - `data_url` wird als Ordner behandelt (fehlender `/` wird ergänzt).
 - Langes Drücken (500 ms ruhig) auf eine Leuchte: `hass-more-info` mit der (ersten) Entity – HA öffnet seinen Dialog
   (Farbe, Helligkeit). Nicht im Editiermodus; Kontextmenü/iOS-Callout unterdrückt.

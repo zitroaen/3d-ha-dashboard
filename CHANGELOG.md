@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.4.1
+
+- **Demo-Haus speichern:** Der Editor speichert Änderungen am Demo-Haus (z. B. Verknüpfungen mit echten Lampen) in
+  eigene HA-Benutzerdaten (`ha_3d_dashboard_layout_demo`) – getrennt von den Daten des eigenen Hauses, nie in Dateien.
+- **Werkzeugleiste auf dem iPhone:** Knöpfe brechen in eine zweite Zeile um statt rechts abgeschnitten zu werden
+  („Fertig“ war nicht erreichbar).
+
 ## 0.4.0
 
 - **iPhone (HA-App, Hochformat):** Die Werkzeugleiste war unten abgeschnitten. Das Panel beginnt dort unter der

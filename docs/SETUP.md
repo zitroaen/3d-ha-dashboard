@@ -93,8 +93,9 @@ nicht in `engine/` der Instanz ändern.
    Browser lädt das neue Bundle also von selbst.
 
 Solange im Datenordner nichts liegt, zeigt das Panel das eingebaute **Demo-Haus** mit Hinweis: Seine Leuchten sind
-unverknüpft und schalten lokal; im Editor mit einer echten Lampe verknüpfte schalten über HA (nicht gespeichert).
-Sonne/Mond kommen aus `sun.sun`, der Editor speichert nichts.
+unverknüpft und schalten lokal; im Editor mit einer echten Lampe verknüpfte schalten über HA. Sonne/Mond kommen aus
+`sun.sun`. **Speichern** legt Änderungen am Demo-Haus in eigene HA-Benutzerdaten (`ha_3d_dashboard_layout_demo`), nie in
+die des eigenen Hauses.
 Kaputte eigene Daten zeigen dagegen eine Fehlermeldung und werden nie durch das Demo-Haus ersetzt.
 
 **Variante Selbst bauen (Instanz mit Submodul, mit `panel_custom` in der YAML):**
