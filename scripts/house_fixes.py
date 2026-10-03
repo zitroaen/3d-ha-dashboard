@@ -1,11 +1,11 @@
-"""Bereinigt house.json nach der Extraktion (idempotent, ändert nur, was zu bereinigen ist):
+"""Bereinigt ein Gebäude (building.json aus extract_plan.py) nach der Extraktion (idempotent, ändert nur, was zu bereinigen ist):
 
 - Fenster, die direkt nebeneinander liegen (Lücke < 10 cm), werden zu einem Fensterband zusammengefasst.
   Magicplan zeichnet sie einzeln, mit einem wenige Millimeter dünnen Wandstreifen dazwischen. Im Modell
   stünde dort ein Pfeiler in voller Raumhöhe, den es in Wirklichkeit nicht gibt.
 - Wandstreifen innerhalb solcher Bänder und entartete Wände (weniger als 3 Punkte, keine Fläche) fallen weg.
 
-    python scripts/house_fixes.py <datenordner>/house.json     # bereinigt die Datei an Ort und Stelle
+    python scripts/house_fixes.py <ordner>/building.json     # bereinigt die Datei an Ort und Stelle
 """
 import json
 import sys
@@ -70,14 +70,19 @@ def fix_house(house):
 
 
 def main():
+    """Gebäude im Datenmodell v2 (building.json aus extract_plan.py) nachbearbeiten."""
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     p = Path(sys.argv[1])
-    house = json.loads(p.read_text(encoding="utf-8"))
+    building = json.loads(p.read_text(encoding="utf-8"))
+    house = {"floors": [{**f, "walls": [w["polygon"] for w in f["walls"]], "windows": f.get("windows", [])} for f in building["floors"]]}
     before = [(len(f["windows"]), len(f["walls"])) for f in house["floors"]]
     fix_house(house)
-    p.write_text(json.dumps(house, ensure_ascii=False, indent=1), encoding="utf-8")
-    for f, (w, wl) in zip(house["floors"], before):
+    for f, h in zip(building["floors"], house["floors"]):
+        f["walls"] = [{"polygon": w} for w in h["walls"]]
+        f["windows"] = h["windows"]
+    p.write_text(json.dumps(building, ensure_ascii=False, indent=1), encoding="utf-8")
+    for f, (w, wl) in zip(building["floors"], before):
         print(f'{f["id"]}: Fenster {w} -> {len(f["windows"])}, Wände {wl} -> {len(f["walls"])}')
 
 
