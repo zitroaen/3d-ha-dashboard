@@ -6,7 +6,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DATA_DIR, ENTITIES, OUT, IS_DEMO } from './lib/config.mjs';
 import { startServer } from './lib/server.mjs';
-import { launchBrowser, guardedPage, toScreen } from './lib/browser.mjs';
+import { launchBrowser, newPage, guardedPage, toScreen } from './lib/browser.mjs';
 
 if (!IS_DEMO) {
   console.log('ℹ Demo-Tests laufen nur mit dem Demo-Haus (ohne DATA_DIR) – übersprungen');
@@ -109,7 +109,7 @@ try {
   await p2.close();
 
   // ohne Hass (reine Vorschau) funktioniert der Demo-Modus ebenfalls
-  const p3 = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const p3 = await newPage(browser, { viewport: { width: 390, height: 844 } });
   p3.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
   await p3.goto(`${base}/tests/harness.html?demo=1`);
   await p3.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
