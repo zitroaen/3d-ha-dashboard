@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.5.0
+
+- **Fertig speichert, Abbrechen verwirft:** Der Speichern-Knopf entfällt. „Fertig“ (und der Stift) speichert alle
+  Änderungen und schließt den Editor; scheitert das Speichern, bleibt er mit Meldung offen. Neuer Knopf „Abbrechen“
+  verwirft alle Änderungen seit dem Öffnen.
+- Im Editor ist der Demo-Hinweis ausgeblendet (lag auf dem iPhone über der Lampenauswahl).
+
 ## 0.4.1
 
 - **Demo-Haus speichern:** Der Editor speichert Änderungen am Demo-Haus (z. B. Verknüpfungen mit echten Lampen) in

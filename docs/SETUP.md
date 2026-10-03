@@ -64,14 +64,14 @@ Prüfen: `npm run validate`, dann `npm run serve` und http://127.0.0.1:8123/test
    (Modelle und Felder: `docs/DATA_FORMAT.md`).
 3. Optional den HA-Export (Template in `docs/DATA_FORMAT.md`) als `reference/entities.txt` speichern – dann prüft
    `npm test` alle Verknüpfungen, und die Vorschau simuliert HA mit den echten Entities.
-4. Verknüpfen im Panel: Stift → Leuchte antippen → **Verknüpfen** → Entity wählen → **Speichern**. In der lokalen
+4. Verknüpfen im Panel: Stift → Leuchte antippen → **Verknüpfen** → Entity wählen → **Fertig** (speichert; **Abbrechen** verwirft). In der lokalen
    Vorschau schreibt das direkt nach `data/devices.yaml`.
 
 ## 4. Möbel
 
 Fotos pro Raum nach `reference/photos/<raum>/` (gitignored). Daraus die Möbel in `data/furniture.yaml` anlegen –
 Modelle und Parameter in `docs/DATA_FORMAT.md`. Feinjustieren geht im Panel: Stift → Möbel antippen → verschieben,
-drehen, **Anlegen** an Wand oder Boden → **Speichern**. Bilder an der Wand können eine Textur bekommen
+drehen, **Anlegen** an Wand oder Boden → **Fertig**. Bilder an der Wand können eine Textur bekommen
 (`data/textures/`, Feld `texture`). Fehlt ein Modell, ein generisches Modell in der Engine vorschlagen (Issue/PR),
 nicht in `engine/` der Instanz ändern.
 
@@ -94,7 +94,7 @@ nicht in `engine/` der Instanz ändern.
 
 Solange im Datenordner nichts liegt, zeigt das Panel das eingebaute **Demo-Haus** mit Hinweis: Seine Leuchten sind
 unverknüpft und schalten lokal; im Editor mit einer echten Lampe verknüpfte schalten über HA. Sonne/Mond kommen aus
-`sun.sun`. **Speichern** legt Änderungen am Demo-Haus in eigene HA-Benutzerdaten (`ha_3d_dashboard_layout_demo`), nie in
+`sun.sun`. **Fertig** speichert Änderungen am Demo-Haus in eigene HA-Benutzerdaten (`ha_3d_dashboard_layout_demo`), nie in
 die des eigenen Hauses.
 Kaputte eigene Daten zeigen dagegen eine Fehlermeldung und werden nie durch das Demo-Haus ersetzt.
 
@@ -121,7 +121,8 @@ Kaputte eigene Daten zeigen dagegen eine Fehlermeldung und werden nie durch das 
 Geräteliste sind damit für jeden lesbar, der die HA-Adresse erreicht. Für reine Heimnetz-Installationen meist
 unkritisch – bei Fernzugriff abwägen.
 
-**Speichern im Panel:** In HA kann das Panel keine Dateien schreiben. Änderungen aus dem Editor landen in den
+**Speichern im Panel:** **Fertig** speichert, **Abbrechen** verwirft alle Änderungen seit dem Öffnen des Editors.
+In HA kann das Panel keine Dateien schreiben. Änderungen aus dem Editor landen in den
 HA-Benutzerdaten (pro Benutzer) und werden über die Dateien gelegt; **Export** im Editor liefert die fertigen YAML-
 Dateien für die Instanz.
 
