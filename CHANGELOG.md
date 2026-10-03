@@ -1,5 +1,13 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- CI schneller: keine doppelten Läufe für Push + PR, veraltete Läufe werden abgebrochen, Doku-Änderungen lösen keine
+  Tests aus, vorinstalliertes Chrome statt Chromium-Download, Python-Pakete mit uv und Cache.
+- Neuer CI-Job WebKit (Safari/iOS): Panel lädt in der HA-Einbettung auf iPhone- und iPad-Größe (`npm run test:webkit`).
+- Release automatisch, sobald die Tests auf main grün sind und die Version aus `package.json` noch kein Release hat;
+  kein zweiter Testlauf mehr im Release.
+
 ## 0.3.1
 
 - **Weiße Seite ab HA 2026.9 behoben:** Der Panel-Container hat dort keine Höhe mehr, das Panel war 0 px hoch. Es füllt

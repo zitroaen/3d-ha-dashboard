@@ -3,68 +3,73 @@ name: Release
 # Release für HACS (Kategorie Integration): baut das Bundle, packt die Integration custom_components/ha_3d_dashboard
 # samt Bundle in dist/ha_3d_dashboard.zip (das lädt HACS) und hängt zusätzlich dist/ha-3d-dashboard.js an
 # (für die Installation von Hand mit panel_custom).
-#   - Tag v* gepusht:      Release zu diesem Tag
-#   - Actions → Release → Run workflow (Eingabe: Version, z. B. 0.2.0): legt den Tag v<Version> selbst an
-# Die Version muss mit package.json und custom_components/ha_3d_dashboard/manifest.json übereinstimmen.
+#
+# Automatisch: Sobald die Tests auf main grün sind und es zur Version aus package.json noch kein Release gibt.
+# Eine neue Version veröffentlichen = Version in package.json und manifest.json erhöhen und nach main mergen.
+# Von Hand: Actions → Release → Run workflow (nur von main, nur wenn die Tests für diesen Stand grün waren).
+# Die Tests laufen hier nicht noch einmal – sie sind für genau diesen Commit schon gelaufen.
 
 on:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version ohne v (muss package.json entsprechen), z. B. 0.2.0'
-        required: true
 
 permissions:
   contents: write
+  actions: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
       - name: Version bestimmen und prüfen
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            VERSION="${INPUT_VERSION#v}"
             if [ "$GITHUB_REF" != "refs/heads/main" ]; then
               echo "::error::Release nur von main aus starten (aktuell: $GITHUB_REF)"; exit 1
             fi
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
+            OK=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/test.yml/runs?head_sha=$SHA&status=success" --jq '.total_count')
+            if [ "$OK" = "0" ]; then
+              echo "::error::Für $SHA gibt es keinen grünen Testlauf – erst Tests laufen lassen"; exit 1
+            fi
           fi
-          PKG=$(node -p "require('./package.json').version")
-          if [ "$VERSION" != "$PKG" ]; then
-            echo "::error::Version $VERSION passt nicht zu package.json ($PKG)"; exit 1
+          VERSION=$(node -p "require('./package.json').version")
+          MANIFEST=$(node -p "require('./custom_components/ha_3d_dashboard/manifest.json').version")
+          if [ "$VERSION" != "$MANIFEST" ]; then
+            echo "::error::package.json ($VERSION) und manifest.json ($MANIFEST) haben unterschiedliche Versionen"; exit 1
           fi
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Ungültige Version: $VERSION"; exit 1
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "v$VERSION gibt es schon – nichts zu tun"
+            echo "SKIP=1" >> "$GITHUB_ENV"
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: env.SKIP != '1'
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright-core install --with-deps chromium
-      - run: npm test
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - run: bash tests/ha/install.sh
-      - run: python -m pytest tests/ha -q -p no:cacheprovider
-      - run: npm run build
-      - run: npm run package
+        if: env.SKIP != '1'
+      - run: npm run build && npm run package
+        if: env.SKIP != '1'
       - name: GitHub-Release erstellen
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: env.SKIP != '1'
         run: |
-          # bei workflow_dispatch legt gh den Tag v<Version> am aktuellen Commit selbst an
           gh release create "v$VERSION" dist/ha_3d_dashboard.zip dist/ha-3d-dashboard.js \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
+            --target "$SHA" \
             --title "v$VERSION" \
             --generate-notes
