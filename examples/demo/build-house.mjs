@@ -127,6 +127,16 @@ const outdoor = [
   { id: 'terrasse', name: 'Terrasse', polygon: rect(0, 8, 6.5, 10.5), surface: 'paving' },
   { id: 'einfahrt', name: 'Einfahrt', polygon: rect(GX, GD, GX + GW, 12), surface: 'gravel', elevation: -0.05 },
   { id: 'beet', name: 'Beet', polygon: rect(7, 9, 10.5, 10.5), surface: 'soil', elevation: -0.04 },
+  // Blumenbeete rund um die Terrasse, dazwischen der Weg in den Garten
+  { id: 'beet_west', name: 'Beet West', polygon: rect(-1, 8, 0, 11.3), surface: 'soil', elevation: -0.04 },
+  { id: 'beet_sued_1', name: 'Beet Süd links', polygon: rect(0, 10.5, 2.7, 11.3), surface: 'soil', elevation: -0.04 },
+  { id: 'beet_sued_2', name: 'Beet Süd rechts', polygon: rect(3.8, 10.5, 6.5, 11.3), surface: 'soil', elevation: -0.04 },
+  { id: 'weg', name: 'Gartenweg', polygon: rect(2.7, 10.5, 3.8, 11.3), surface: 'paving' },
+  // Garten als Südhang (Süden = +y): oben auf Terrassenhöhe, unten 1,5 m tiefer (Höhe je Eckpunkt)
+  {
+    id: 'garten', name: 'Garten', surface: 'lawn',
+    polygon: [[-4, 11.3, -0.05], [11.2, 11.3, -0.05], [11.2, 18, -1.5], [-4, 18, -1.5]],
+  },
 ];
 
 const file = fileURLToPath(new URL('./model.yaml', import.meta.url));
