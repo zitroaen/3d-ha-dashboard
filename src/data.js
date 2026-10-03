@@ -5,10 +5,18 @@ import { load as parseYaml } from 'js-yaml';
 
 export const DATA_FILES = { house: 'house.json', furniture: 'furniture.yaml', devices: 'devices.yaml' };
 
+/** Daten nicht abrufbar (HTTP-Fehler wie 404, Netzwerk) – im Gegensatz zu kaputtem Inhalt */
+export class DataUnavailableError extends Error {}
+
 async function fetchText(url) {
   // no-cache: der Browser fragt jedes Mal nach, ob sich die Datei geändert hat (ETag), lädt sie aber nur dann neu
-  const res = await fetch(url, { cache: 'no-cache', credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  let res;
+  try {
+    res = await fetch(url, { cache: 'no-cache', credentials: 'same-origin' });
+  } catch (e) {
+    throw new DataUnavailableError(`${url}: ${e.message}`);
+  }
+  if (!res.ok) throw new DataUnavailableError(`${url}: HTTP ${res.status}`);
   return res.text();
 }
 
@@ -20,7 +28,11 @@ export async function loadData(baseUrl) {
   const entries = await Promise.all(
     Object.entries(DATA_FILES).map(async ([key, file]) => [key, await fetchText(new URL(file, baseUrl))])
   );
-  const text = Object.fromEntries(entries);
+  return parseData(Object.fromEntries(entries));
+}
+
+/** Rohtexte (house.json, furniture.yaml, devices.yaml) in Daten umwandeln */
+export function parseData(text) {
   const yaml = (t, file) => {
     try {
       return (t.trim() && parseYaml(t)) || {};

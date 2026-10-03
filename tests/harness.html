@@ -17,7 +17,9 @@
     const el = document.querySelector('ha-3d-dashboard');
     // Daten direkt aus dem Repo laden: Änderungen in data/ sind nach einem Neuladen sichtbar, ohne Build
     // save_url: der Dev-Server (npm run serve) schreibt Editor-Änderungen direkt nach data/
-    el.panel = { config: { data_url: '/data/', save_url: '/__save/' } };
+    // Varianten für die Demo-Tests: ?demo=1 (config.demo) bzw. ?nodata=1 (Daten nicht erreichbar -> Demo-Fallback)
+    const q = new URLSearchParams(location.search);
+    el.panel = { config: q.has('demo') ? { demo: true } : q.has('nodata') ? { data_url: '/fehlt' } : { data_url: '/data/', save_url: '/__save/' } };
 
     // Simuliertes HA wie die echte Installation: alle Entities aus dem HA-Export (reference/entities.txt) mit
     // Bereich (wie hass.states + Entity-/Bereichs-Registry) plus jede in devices.yaml verknüpfte Entity –

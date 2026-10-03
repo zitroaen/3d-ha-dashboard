@@ -5,7 +5,7 @@ vollständig, bevor du etwas änderst, und halte sie aktuell (Entscheidungslog u
 
 ## Was das ist
 
-Ein interaktiver 3D-Grundriss als Home-Assistant-Panel (`panel_custom`, Custom Element `<ha-3d-dashboard>`):
+Ein interaktiver 3D-Grundriss als Home-Assistant-Panel (`panel_custom`, Custom Element `<ha-3d-dashboard>`; Installation über HACS, Kategorie Dashboard):
 three.js, ein JS-Bundle, offline, touch-tauglich. Das Panel lädt die Hausdaten zur Laufzeit aus seinem Ordner
 (`house.json`, `furniture.yaml`, `devices.yaml`, `textures/`) bzw. aus `panel_custom → config → data_url`.
 
@@ -48,6 +48,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run build` | `dist/ha-3d-dashboard.js` (esbuild) |
 | `npm run serve` | Vorschau mit Demo-Haus: http://127.0.0.1:8123/tests/harness.html |
 | `npm test` | Datenschutz-Check, Datenprüfung, Unit-Tests, Link-Check, Build, Screenshots, Bedien-Tests |
+| `npm run test:demo` | Demo-Modus und Fallback (Teil von `npm test`) |
 | `npm run demo` | Demo-Haus aus `examples/demo/build-house.mjs` neu erzeugen |
 | `python scripts/extract_plan.py <pdf> --out <ordner>/house.json [--config plan.json] [--debug]` | Magicplan-Import |
 
@@ -57,7 +58,7 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 ## Code-Aufbau
 
 - `src/main.js` Custom Element, Kompass, Editier-Werkzeugleiste, Link-Check, HA-Anbindung
-- `src/data.js` lädt die Daten zur Laufzeit (js-yaml im Browser)
+- `src/data.js` lädt die Daten zur Laufzeit (js-yaml im Browser) · `src/demo.js` eingebettetes Demo-Haus
 - `src/scene.js` Kamera, Himmel (Sonne/Mond aus `sun.sun`), Render-on-demand, Antippen, Licht-Zustand
 - `src/house.js` Bauwerk aus `house.json` · `src/openings.js` Fenster und Türen im Detail
 - `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen)
@@ -86,3 +87,12 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Weiterentwicklung.
 - Drehwinkel aus der Quaternion lesen (nicht `rotation.y`, das ist über 90° gespiegelt).
 - YAML-Patch erhält das Zeilenende (CRLF-Dateien unter Windows).
+- HACS (Kategorie Dashboard): `hacs.json` im Root, das Release-Asset `ha-3d-dashboard.js` kommt aus
+  `.github/workflows/release.yml` (Tag `v*` oder Actions → Release → Run workflow mit Version = `package.json`).
+  `dist/` bleibt gitignored. Eine HACS-Validierung (hacs/action) fehlt bewusst: sie scheitert vor dem ersten Release
+  und braucht Repo-Beschreibung/Topics in den GitHub-Einstellungen.
+- Demo-Modus: Das Demo-Haus steckt als Text im Bundle (esbuild-Plugin `demo-data`, ~15 kB). Aktiv per
+  `config.demo: true` oder als Fallback, wenn die Daten unerreichbar sind (`DataUnavailableError`, nur ohne
+  vorhandene Ansicht). Dann: lokal schalten statt HA-Dienste, Sonne weiter aus `sun.sun`, kein Speichern/Export, keine
+  Benutzerdaten-Overrides – eigene Daten werden nie überschrieben, kaputte eigene Daten nie durch die Demo ersetzt.
+- `data_url` wird als Ordner behandelt (fehlender `/` wird ergänzt).

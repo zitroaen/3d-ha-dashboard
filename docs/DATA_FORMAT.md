@@ -139,3 +139,15 @@ Zusätzliche Screenshot-Ansichten für `npm test` der Instanz:
 
 `rooms`: Raum-IDs oder `"all"`, `sun`: `{ "azimuth": 215, "elevation": 38 }` (sonst Nacht), `view.at`: Plan-Punkt,
 `zoom`, `az`: Schwenk um die Hochachse in Grad.
+
+## Panel-Konfiguration (`panel_custom` → `config`)
+
+Alle Felder optional:
+
+| Feld | Bedeutung |
+|---|---|
+| `data_url` | Ordner mit `house.json`, `furniture.yaml`, `devices.yaml`, `textures/` (z. B. `/local/ha-3d-dashboard/`). Ohne Angabe: neben dem Modul. |
+| `demo` | `true`: eingebettetes Demo-Haus statt eigener Daten (lokales Schalten, kein Speichern). |
+| `save_url` | nur Entwicklung: Dev-Server-Endpunkt zum Speichern des Editors. |
+
+Sind die Daten nicht erreichbar (HTTP-Fehler), zeigt das Panel das Demo-Haus mit Hinweis.

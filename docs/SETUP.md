@@ -79,6 +79,36 @@ nicht in `engine/` der Instanz ändern.
 
 ## 5. In Home Assistant installieren
 
+**Variante HACS** (Engine über HACS, nur die Daten des Hauses liegen selbst in HA):
+
+1. HACS → ⋮ → Benutzerdefinierte Repositories → `https://github.com/zitroaen/3d-ha-dashboard`, Typ **Dashboard** →
+   herunterladen. HACS legt nur `ha-3d-dashboard.js` unter `/hacsfiles/3d-ha-dashboard/` ab und registriert es als
+   Ressource – das Seitenleisten-Panel entsteht erst durch `panel_custom`.
+2. Zum **Ausprobieren** mit dem eingebauten Demo-Haus (kein Build, keine eigenen Daten):
+   ```yaml
+   panel_custom:
+     - name: ha-3d-dashboard
+       url_path: haus-3d
+       sidebar_title: Haus 3D
+       sidebar_icon: mdi:home-floor-3
+       module_url: /hacsfiles/3d-ha-dashboard/ha-3d-dashboard.js
+       config:
+         demo: true   # zum Ausprobieren; für das eigene Haus stattdessen data_url: /local/ha-3d-dashboard/
+   ```
+3. Für das **eigene Haus**: `demo: true` durch `data_url: /local/ha-3d-dashboard/` ersetzen und `house.json`,
+   `furniture.yaml`, `devices.yaml`, `textures/*` nach `/config/www/ha-3d-dashboard/` kopieren (`npm run deploy:data`
+   bzw. von Hand; `engine/dist/` und das Bundle brauchst du dann nicht). `data_url` ist ein Ordner (absolut oder
+   relativ zur Panel-Seite; ein fehlender abschließender `/` wird ergänzt).
+4. Home Assistant neu starten. Nach einem Update über HACS ggf. `?v=2` an `module_url` hängen oder den Browser-Cache
+   leeren (`panel_custom` kennt den HACS-Versionsparameter nicht).
+
+Der **Demo-Modus** schaltet Raum/Leuchte lokal (die Demo-Entities existieren in HA nicht), Sonne/Mond kommen aus
+`sun.sun`, der Editor speichert nichts. Sind die Daten nicht erreichbar (404), fällt das Panel automatisch auf das
+Demo-Haus mit Hinweis zurück – kaputte eigene Daten zeigen dagegen weiter eine Fehlermeldung und werden nie durch das
+Demo-Haus ersetzt.
+
+**Variante Selbst bauen (Instanz mit Submodul):**
+
 1. Bauen und Dateien nach `/config/www/ha-3d-dashboard/` bringen:
    - per SSH: in `ha3d.config.json` unter `ha.ssh` z. B. `root@homeassistant.local` eintragen, dann `npm run deploy`
      (nur Daten: `npm run deploy:data`);
