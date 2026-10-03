@@ -23,7 +23,7 @@ const STYLE = `
   /* Ab HA 2026.9 hat der Panel-Container keine Höhe mehr (height: 100% ergäbe 0) – das Panel füllt den Bildschirm */
   min-height: 100vh; min-height: 100dvh;
   font-family: var(--paper-font-body1_-_font-family, 'Segoe UI', Roboto, sans-serif); color: #e8e2d8;
-  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
 button { touch-action: manipulation; }
 #stage { position: absolute; inset: 0; }
 .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 55%, #000a 100%); transition: opacity 1s; }
@@ -282,6 +282,7 @@ class Ha3dDashboard extends HTMLElement {
       assetBase: this.dataUrl,
       onRoomTap: (id) => this._onRoomTap(id),
       onLampTap: (id) => this._onLampTap(id),
+      onLampHold: (id) => this._onLampHold(id),
       onViewChange: () => this._updateCompass(),
     });
     this._updateCompass();
@@ -448,9 +449,9 @@ class Ha3dDashboard extends HTMLElement {
     this.view.setSky(a && Number.isFinite(a.elevation) ? { azimuth: a.azimuth, elevation: a.elevation } : null);
     this.toggleAttribute('day', this.view.daylight > 0.5);
 
-    // Demo-Entities gibt es in HA nicht: im Demo-Modus werden Leuchten lokal geschaltet, nur die Sonne kommt aus HA
-    for (const [id, s] of this.demo ? [] : this.view.lamps) {
-      const ents = entitiesOf(s.lamp);
+    // Im Demo-Modus folgen nur Leuchten, die mit einer echten Entity verknüpft wurden, HA; die übrigen schalten lokal
+    for (const [id, s] of this.view.lamps) {
+      const ents = this._liveEntities(s.lamp);
       if (!ents.length) continue;
       // nur neu rechnen, wenn sich eines der State-Objekte geändert hat (HA ersetzt sie bei Änderungen)
       const refs = ents.map((e) => states[e]);
@@ -463,9 +464,19 @@ class Ha3dDashboard extends HTMLElement {
     if (this.shadowRoot.querySelector('.links.show')) this._renderLinks();
   }
 
+  /**
+   * Entities einer Leuchte, die HA schaltet. Im Demo-Modus nur solche, die es in HA wirklich gibt (eine im Editor
+   * verknüpfte echte Lampe); ohne HA-Verbindung keine.
+   */
+  _liveEntities(lamp) {
+    if (!this._hass) return [];
+    const ents = entitiesOf(lamp);
+    return this.demo ? ents.filter((e) => e in (this._hass.states || {})) : ents;
+  }
+
   /** Leuchten eines Raums mit HA-Entities */
   _linkedLamps(ids) {
-    return ids.map((id) => this.view.lamps.get(id)).filter((s) => s && entitiesOf(s.lamp).length);
+    return ids.map((id) => this.view.lamps.get(id)).filter((s) => s && this._liveEntities(s.lamp).length);
   }
 
   /**
@@ -479,24 +490,21 @@ class Ha3dDashboard extends HTMLElement {
     const linked = this._linkedLamps(ids);
     const on = !this.view.isRoomLit(roomId);
     this.dispatchEvent(new CustomEvent('room-tap', { detail: { roomId, on } }));
-    if (this._hass && !this.demo && linked.length) {
-      this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'}`);
-      await this._call(on ? 'turn_on' : 'turn_off', linked.flatMap((s) => entitiesOf(s.lamp)));
-    } else if (!this._hass || this.demo) {
-      this.view.setRoomLight(roomId, on);
-      this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'} (${this.demo ? 'Demo' : 'Vorschau'})`);
-    } else {
-      this._toast(`${room?.name ?? roomId}: keine Leuchte mit HA verknüpft`);
-    }
+    const local = !this._hass || this.demo;
+    if (!linked.length && !local) return this._toast(`${room?.name ?? roomId}: keine Leuchte mit HA verknüpft`);
+    // Demo/Vorschau: unverknüpfte Leuchten lokal schalten (verknüpfte meldet HA über hass zurück)
+    if (local) for (const id of ids) if (!linked.some((s) => s.lamp.id === id)) this.view.setLamp(id, on);
+    this._toast(`${room?.name ?? roomId}: ${on ? 'an' : 'aus'}${local && !linked.length ? ` (${this.demo ? 'Demo' : 'Vorschau'})` : ''}`);
+    if (linked.length) await this._call(on ? 'turn_on' : 'turn_off', linked.flatMap((s) => this._liveEntities(s.lamp)));
   }
 
   /** Leuchte antippen: nur diese Leuchte (alle ihre Entities gemeinsam) schalten. */
   async _onLampTap(lampId) {
     const s = this.view.lamps.get(lampId);
-    const ents = entitiesOf(s.lamp);
+    const ents = this._liveEntities(s.lamp);
     const on = !s.on;
     this.dispatchEvent(new CustomEvent('lamp-tap', { detail: { lampId, on } }));
-    if (this._hass && !this.demo && ents.length) {
+    if (ents.length) {
       this._toast(`${s.lamp.name ?? lampId}: ${on ? 'an' : 'aus'}`);
       await this._call(on ? 'turn_on' : 'turn_off', ents);
     } else if (!this._hass || this.demo) {
@@ -505,6 +513,17 @@ class Ha3dDashboard extends HTMLElement {
     } else {
       this._toast(`${s.lamp.name ?? lampId}: nicht mit HA verknüpft`);
     }
+  }
+
+  /**
+   * Leuchte lange drücken: HA-eigenen Dialog der verknüpften Entity öffnen (Farbe, Helligkeit, Verlauf …).
+   * Bei mehreren Entities (z. B. drei Spots) die erste.
+   */
+  _onLampHold(lampId) {
+    const s = this.view.lamps.get(lampId);
+    const [entityId] = this._liveEntities(s.lamp);
+    if (!entityId) return this._toast(`${s.lamp.name ?? lampId}: nicht mit HA verknüpft – im Editor (Stift) verknüpfen`);
+    this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId }, bubbles: true, composed: true }));
   }
 
   async _call(service, entityIds) {
