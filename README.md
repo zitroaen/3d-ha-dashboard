@@ -38,7 +38,7 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   wenn sich etwas ändert.
 - **Katalog und Lager:** im Editor Modelle aus dem Katalog (mit Vorschaubildern) hinzufügen; Objekte einlagern (z. B.
   Weihnachtsdekoration) und später mit allen Verknüpfungen wieder aufstellen.
-- **Animationen:** Ventilatoren drehen sich, solange sie an sind (Tempo aus der Stufe), Garagentore schwenken auf,
+- **Animationen:** Ventilatoren drehen sich, solange sie an sind (Tempo aus der Stufe), Sektional-Garagentore fahren hoch,
   im Kabel des Balkonkraftwerks fließt Energie, solange es Strom erzeugt; abschaltbar, mit
   Leistungsanzeige (Bilder/s) in den Einstellungen.
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,

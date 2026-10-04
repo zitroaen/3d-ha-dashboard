@@ -695,19 +695,45 @@ export const FURNITURE = {
   },
 
   /**
-   * Garagentor (Schwingtor) für eine Toröffnung in der Wand: size = [Breite, Wanddicke, Höhe]; Sturz bis zur Decke.
-   * Ursprung an der Innenkante der Wand (Mitte der Öffnung), +z = nach außen. Animation: Das Torblatt schwenkt nach
-   * innen unter die Decke, solange das Tor offen ist (cover: open/opening).
+   * Garagentor (Sektionaltor) für eine Toröffnung in der Wand: size = [Breite, Wanddicke, Höhe]; Sturz bis zur Decke.
+   * Ursprung an der Innenkante der Wand (Mitte der Öffnung), +z = nach außen. Das Torblatt aus waagrechten Lamellen
+   * sitzt innen hinter der Öffnung und läuft in seitlichen Schienen: senkrecht hoch, im Bogen unter die Decke und
+   * waagrecht nach hinten, solange das Tor offen ist (cover: open/opening). Antrieb an der Decke.
    */
   garage_door(P, it, { ceiling = 2.4 } = {}) {
     const [W, D, H] = it.size || [3.0, 0.2, 2.1];
-    const c = it.color || 'door_grey', z = D / 2; // Ursprung an der Innenkante der Wand, Tor in Wandmitte
-    if (ceiling - H > 0.02) P.box('plaster', W, ceiling - H, D, 0, H, z); // Sturz
-    P.beginAnim({ type: 'swing', axis: 'x', angle: Math.PI / 2 * 0.98, duration: 6 }, [0, H, z]);
-    // Torblatt mit waagrechten Sicken und Griff – ein Material (ein Zeichenaufruf für das bewegliche Teil)
-    P.box(c, W - 0.04, H - 0.03, 0.04, 0, 0.02, z);
-    for (let i = 1; i < 6; i++) P.box(c, W - 0.12, 0.012, 0.01, 0, (H - 0.03) * (i / 6), z + 0.025);
-    P.box(c, 0.3, 0.04, 0.03, 0, H * 0.42, z + 0.035);
+    const c = it.color || 'door_grey';
+    const n = it.sections ?? 5, z = -0.04; // Torblatt knapp hinter der Innenkante
+    const BW = W + 0.1, BH = H + 0.05, h = BH / n, T = 0.04; // Blatt überdeckt die Laibung etwas
+    const R = Math.max(0.08, Math.min(0.3, ceiling - BH - 0.08)); // Bogenradius der Schienen (bis unter die Decke)
+    if (ceiling - H > 0.02) P.box('plaster', W, ceiling - H, D, 0, H, D / 2); // Sturz
+    // Schienen: senkrecht, Bogen, waagrecht (feststehend, zusammengefasst mit dem Rest)
+    const back = BH - (Math.PI / 2) * R + 0.1; // waagrechter Teil: so lang, dass das offene Tor ganz hineinpasst
+    const track = (sx) => {
+      const x = sx * (BW / 2 + 0.03), pts = [[x, 0, z]];
+      for (let k = 0; k <= 6; k++) {
+        const a = (k / 6) * (Math.PI / 2);
+        pts.push([x, BH + R * Math.sin(a), z - R * (1 - Math.cos(a))]);
+      }
+      pts.push([x, BH + R, z - R - back]);
+      for (let i = 1; i < pts.length; i++) P.rod('alu', pts[i - 1], pts[i], 0.018, { seg: 4 });
+    };
+    track(-1);
+    track(1);
+    // Antrieb: Schiene in der Mitte unter der Decke, Motor hinten
+    const yr = Math.min(ceiling - 0.04, BH + R + 0.04), zm = z - R - back;
+    P.box('alu', 0.04, 0.03, back + R, 0, yr, z - (back + R) / 2);
+    P.box('white', 0.3, 0.12, 0.38, 0, yr - 0.06, zm);
+    // Torblatt: Lamellen mit Fuge und Sicke – ein Material (ein Zeichenaufruf). Die Szene führt jede Lamelle einzeln
+    // die Schiene entlang (Animation 'sectional'); zugeordnet wird über die Höhe der Dreiecke im geschlossenen Tor.
+    P.beginAnim({ type: 'sectional', sections: n, height: BH, radius: R, duration: 8 }, [0, 0, z]);
+    for (let i = 0; i < n; i++) {
+      const y0 = i * h;
+      P.box(c, BW, h - 0.012, T, 0, y0 + 0.006, z - T / 2);
+      P.box(c, BW - 0.1, 0.012, 0.01, 0, y0 + h * 0.5, z + 0.004); // Sicke außen
+      P.box(c, BW - 0.1, 0.012, 0.01, 0, y0 + h * 0.5, z - T - 0.004); // Sicke innen
+    }
+    P.box(c, 0.25, 0.035, 0.03, 0, h * 0.5 + 0.03, z - T - 0.02); // Griff innen
     P.endAnim();
   },
 

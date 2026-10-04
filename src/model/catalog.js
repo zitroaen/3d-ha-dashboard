@@ -8,7 +8,8 @@
 //   params        erlaubte Schlüssel in objects[].params
 //   label         Name im Katalog des Editors
 //   anim          Animation, solange das Objekt aktiv ist (Entity an bzw. `state: on`): spin = dreht sich,
-//                 swing = schwenkt auf (Tor), flow = Energiefluss im Kabel
+//                 swing = schwenkt auf (Tor), sectional = Sektionaltor
+//                 fährt hoch, flow = Energiefluss im Kabel
 
 export const CATALOG = {
   // --- Möbel
@@ -45,7 +46,7 @@ export const CATALOG = {
   marker: { label: 'Markierung', category: 'device', size: [0.12], params: ['color'] },
   ceiling_fan: { label: 'Deckenventilator', category: 'device', size: [1.2], params: ['color'], anim: 'spin' },
   floor_fan: { label: 'Standventilator', category: 'device', size: [0.42, 0.42, 1.15], params: ['color'], anim: 'spin' },
-  garage_door: { label: 'Garagentor', category: 'device', size: [3.0, 0.2, 2.1], params: ['color'], anim: 'swing' },
+  garage_door: { label: 'Garagentor', category: 'device', size: [3.0, 0.2, 2.1], params: ['color', 'sections'], anim: 'sectional' },
   solar_panels: { label: 'Balkonkraftwerk', category: 'device', size: [2.29, 1.72, 0.1], params: ['panels', 'cable_to', 'drop', 'peak'], anim: 'flow' },
   tv: { label: 'Fernseher', category: 'device', size: [1.45, 0.06, 0.84], params: [] },
   // --- Leuchten

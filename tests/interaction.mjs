@@ -510,7 +510,7 @@ try {
   });
   ok(door?.domain === 'cover' && door.service === 'open_cover' && garage.level === 1 && garage.roof && garage.buttons === 2 && garage.door > 0
     && garage.pv === true && garage.pvSpeed === 0.5 && garage.badge === 'Offen' && garage.doorOff === 1 && !garage.roofAt0,
-    'Garagentor: Antippen öffnet (cover.open_cover), Tor schwenkt auf; 1. OG zeigt das Garagendach mit Energiefluss (400 W = halbes Tempo)',
+    'Garagentor: Antippen öffnet (cover.open_cover), Sektionaltor fährt hoch; 1. OG zeigt das Garagendach mit Energiefluss (400 W = halbes Tempo)',
     `Garage: Antippen=${JSON.stringify(door)} ${JSON.stringify(garage)}`);
 
   // ---------------- Leistungsanzeige ----------------

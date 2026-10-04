@@ -221,6 +221,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Weitere Animationsarten (0.16.0): `swing` (Tor; Fortschritt 0..1 läuft auch beim Schließen, nach dem Laden ohne
   Aufschwenken in der richtigen Lage) und `flow` (Lichtpunkte entlang eines Pfads, nur sichtbar, solange aktiv).
   Aktivität aus Messwerten (≥ 1, Tempo = Wert/`peak`), ohne power-Entity aus den info-Entities.
+- Sektionaltor (0.16.1, statt Schwingtor): Animation `sectional` – die Lamellen eines Meshes (ein Zeichenaufruf)
+  werden je Bild direkt in der Geometrie entlang der Schiene (senkrecht, Viertelbogen, waagrecht) als Sehne gelegt;
+  Zuordnung Dreieck → Lamelle über die Höhe im geschlossenen Tor. Fortschritt wie `swing` (`PROGRESS` in scene.js).
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).

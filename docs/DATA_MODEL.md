@@ -212,7 +212,7 @@ es zurück, **Entfernen → Löschen** streicht den Eintrag.
 solange das Objekt aktiv ist: mit `ha.entities.power` (ohne power: `info`) sobald eine Entity aktiv ist (nicht `off`,
 `idle`, `paused`, `standby`, `closed`, `closing`, `docked`, `unavailable`, `unknown`; Messwerte ab 1), das Tempo folgt
 dem Attribut `percentage` (Ventilatorstufe) bzw. dem Messwert (Leistung/`peak`); ohne Entity gilt `state`. Tore
-(`garage_door`) schwenken in rund 6 s auf bzw. zu. Die Einstellungen (Zahnrad) schalten Animationen für das Gerät ab.
+(`garage_door`, Sektionaltor) fahren in rund 8 s hoch bzw. zu. Die Einstellungen (Zahnrad) schalten Animationen für das Gerät ab.
 
 ```yaml
 - { id: ventilator, name: Deckenventilator, model: ceiling_fan, space: schlafen, pos: [7, 4.7], state: on,
@@ -334,7 +334,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `curtain` | Möbel | | | `color` |
 | `floor_fan` | Gerät | | 0.42 × 0.42 × 1.15 | `color` (Rotor) – Animation: Rotor dreht sich, Tempo aus `percentage` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
-| `garage_door` | Gerät | | 3.0 × 0.2 × 2.1 | `color` – Schwingtor in einer Wandöffnung, Ursprung an der Innenkante; Animation: schwenkt auf, solange offen (`cover`: open/opening); Sturz bis zur Decke |
+| `garage_door` | Gerät | | 3.0 × 0.2 × 2.1 | `color`, `sections` (Lamellen, Standard 5) – Sektionaltor innen hinter einer Wandöffnung, Ursprung an der Innenkante; Schienen, Deckenantrieb; Animation: die Lamellen fahren die Schienen hoch unter die Decke, solange offen (`cover`: open/opening); Sturz bis zur Decke |
 | `garden_chair` | Möbel | | | `color` (Bespannung; Gartenstuhl) |
 | `garden_table` | Möbel | | 1.6 × 0.9 × 0.74 | `color` (Platte; Gartentisch) |
 | `grand_piano` | Möbel | | 1.48 × 1.6 | |
