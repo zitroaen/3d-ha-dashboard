@@ -177,3 +177,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   geringere Auflösung, keine Verfeinerung). `tests/performance.mjs` begrenzt Zeichenaufrufe/Dreiecke.
 - Einstellungsmenü (0.11.0): Zahnrad statt Stift und Ketten-Knopf; Bearbeiten nur für Administratoren
   (`readonly`); Tageszeit Automatisch/Tag/Nacht überschreibt sun.sun (zum Testen, Wand-Tablets).
+- Wetter (0.12.0): `src/weather.js` bildet `weather.*`-Zustände auf { cloud, rain, snow, fog } ab; `scene.setWeather`
+  ändert nur Licht, Schatten-Intensität, Umgebung, Nebel und zwei Shader-Uniforms (`uWet`, `uSnow` in roomlight.js,
+  nur Materialien mit `weather: true`: Flächen im Freien, Laub). Niederschlag als CSS-Ebene mit transform-Animation
+  (Compositing, kein Neurendern; reduzierte Bewegung respektiert) – die Regel „keine Dauerschleife“ gilt fürs WebGL.
+  Wetter-Entity: `site.weather` oder automatisch. Testschalter im Menü wie bei der Tageszeit.
+- Kompass: Nadel ohne CSS-Übergang und im `onRender` nachgeführt (vorher 80 ms Verzögerung beim Drehen).

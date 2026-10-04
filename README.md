@@ -23,6 +23,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   (z. B. „42 min“).
 - **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände mit Höhen (z. B. Südhang); Bäume, Sträucher
   und Blumen aus dem Katalog.
+- **Wetter:** Wolken, Regen (nasse Flächen), Schnee (weiße Decke) und Nebel aus der HA-Wetter-Entity; Symbol und
+  Temperatur oben, antippen zeigt die Vorhersage.
 - **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden.
 - **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
 - **Einstellungen (Zahnrad):** Tageszeit Automatisch/Tag/Nacht, Qualität Automatisch/Hoch/Sparsam, Bearbeiten,
