@@ -43,23 +43,30 @@ export const lightUniforms = {
   uLights: { value: null },
   uFloorAO: { value: null },
   uFloorAOBox: { value: new THREE.Vector4(0, 0, 1, 1) }, // xMin, zMin, Breite, Tiefe
+  // Wetter (scene.setWeather): Nässe 0..1 (dunkler, glänzend) und Schneedecke 0..1 (auf nach oben zeigenden Flächen)
+  uWet: { value: 0 },
+  uSnow: { value: 0 },
 };
 
 const VERT_PARS = /* glsl */ `
 attribute float roomIdx;
 varying float vRoomIdx;
 varying vec3 vRoomWorld;
+varying float vUpN;
 `;
 const VERT_MAIN = /* glsl */ `
 vRoomIdx = roomIdx;
 vRoomWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vUpN = normalize(mat3(modelMatrix) * objectNormal).y;
 `;
 const FRAG_PARS = /* glsl */ `
 uniform highp sampler2D uLights;
 uniform sampler2D uFloorAO;
 uniform vec4 uFloorAOBox;
+uniform float uWet, uSnow;
 varying float vRoomIdx;
 varying vec3 vRoomWorld;
+varying float vUpN;
 
 // Licht aller Lampen des eigenen Raums + etwas indirektes Licht (Reflexion von Wänden/Decke)
 vec3 roomIrradiance(vec3 n, float bounce) {
@@ -92,6 +99,7 @@ const BOUNCE = 0.07;
  * opts.floorAO: Boden-AO-Textur über die Etage legen
  * opts.wallAO: Wände zum Boden hin abdunkeln (Kontaktschatten)
  * opts.glow: Fläche leuchtet selbst in der Raumlichtfarbe (Glas), Faktor
+ * opts.weather: Fläche im Freien – wird bei Regen nass (dunkler, glänzend) und bei Schnee weiß (nur Oberseiten)
  */
 export function withRoomLight(material, opts = {}) {
   material.onBeforeCompile = (shader) => {
@@ -110,11 +118,22 @@ export function withRoomLight(material, opts = {}) {
       colorMod += /* glsl */ `
       diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(0.0, 0.7, vRoomWorld.y - ${opts.wallAO.toFixed(3)}));`;
     }
+    let roughMod = '';
+    if (opts.weather) {
+      colorMod += /* glsl */ `
+      float snowF = uSnow * smoothstep(0.35, 0.8, vUpN);
+      diffuseColor.rgb *= 1.0 - 0.38 * uWet * (1.0 - snowF);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.88, 0.92), snowF);`;
+      roughMod = /* glsl */ `
+      roughnessFactor = mix(roughnessFactor, 0.14, uWet * 0.85 * (1.0 - snowF) * step(0.5, vUpN));
+      roughnessFactor = mix(roughnessFactor, 0.9, snowF);`;
+    }
     const glow = opts.glow ? `totalEmissiveRadiance += roomIrradiance(normal, 0.6) * ${opts.glow.toFixed(3)};` : '';
 
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAG_PARS}`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${colorMod}`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n${roughMod}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${glow}`)
       .replace(
         '#include <lights_fragment_end>',

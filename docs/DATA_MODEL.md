@@ -59,6 +59,7 @@ objects: [ ... ]     # Möbel, Leuchten, Geräte – mit Verknüpfung zu Home As
 | `name` | ja | | Anzeigename (oben links im Panel) |
 | `north_deg` | nein | 0 | Richtung Norden im Plan, Grad im Uhrzeigersinn von Plan-oben (Sonne, Mond, Kompass). Beispiel: Norden zeigt im Plan nach rechts → 90 |
 | `ground` | nein | `{ surface: lawn }` | Boden außerhalb aller Außenbereiche: `{ surface }` |
+| `weather` | nein | automatisch | Wetter-Entity für Himmel, Regen, Schnee, Nebel und die Anzeige oben, z. B. `weather.home`. Ohne Angabe: `weather.home`, `weather.forecast_home`, sonst die erste `weather.*` |
 
 ## `buildings` – Gebäude
 
@@ -485,6 +486,7 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.12.0, abwärtskompatibel):** `site.weather` (Wetter-Entity).
 - **Version 2, Ergänzung (0.11.0, abwärtskompatibel):** `tree` mit `shape: column` (Säulenbaum) und `birch` (Birke).
 - **Version 2, Ergänzung (0.9.0, abwärtskompatibel):** Gelände – Eckpunkte von Außenbereichen mit Höhe
   `[x, y, z]`; Katalog-Art „Pflanze“ mit `tree`, `shrub`, `flowers`.

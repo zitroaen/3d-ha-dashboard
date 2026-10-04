@@ -44,7 +44,8 @@
           "type": "object",
           "additionalProperties": false,
           "properties": { "surface": { "$ref": "#/$defs/surface" } }
-        }
+        },
+        "weather": { "type": "string", "pattern": "^weather\\.[a-z0-9_]+$" }
       }
     },
     "building": {

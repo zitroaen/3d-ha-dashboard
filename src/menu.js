@@ -2,7 +2,7 @@
 // Ansichts-Einstellungen gelten pro Gerät (localStorage) – ein Wand-Tablet darf sparsam rechnen, der PC nicht.
 
 const PREFS_KEY = 'ha3d_view_prefs';
-export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto' };
+export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto', weather: 'auto' };
 
 /** Ansichts-Einstellungen dieses Geräts (ohne Speicher, z. B. privates Fenster: Standardwerte) */
 export function loadPrefs() {
@@ -21,6 +21,7 @@ export function savePrefs(prefs) {
 
 const DAYTIME = [['auto', 'Automatisch'], ['day', 'Tag'], ['night', 'Nacht']];
 const QUALITY = [['auto', 'Automatisch'], ['high', 'Hoch'], ['low', 'Sparsam']];
+const WEATHER = [['auto', 'Automatisch'], ['clear', 'Klar'], ['cloudy', 'Bewölkt'], ['rain', 'Regen'], ['snow', 'Schnee'], ['fog', 'Nebel']];
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 export class SettingsMenu {
@@ -75,7 +76,7 @@ export class SettingsMenu {
 
   render() {
     if (!this.isOpen) return;
-    const { canEdit, version, source, quality } = this.info || {};
+    const { canEdit, version, source, quality, weather } = this.info || {};
     const seg = (pref, opts) => `<div class="seg" role="group">${opts.map(([v, l]) =>
       `<button data-pref="${pref}" data-value="${v}" class="${this.prefs[pref] === v ? 'on' : ''}" aria-pressed="${this.prefs[pref] === v}">${l}</button>`).join('')}</div>`;
     const autoQ = this.prefs.quality === 'auto' && quality ? `<p class="hint">Automatisch gewählt: ${quality === 'high' ? 'Hoch' : 'Sparsam'}</p>` : '';
@@ -85,6 +86,8 @@ export class SettingsMenu {
         <section><h3>Ansicht</h3>
           <label>Tageszeit</label>${seg('daytime', DAYTIME)}
           <p class="hint">Automatisch folgt der Sonne aus Home Assistant (sun.sun).</p>
+          <label>Wetter</label>${seg('weather', WEATHER).replace('class="seg"', 'class="seg wrap"')}
+          <p class="hint">${weather ? `Automatisch: ${esc(weather)}` : 'Automatisch: keine Wetter-Entity in Home Assistant gefunden'}</p>
           <label>Qualität</label>${seg('quality', QUALITY)}
           ${autoQ}
           <p class="hint">Hoch: Raumschatten und volle Auflösung, sobald die Ansicht stillsteht. Sparsam: für ältere Tablets.</p>

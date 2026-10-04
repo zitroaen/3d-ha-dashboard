@@ -231,7 +231,8 @@ export class FurnishingLayer {
           })();
           Object.assign(params, { normalMap: this.shared.weave, normalScale: new THREE.Vector2(0.5, 0.5) });
         }
-        cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(params)));
+        // Laub, Nadeln und Rinde draußen: Schnee bleibt oben liegen, Regen macht sie dunkler
+        cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(params), { weather: /^(leaf|conifer|bark|birch|flower)/.test(key) }));
       }
     }
     return cache.get(k);
