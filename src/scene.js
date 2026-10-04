@@ -31,6 +31,64 @@ function pathOf(pts) {
   };
 }
 
+/** Animationen mit Fortschritt 0..1 (Tore): laufen bis in die Endlage, auch beim Schließen */
+const PROGRESS = new Set(['swing', 'sectional']);
+
+/** Punkt der Torschiene nach Weglänge s (y, z in der Ebene des Tors): senkrecht bis H, Viertelbogen, waagrecht nach innen */
+function trackAt(s, H, R) {
+  if (s <= H) return [s, 0];
+  const arc = (Math.PI / 2) * R;
+  if (s <= H + arc) {
+    const a = (s - H) / R;
+    return [H + R * Math.sin(a), -R * (1 - Math.cos(a))];
+  }
+  return [H + R, -R - (s - H - arc)];
+}
+
+/**
+ * Sektionaltor: Jede Lamelle i (im geschlossenen Tor zwischen i·h und (i+1)·h) liegt als Sehne auf der Schiene, ihre
+ * Unterkante bei Weglänge i·h + e·H. Die Ecken werden direkt in der Geometrie verschoben (wenige hundert Punkte, ein
+ * Mesh, ein Zeichenaufruf). Die Ausgangslage merkt sich das Mesh beim ersten Mal.
+ */
+function poseSections(node, { sections: n, height: H, radius: R }, e) {
+  const h = H / n;
+  const pose = [];
+  for (let i = 0; i < n; i++) {
+    const s0 = i * h + e * H;
+    const [y0, z0] = trackAt(s0, H, R), [y1, z1] = trackAt(s0 + h, H, R);
+    const l = Math.hypot(y1 - y0, z1 - z0) || 1;
+    const uy = (y1 - y0) / l, uz = (z1 - z0) / l; // „oben“ der Lamelle; außen = (−uz, uy)
+    pose.push([y0, z0, uy, uz]);
+  }
+  for (const m of node.children) {
+    if (!m.isMesh) continue;
+    const pos = m.geometry.attributes.position, nor = m.geometry.attributes.normal;
+    const base = (m.userData.base ??= { pos: pos.array.slice(), nor: nor.array.slice(), sec: sectionsOf(pos.array, h, n) });
+    m.frustumCulled = false; // Begrenzung ändert sich mit der Lage
+    for (let v = 0; v < pos.count; v++) {
+      const [y0, z0, uy, uz] = pose[base.sec[(v / 3) | 0]];
+      const k = v * 3, yl = base.pos[k + 1] - (base.sec[(v / 3) | 0]) * h, zl = base.pos[k + 2];
+      pos.array[k + 1] = y0 + yl * uy - zl * uz;
+      pos.array[k + 2] = z0 + yl * uz + zl * uy;
+      const ny = base.nor[k + 1], nz = base.nor[k + 2];
+      nor.array[k + 1] = ny * uy - nz * uz;
+      nor.array[k + 2] = ny * uz + nz * uy;
+    }
+    pos.needsUpdate = true;
+    nor.needsUpdate = true;
+  }
+}
+
+/** Lamelle je Dreieck (Geometrie ohne Index): aus der Höhe seines Mittelpunkts im geschlossenen Tor */
+function sectionsOf(p, h, n) {
+  const sec = new Uint8Array(p.length / 9);
+  for (let t = 0; t < sec.length; t++) {
+    const cy = (p[t * 9 + 1] + p[t * 9 + 4] + p[t * 9 + 7]) / 3;
+    sec[t] = Math.max(0, Math.min(n - 1, Math.floor(cy / h)));
+  }
+  return sec;
+}
+
 const QUALITY = {
   high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2 },
   low: { shadowMap: 1024, shadowRadius: 3, maxPixelRatio: 1.25 },
@@ -623,7 +681,7 @@ export class HouseScene {
     const on = this.animationsOn !== false;
     for (const a of this._anims) {
       const act = this.activity?.get(a.id)?.active ?? false;
-      if (a.spec.type === 'swing' && (a.progress == null || !on)) {
+      if (PROGRESS.has(a.spec.type) && (a.progress == null || !on)) {
         a.progress = act ? 1 : 0;
         this._pose(a);
       }
@@ -636,7 +694,7 @@ export class HouseScene {
     if (this.animationsOn === false || !this.activity?.size) return [];
     return this._anims.filter((a) => {
       const act = this.activity.get(a.id)?.active;
-      if (a.spec.type === 'swing') return a.progress != null && (act ? a.progress < 1 : a.progress > 0);
+      if (PROGRESS.has(a.spec.type)) return a.progress != null && (act ? a.progress < 1 : a.progress > 0);
       return act;
     });
   }
@@ -654,7 +712,7 @@ export class HouseScene {
         a.angle = ((a.angle || 0) + dt * spec.speed * speed * Math.PI * 2) % (Math.PI * 2);
         const axis = spec.axis === 'x' ? _X : spec.axis === 'z' ? _Z : _Y;
         node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, a.angle));
-      } else if (spec.type === 'swing') {
+      } else if (PROGRESS.has(spec.type)) {
         const step = dt / (spec.duration || 5);
         a.progress = act?.active ? Math.min(1, a.progress + step) : Math.max(0, a.progress - step);
         this._pose(a);
@@ -670,11 +728,12 @@ export class HouseScene {
     }
   }
 
-  /** Torblatt: Drehung um die Achse nach Fortschritt (sanft beschleunigen/bremsen) */
+  /** Tor nach Fortschritt (sanft beschleunigen/bremsen): Schwingtor dreht, Sektionaltor fährt die Schienen entlang */
   _pose(a) {
     const { node, spec } = a;
-    if (spec.type !== 'swing') return;
+    if (!PROGRESS.has(spec.type)) return;
     const e = a.progress * a.progress * (3 - 2 * a.progress);
+    if (spec.type === 'sectional') return poseSections(node, spec, e);
     const axis = spec.axis === 'y' ? _Y : spec.axis === 'z' ? _Z : _X;
     node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, spec.angle * e));
   }

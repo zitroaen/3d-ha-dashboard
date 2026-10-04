@@ -1,5 +1,10 @@
 # Änderungen
 
+## 0.16.1
+
+- **Garagentor als Sektionaltor:** Das Torblatt aus Lamellen sitzt innen hinter der Öffnung und fährt in seitlichen
+  Schienen hoch und unter die Decke (mit Deckenantrieb) statt aufzuschwenken. Anzahl der Lamellen: `params.sections`.
+
 ## 0.16.0
 
 - **Vorschaubilder im Katalog:** Jedes Modell erscheint mit einem kleinen Bild (einmal gerechnet, dann
