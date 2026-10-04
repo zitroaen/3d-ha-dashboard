@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [screens, interaction, rest]
+        suite: [screens, demo, interaction]
     env:
       # Google Chrome ist auf den GitHub-Runnern vorinstalliert – kein Browser-Download nötig
       PW_CHANNEL: chrome
@@ -45,12 +45,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # etwa gleich lange Gruppen (lokal je 2½–3 min)
       - if: matrix.suite == 'screens'
-        run: npm run test:screens
+        run: npm run test:screens && npm run test:perf
+      - if: matrix.suite == 'demo'
+        run: npm run test:demo
       - if: matrix.suite == 'interaction'
-        run: npm run test:interaction
-      - if: matrix.suite == 'rest'
-        run: npm run test:demo && npm run test:shared && npm run test:perf
+        run: npm run test:interaction && npm run test:shared
       - uses: actions/upload-artifact@v4
         if: always() && matrix.suite == 'screens'
         with:
