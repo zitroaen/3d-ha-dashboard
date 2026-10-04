@@ -35,6 +35,11 @@ const until = async (cond, ms = 15000) => { const t = Date.now(); while (!cond()
 
 try {
   const page = await guardedPage(browser, base, errors, { viewport: { width: 1600, height: 1000 }, label: 'desktop' });
+  // Einstellungsmenü öffnen und einen Eintrag wählen (edit, links)
+  const menuAct = async (act) => {
+    await clickShadow('.settings-toggle');
+    await clickShadow(`.settings button[data-act="${act}"]`);
+  };
   const clickShadow = async (sel) => {
     const r = await page.evaluate((sel) => {
       const b = window.panel.shadowRoot.querySelector(sel).getBoundingClientRect();
@@ -108,8 +113,28 @@ try {
   }, lampId);
   ok(col.on && col.r > 0.9 && col.g < 0.1 && Math.abs(col.b - 0.17) < 0.02, `Lichtfarbe und Helligkeit kommen aus HA (${JSON.stringify(col)})`, `Lichtfarbe aus HA: ${JSON.stringify(col)}`);
 
+  // ---------------- Einstellungsmenü: Tageszeit fest Tag/Nacht, gespeichert pro Gerät ----------------
+  await clickShadow('.settings-toggle');
+  const menu = await page.evaluate(() => {
+    const r = window.panel.shadowRoot.querySelector('.settings');
+    return { open: r.classList.contains('show'), items: [...r.querySelectorAll('button[data-act], button[data-pref]')].map((b) => b.dataset.act || `${b.dataset.pref}:${b.dataset.value}`).join() };
+  });
+  ok(menu.open && /daytime:day/.test(menu.items) && /quality:low/.test(menu.items) && /edit/.test(menu.items) && /links/.test(menu.items),
+    'Einstellungsmenü: Tageszeit, Qualität, Bearbeiten, Link-Check', `Menü: ${JSON.stringify(menu)}`);
+  await page.screenshot({ path: join(OUT, 'demo_einstellungen.png') });
+  await clickShadow('.settings button[data-pref="daytime"][data-value="day"]');
+  const dayL = await page.evaluate(() => window.panel.view.daylight);
+  await clickShadow('.settings button[data-pref="daytime"][data-value="night"]');
+  const nightL = await page.evaluate(() => window.panel.view.daylight);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('ha3d_view_prefs')).daytime);
+  await clickShadow('.settings button[data-pref="daytime"][data-value="auto"]');
+  const autoL = await page.evaluate(() => window.panel.view.daylight); // Testumgebung: sun.sun unter dem Horizont
+  ok(dayL > 0.9 && nightL < 0.1 && autoL < 0.1 && stored === 'night', `Tageszeit umschaltbar: Tag ${dayL.toFixed(2)}, Nacht ${nightL.toFixed(2)}, Automatisch folgt sun.sun`,
+    `Tageszeit: Tag ${dayL}, Nacht ${nightL}, auto ${autoL}, gespeichert ${stored}`);
+  await clickShadow('.settings header button');
+
   // ---------------- Link-Check ----------------
-  await clickShadow('.links-toggle');
+  await menuAct('links');
   const lc = await page.evaluate(() => window.panel.shadowRoot.querySelector('.links .summary').textContent);
   const about = await page.evaluate(() => window.panel.shadowRoot.querySelector('.links .about').textContent);
   const { version } = JSON.parse(await readFile(join(ENGINE_ROOT, 'package.json'), 'utf8'));
@@ -182,7 +207,7 @@ try {
   // ---------------- Editiermodus ----------------
   await page.reload();
   await page.waitForFunction(() => window.panelReady === true, null, { timeout: 120000 });
-  await clickShadow('.edit-toggle');
+  await menuAct('edit');
   // Sideboard-Front knapp über dem Boden antippen (darüber hängt der Fernseher)
   await steady(page);
   pt = await toScreen(page, [5.46, 0.08, 3.4]);
@@ -248,7 +273,7 @@ try {
     `Editor: Fertig speichert das Modell (sideboard: ${JSON.stringify(savedSofa?.pos)}) und beendet den Editiermodus`, `Fertig: ${saved?.url} ${JSON.stringify(savedSofa)} aus=${offAfterSave}`);
 
   // Abbrechen verwirft: verschieben, Abbrechen -> nichts gespeichert, alte Lage wieder da
-  await clickShadow('.edit-toggle');
+  await menuAct('edit');
   let savedOnCancel = false;
   await page.route('**/__save/**', async (route) => { savedOnCancel = true; await route.fulfill({ status: 204 }); });
   await page.evaluate(() => {
@@ -269,7 +294,7 @@ try {
   const filePos = yaml.load(await readFile(join(DATA_DIR, 'model.yaml'), 'utf8')).objects.find((o) => o.id === 'sideboard').pos;
   ok(!cancel.editing && !savedOnCancel && Math.abs(cancel.pos[0] - filePos[0]) < 0.01 && Math.abs(cancel.pos[1] - filePos[1]) < 0.01,
     'Editor: Abbrechen verwirft die Änderungen und speichert nichts', `Abbrechen: ${JSON.stringify(cancel)} gespeichert=${savedOnCancel}`);
-  await clickShadow('.edit-toggle');
+  await menuAct('edit');
 
   // Verknüpfen: Leuchtkugel wählen, Entity-Auswahl (vorgefiltert auf HA-Bereich Wohnzimmer), suchen, antippen
   await page.evaluate(() => window.panel.editor.select({ type: 'lamp', id: 'eg_wohnen_kugel' }));

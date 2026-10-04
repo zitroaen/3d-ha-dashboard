@@ -6,6 +6,14 @@ import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
 import { pointInPoly, heightAt, terrainHeightNear } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
+import { SkyEnvironment } from './environment.js';
+import { Refiner } from './refine.js';
+
+/** Qualitätsstufen: Schattenauflösung und -weichheit, Bildauflösung, Ruhebild-Verfeinerung */
+const QUALITY = {
+  high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2, refine: true },
+  low: { shadowMap: 1024, shadowRadius: 3, maxPixelRatio: 1.25, refine: false },
+};
 
 // Warmweiß ~2700 K
 const DEFAULT_LIGHT = new THREE.Color().setRGB(1.0, 0.8, 0.6, THREE.SRGBColorSpace);
@@ -23,13 +31,14 @@ export class HouseScene {
    * @param objectGestures   ref -> Set der Gesten, auf die das Objekt reagiert (sonst geht das Antippen zum Raum)
    * @param onRender         nach jedem Bild (Zustandsanzeigen nachführen)
    */
-  constructor(container, house, furnishing, { onRoomTap, onObjectGesture, objectGestures, onViewChange, onRender, assetBase = null } = {}) {
+  constructor(container, house, furnishing, { onRoomTap, onObjectGesture, objectGestures, onViewChange, onRender, onQualityChange, assetBase = null } = {}) {
     this.container = container;
     this.house = house;
     this.onRoomTap = onRoomTap;
     this.onObjectGesture = onObjectGesture;
     this.objectGestures = objectGestures;
     this.onRender = onRender;
+    this.onQualityChange = onQualityChange;
     this.onViewChange = onViewChange;
     this.lamps = new Map(); // lampId -> { idx, lamp, room, roomIdx, floor, on, color, brightness }
     this.furnishing = [];
@@ -49,10 +58,14 @@ export class HouseScene {
     container.appendChild(r.domElement);
 
     this.scene = new THREE.Scene();
+    this.skyEnv = new SkyEnvironment(r); // Spiegelungen und Himmelslicht (scene.environment)
     this.scene.background = new THREE.Color(0x0a0d13);
     this.scene.fog = new THREE.Fog(0x0a0d13, 45, 95);
 
     this.shared = createSharedMaterials();
+    // scharfe Böden auch bei flachem Blickwinkel (anisotrope Filterung, kostet kaum etwas)
+    const aniso = Math.min(8, r.capabilities.getMaxAnisotropy());
+    for (const m of Object.values(this.shared.mat)) for (const t of [m.map, m.normalMap]) if (t) t.anisotropy = aniso;
     // Texturen aus dem Datenordner (z. B. Gemälde), einmal geladen und geteilt; nach dem Laden neu rendern
     const texCache = new Map();
     this.shared.loadTexture = (path) => {
@@ -320,12 +333,13 @@ export class HouseScene {
     const L = (a, b) => a + (b - a) * day;
     const mix = (a, b) => new THREE.Color(a).lerp(new THREE.Color(b), day);
 
-    // Halbkugel: Nacht kühl und gedämpft, Tag hell mit warmem Bodenreflex
+    // Halbkugel: Nacht kühl und gedämpft, Tag hell mit warmem Bodenreflex. Einen Teil des Himmelslichts liefert die
+    // Umgebung (scene.environment, unten) – sie bringt dazu die Spiegelungen auf Glas, Böden und Lack.
     this.hemi.color.copy(mix(0x525a6c, 0xc9d8ec));
     this.hemi.groundColor.copy(mix(0x1e1d1c, 0x6e6250));
-    this.hemi.intensity = L(1.2, 1.6);
+    this.hemi.intensity = L(0.95, 1.05);
+    // Hintergrund und Nebel: Richtung Horizont geht der Boden in die Himmelsfarbe über (Farbe aus der Umgebung unten)
     this.scene.background.copy(mix(0x0a0d13, 0x8d9aa8));
-    this.scene.fog.color.copy(this.scene.background);
 
     // Gestirn: über dem Horizont die Sonne (bei tiefem Stand wärmer), sonst der Mond gegenüber
     const isSun = elev > -2;
@@ -344,6 +358,11 @@ export class HouseScene {
     const d = 35;
     // Plan: "oben" = -z, im Uhrzeigersinn = +x
     light.position.set(this.center.x + Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d, this.center.z - Math.cos(a) * Math.cos(e) * d);
+    const dir = light.position.clone().sub(this.center).normalize();
+    this.scene.environment = this.skyEnv.update(day, dir, isSun, sunWarm);
+    this.scene.background.lerp(this.skyEnv.horizon, 0.35 * day);
+    this.scene.fog.color.copy(this.scene.background);
+    this.scene.environmentIntensity = L(0.35, 0.75);
     this.renderer.shadowMap.needsUpdate = true;
     this.onSkyChange?.(day);
     this.requestRender();
@@ -399,6 +418,12 @@ export class HouseScene {
       this.requestRender();
       this.onViewChange?.();
     });
+    // während des Ziehens schnell rendern, danach (Stillstand) verfeinern
+    c.addEventListener('start', () => (this._dragging = true));
+    c.addEventListener('end', () => {
+      this._dragging = false;
+      this.requestRender();
+    });
     c.update();
   }
 
@@ -407,6 +432,7 @@ export class HouseScene {
     this.renderer.setSize(w, h, false);
     this.renderer.domElement.style.width = w + 'px';
     this.renderer.domElement.style.height = h + 'px';
+    this._refiner?.setSize();
     this._fitFrustum(w / h);
     this.camera.updateProjectionMatrix();
     this.requestRender();
@@ -492,21 +518,77 @@ export class HouseScene {
 
   requestRender() {
     if (this._raf) return;
-    this._raf = requestAnimationFrame(() => {
+    this._raf = requestAnimationFrame((t) => {
       this._raf = 0;
-      const moving = this.controls.update();
-      this.renderer.render(this.scene, this.camera);
-      this.onRender?.();
+      const moving = this.controls.update() || this._dragging || !!this._anim;
+      this._draw(!moving);
       this.frames = (this.frames || 0) + 1;
-      if (moving) this.requestRender();
+      if (moving) {
+        this._measure(t);
+        this.requestRender();
+      } else this._lastT = 0;
     });
   }
 
   /** Sofort rendern (für Tests). */
   renderNow() {
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    this._draw(true);
+  }
+
+  /** Ein Bild: in Bewegung schnell, im Stillstand bei Qualität „Hoch“ verfeinert (Umgebungsverdeckung) */
+  _draw(still) {
+    if (still && QUALITY[this.quality]?.refine) {
+      this._refiner ??= new Refiner(this.renderer, this.scene, this.camera);
+      this._refiner.render();
+      this.refined = (this.refined || 0) + 1;
+    } else this.renderer.render(this.scene, this.camera);
     this.onRender?.();
+  }
+
+  /**
+   * Qualität „Automatisch“: Bildabstände beim Drehen/Zoomen messen. Liegen sie über 20 Bilder im Mittel über 45 ms
+   * (unter ~22 Bildern/s), schaltet die Ansicht auf „Sparsam“ (bis zum Neuladen).
+   */
+  _measure(t) {
+    if (this.qualityPref !== 'auto' || this.quality === 'low') return;
+    if (this._lastT) {
+      const dt = t - this._lastT;
+      if (dt < 500) (this._dts ??= []).push(dt); // längere Pausen sind kein Ruckeln
+      if (this._dts?.length >= 20) {
+        const avg = this._dts.reduce((a, b) => a + b, 0) / this._dts.length;
+        this._dts = [];
+        if (avg > 45) {
+          this._autoLow = true;
+          this.setQuality('auto');
+          this.onQualityChange?.(this.quality);
+        }
+      }
+    }
+    this._lastT = t;
+  }
+
+  /**
+   * Qualität setzen: 'auto' | 'high' | 'low'. „Automatisch“ beginnt mit „Hoch“, außer das Gerät ist offensichtlich
+   * schwach oder das Messen beim Drehen hat schon zu „Sparsam“ geführt.
+   */
+  setQuality(pref = 'auto') {
+    this.qualityPref = pref;
+    const weak = (navigator.hardwareConcurrency || 8) <= 2 || (navigator.deviceMemory || 8) <= 2;
+    const q = pref === 'auto' ? (this._autoLow || weak ? 'low' : 'high') : pref;
+    if (q === this.quality) return;
+    this.quality = q;
+    const Q = QUALITY[q];
+    const sky = this.skyLight;
+    if (sky && sky.shadow.mapSize.x !== Q.shadowMap) {
+      sky.shadow.mapSize.set(Q.shadowMap, Q.shadowMap);
+      sky.shadow.map?.dispose();
+      sky.shadow.map = null;
+    }
+    if (sky) sky.shadow.radius = Q.shadowRadius;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.maxPixelRatio));
+    this.renderer.shadowMap.needsUpdate = true;
+    this.resize();
   }
 
   /**
@@ -707,6 +789,8 @@ export class HouseScene {
   }
 
   dispose() {
+    this.skyEnv.dispose();
+    this._refiner?.dispose();
     this._resizeObs.disconnect();
     this.controls.dispose();
     this.renderer.dispose();

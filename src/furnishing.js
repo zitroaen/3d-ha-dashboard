@@ -2,12 +2,38 @@
 // Unabhängig vom Hausmodell: lässt sich jederzeit verwerfen und neu aufbauen, ohne das Haus anzufassen.
 // Bezug zum Haus nur über Raum-IDs und Plan-Koordinaten.
 import * as THREE from 'three';
-import { Builder } from './geometry.js';
+import { Builder, heightAt } from './geometry.js';
 import { PartCollector, PALETTE, FURNITURE, LAMPS } from './models.js';
 import { withRoomLight, lampMaterial } from './roomlight.js';
+import { normalFromCanvas, weaveCanvas } from './textures.js';
+
+// Stoffe bekommen ein feines Gewebe (Normalen-Karte), sonst wirken Polster wie Kunststoff
+const FABRIC = /^(fabric|cushion|rug|curtain)/;
 
 // Leuchtende Teile: Farbe im ausgeschalteten Zustand
 const GLOW_OFF = { shade: 0x8f897d, bulb: 0x7d786f, disc: 0x1f1e1c };
+
+// Kein Kontaktschatten: liegt flach am Boden oder hängt an der Wand
+const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers']);
+
+/** Weicher Kontaktschatten (Alpha-Verlauf, Rechteck mit runden Ecken), einmal pro Szene */
+function contactTexture() {
+  const N = 64, data = new Uint8Array(N * N * 4);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      // Abstand zum Rand eines abgerundeten Rechtecks, innen voll, nach außen weich auslaufend
+      const u = Math.abs((x + 0.5) / N * 2 - 1), v = Math.abs((y + 0.5) / N * 2 - 1);
+      const d = Math.hypot(Math.max(u - 0.45, 0), Math.max(v - 0.45, 0)) / 0.55;
+      const a = Math.pow(Math.max(0, 1 - d), 1.6);
+      data.set([0, 0, 0, Math.round(a * 255)], (y * N + x) * 4);
+    }
+  }
+  const t = new THREE.DataTexture(data, N, N);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+}
 
 /** Schlüssel eines bearbeitbaren Objekts, z. B. "item:sofa" oder "lamp:eg_wohnen_stehlampe". */
 export const refKey = (type, id) => `${type}:${id}`;
@@ -41,9 +67,11 @@ export class FurnishingLayer {
 
     const P = new PartCollector();
     const pools = new Builder();
+    const contact = new Builder();
     for (const it of items) {
       const box = this._buildItem(P, it, anchorOf('item', it), exclude.has(refKey('item', it.id)));
       if (box) this._hitBox('item', it, box);
+      if (box && !exclude.has(refKey('item', it.id)) && !NO_CONTACT.has(it.kind) && !((it.elevation ?? 0) > 0.3)) this._contact(contact, it, box);
     }
     for (const lamp of lamps) {
       const box = this._buildLamp(P, lamp, anchorOf('lamp', lamp), exclude.has(refKey('lamp', lamp.id)));
@@ -62,7 +90,40 @@ export class FurnishingLayer {
       this.group.add(hit);
     }
 
+    // Nachts fällt Licht aus erleuchteten Räumen durch die Fenster nach draußen (nur im Erdgeschoss, Schein in der
+    // Lichtfarbe der ersten Leuchte des Raums)
+    const wpools = new Builder();
+    const fl = floorModel.floor;
+    if (!fl.outdoor && Math.abs(fl.elevation || 0) < 0.5) {
+      for (const w of fl.windows || []) {
+        const lamp = lamps.find((l) => l.room === w.room);
+        if (!lamp) continue;
+        const [x0, y0, x1, y1] = w.rect;
+        const alongX = x1 - x0 >= y1 - y0;
+        const cx = (x0 + x1) / 2, cz = (y0 + y1) / 2;
+        const half = alongX ? (y1 - y0) / 2 : (x1 - x0) / 2;
+        // Außenseite: dort liegt kein Raum
+        const out = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dz]) => (alongX ? dx === 0 : dz === 0)
+          && !floorModel.roomAt([cx + dx * (half + 0.3), cz + dz * (half + 0.3)]));
+        if (!out) continue;
+        const L = alongX ? x1 - x0 : y1 - y0, depth = 1.0;
+        const pcx = cx + out[0] * (half + depth), pcz = cz + out[1] * (half + depth);
+        quad(wpools, pcx, pcz, alongX ? L / 2 + 0.5 : depth, alongX ? depth : L / 2 + 0.5, lamp.idx, 0.006);
+      }
+    }
+
     for (const m of P.build((key, kind) => this._material(key, kind))) this.group.add(m);
+    if (!wpools.empty) {
+      const m = new THREE.Mesh(wpools.geometry('lampIdx'), shared.mat.windowPool);
+      m.renderOrder = 3;
+      this.group.add(m);
+    }
+    if (!contact.empty) {
+      shared.contactMat ??= new THREE.MeshBasicMaterial({ map: contactTexture(), transparent: true, depthWrite: false, opacity: 0.55, color: 0x000000 });
+      const m = new THREE.Mesh(contact.geometry(), shared.contactMat);
+      m.renderOrder = 2;
+      this.group.add(m);
+    }
     if (!pools.empty) {
       const m = new THREE.Mesh(pools.geometry('lampIdx'), shared.mat.pool);
       m.renderOrder = 3;
@@ -102,6 +163,29 @@ export class FurnishingLayer {
     return target.bounds.clone().translate(new THREE.Vector3(0, -lamp.height, 0));
   }
 
+  /**
+   * Kontaktschatten unter einem Objekt: weiches Rechteck etwas größer als die Grundfläche, knapp über dem Boden
+   * (im Gelände je Ecke auf der Geländehöhe). Ersetzt teure Umgebungsverdeckung für das „Stehen auf dem Boden“.
+   */
+  _contact(b, it, box) {
+    const at = anchorOf('item', it);
+    const room = this.floorModel.rooms.get(it.room)?.room;
+    const pad = 0.12, sx = (box.max.x - box.min.x) / 2 * 1.15 + pad, sz = (box.max.z - box.min.z) / 2 * 1.15 + pad;
+    const cx = (box.max.x + box.min.x) / 2, cz = (box.max.z + box.min.z) / 2;
+    const r = -THREE.MathUtils.degToRad(at.rot), c = Math.cos(r), s = Math.sin(r);
+    const P = ([lx, lz]) => {
+      const x = at.x + (cx + lx) * c + (cz + lz) * s, z = at.z - (cx + lx) * s + (cz + lz) * c;
+      const y = room?.heights ? heightAt(room.polygon, room.heights, [x, z]) + 0.02 : (it.base || 0) + 0.012;
+      return [x, y, z];
+    };
+    const A = P([-sx, -sz]), B = P([sx, -sz]), C = P([sx, sz]), D = P([-sx, sz]);
+    for (const [p, uv] of [[A, [0, 0]], [C, [1, 1]], [B, [1, 0]], [A, [0, 0]], [D, [0, 1]], [C, [1, 1]]]) {
+      b.pos.push(...p);
+      b.room.push(0);
+      b.uv.push(uv[0], uv[1]);
+    }
+  }
+
   /** Unsichtbare Trefferbox eines Möbels (für Auswahl im Editor). */
   _hitBox(type, e, box) {
     this.boxes.set(refKey(type, e.id), box);
@@ -137,7 +221,18 @@ export class FurnishingLayer {
       else if (key.startsWith('tex:')) {
         // Bildtextur aus dem Datenordner (z. B. tex:textures/gemaelde.jpg)
         cache.set(k, withRoomLight(new THREE.MeshStandardMaterial({ map: this.shared.loadTexture(key.slice(4)), roughness: 0.85 })));
-      } else cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(PALETTE[key] || { color: 0xff00ff })));
+      } else {
+        const params = { ...(PALETTE[key] || { color: 0xff00ff }) };
+        if (FABRIC.test(key)) {
+          this.shared.weave ??= (() => {
+            const t = normalFromCanvas(weaveCanvas(), 1, 2.5, 128);
+            t.repeat.set(10, 10);
+            return t;
+          })();
+          Object.assign(params, { normalMap: this.shared.weave, normalScale: new THREE.Vector2(0.5, 0.5) });
+        }
+        cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(params)));
+      }
     }
     return cache.get(k);
   }

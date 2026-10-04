@@ -39,6 +39,7 @@ export const PALETTE = {
   toy_blue: { color: 0x2f5fa8, roughness: 0.6 },
   // Garten
   bark: { color: 0x5a4330, roughness: 0.95 },
+  birch_bark: { color: 0xe6e1d6, roughness: 0.8 },
   leaf_green: { color: 0x4f7a34, roughness: 0.9 },
   leaf_dark: { color: 0x2f5a2c, roughness: 0.9 },
   leaf_light: { color: 0x7fa046, roughness: 0.9 },
@@ -417,8 +418,8 @@ export const FURNITURE = {
   },
 
   /**
-   * Baum: size = [Kronendurchmesser, –, Höhe]; params.shape round (Laubbaum, Standard) oder conifer (Nadelbaum),
-   * params.color = Laubfarbe (Palette).
+   * Baum: size = [Kronendurchmesser, –, Höhe]; params.shape round (Laubbaum, Standard), conifer (Nadelbaum),
+   * column (Säulenbaum, schmal und hoch) oder birch (Birke: weißer Stamm, lockere Krone); params.color = Laubfarbe.
    */
   tree(P, it) {
     const [Dm, , H] = [it.size?.[0] ?? 3, 0, it.size?.[2] ?? it.size?.[1] ?? 5];
@@ -430,6 +431,24 @@ export const FURNITURE = {
         const y0 = H * (0.15 + i * 0.25), h = H * (0.45 - i * 0.07), rr = r * (1 - i * 0.28);
         P.cyl(c, 0, rr, h, 0, y0, 0, { seg: 10 });
       }
+      return;
+    }
+    if (it.shape === 'column') {
+      P.cyl('bark', 0.07, 0.11, H * 0.2, 0, 0, 0, { seg: 8 });
+      P.blob(it.color || 'leaf_dark', r * 0.5, H * 0.42, r * 0.5, 0, H * 0.55, 0);
+      P.blob(it.color || 'leaf_green', r * 0.38, H * 0.3, r * 0.38, r * 0.12, H * 0.62, 0);
+      return;
+    }
+    if (it.shape === 'birch') {
+      // schlanker weißer Stamm mit dunklen Ringen, mehrere kleine, lockere Kronenteile
+      P.cyl('birch_bark', 0.06, 0.1, H * 0.75, 0, 0, 0, { seg: 8 });
+      for (let i = 0; i < 4; i++) P.cyl('black_matte', 0.101 - i * 0.008, 0.101 - i * 0.008, 0.03, 0, H * (0.12 + i * 0.15), 0, { seg: 8 });
+      const c = it.color || 'leaf_light';
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        P.blob(i % 2 ? 'leaf_green' : c, r * 0.42, r * 0.5, r * 0.42, Math.cos(a) * r * 0.42, H * 0.62 + (i % 3) * r * 0.25, Math.sin(a) * r * 0.42);
+      }
+      P.blob(c, r * 0.4, r * 0.55, r * 0.4, 0, H * 0.82, 0);
       return;
     }
     const c = it.color || 'leaf_green';
@@ -469,7 +488,7 @@ export const FURNITURE = {
         // innen höher als am Rand (Hügelform des Laubs)
         const e = 1 - Math.max(Math.abs(x) / (W / 2), Math.abs(z) / (D / 2)) ** 2;
         const c = it.color || mix[Math.floor(jitter(i * 3 + 1, k * 5 + 2) * mix.length)];
-        P.sphere(c, 0.045, x, H * (0.45 + 0.5 * e), z, { seg: 6 });
+        P.sphere(c, 0.045, x, H * (0.45 + 0.5 * e), z, { seg: 8 });
       }
     }
   },

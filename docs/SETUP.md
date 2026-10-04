@@ -69,7 +69,7 @@ Prüfen: `npm run validate`, dann `npm run serve` und http://127.0.0.1:8123/test
    `data/model.yaml` anpassen (Katalog und Felder: `docs/DATA_MODEL.md`).
 3. Optional den HA-Export (Template in `docs/DATA_MODEL.md`) als `reference/entities.txt` speichern – dann prüft
    `npm test` alle Verknüpfungen, und die Vorschau simuliert HA mit den echten Entities.
-4. Verknüpfen im Panel: Stift → Objekt antippen → **Verknüpfen** öffnet seine Einstellungen: unter **Schalten** bzw.
+4. Verknüpfen im Panel: Zahnrad → **Bearbeiten** → Objekt antippen → **Verknüpfen** öffnet seine Einstellungen: unter **Schalten** bzw.
    **Anzeigen** „+ Entity“ → Entity wählen; darunter, was Antippen, Doppeltippen und langes Drücken tun und ob der
    Zustand über dem Objekt erscheint → **Fertig** (speichert; **Abbrechen** verwirft). In der lokalen Vorschau schreibt
    das direkt nach `data/model.yaml`.
@@ -79,7 +79,7 @@ Prüfen: `npm run validate`, dann `npm run serve` und http://127.0.0.1:8123/test
 ## 4. Möbel
 
 Fotos pro Raum nach `reference/photos/<raum>/` (gitignored). Daraus die Möbel als Objekte in `data/model.yaml`
-anlegen – Katalog und Parameter in `docs/DATA_MODEL.md`. Feinjustieren geht im Panel: Stift → Möbel antippen → verschieben,
+anlegen – Katalog und Parameter in `docs/DATA_MODEL.md`. Feinjustieren geht im Panel: Zahnrad → Bearbeiten → Möbel antippen → verschieben,
 drehen, **Anlegen** an Wand oder Boden → **Fertig**. Bilder an der Wand können eine Textur bekommen
 (`data/textures/`, Feld `texture`). Fehlt ein Modell, ein generisches Modell in der Engine vorschlagen (Issue/PR),
 nicht in `engine/` der Instanz ändern.
@@ -100,17 +100,17 @@ nicht in `engine/` der Instanz ändern.
    einstellen, ebenso Titel und Symbol in der Seitenleiste.
 4. Updates kommen über HACS (danach HA **neu starten**); die Integration hängt ihre Version an die Bundle-Adresse, der
    Browser lädt das neue Bundle also von selbst – aber erst nach dem Neustart. Welche Version das Panel wirklich
-   ausführt und woher das Modell kommt (Demo-Haus, gespeichertes Modell oder `model.yaml`), steht im Link-Check
-   (Ketten-Symbol) unter der Überschrift. Zeigt die iOS-App danach noch den alten Stand: in der App unter
+   ausführt und woher das Modell kommt (Demo-Haus, gespeichertes Modell oder `model.yaml`), steht im
+   Zahnrad-Menü unter „Info“. Zeigt die iOS-App danach noch den alten Stand: in der App unter
    Einstellungen → Companion App → Fehlerbehebung den Frontend-Cache zurücksetzen.
 
 **Gemeinsames Modell (nur mit der Integration):** Das Dashboard ist für alle Benutzer gleich. **Fertig** im Editor
 speichert das ganze Modell in der Integration (`/config/.storage/ha_3d_dashboard.model`, Teil jedes HA-Backups); alle
-offenen Panels übernehmen es sofort. Bearbeiten dürfen nur Administratoren, alle anderen sehen keinen Stift.
+offenen Panels übernehmen es sofort. Bearbeiten dürfen nur Administratoren, alle anderen sehen im Zahnrad-Menü kein „Bearbeiten“.
 - **Import:** eine neue `model.yaml` in den Datenordner legen und das Panel neu öffnen. Eine Datei, die sich seit dem
   letzten Speichern geändert hat (oder neu ist), **ersetzt** das gespeicherte Modell – vorher exportieren, wenn im
   Editor Änderungen gemacht wurden, die erhalten bleiben sollen.
-- **Export:** Stift → **Export** lädt das aktuelle Modell als `model.yaml` herunter (z. B. für `data/` der Instanz).
+- **Export:** Zahnrad → Bearbeiten → **Export** lädt das aktuelle Modell als `model.yaml` herunter (z. B. für `data/` der Instanz).
 - Nach dem ersten Speichern braucht das Panel die Datei nicht mehr: Wer den Grundriss nicht unter `/local/` (ohne
   Anmeldung, siehe unten) liegen lassen möchte, kann `model.yaml` dann aus dem Datenordner löschen; nur `textures/`
   bleibt dort.

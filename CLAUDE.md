@@ -59,6 +59,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run package` | `dist/ha_3d_dashboard.zip` (Integration + Bundle, für HACS; nach `npm run build`) |
 | `bash tests/ha/install.sh && python -m pytest tests/ha` | Tests der HA-Integration (Python ≥ 3.13) |
 | `npm run demo` | Demo-Haus aus `examples/demo/build-house.mjs` neu erzeugen |
+| `npm run test:perf` | Leistungsbudget: Zeichenaufrufe und Dreiecke pro Bild (Teil von `npm test`) |
 | `npm run test:unit` | Modell: Migration, YAML, Szenen-Adapter, Zurückschreiben (Teil von `npm test`) |
 | `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude) |
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
@@ -68,7 +69,8 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 
 ## Code-Aufbau
 
-- `src/main.js` Custom Element, Kompass, Editier-Werkzeugleiste, Link-Check, HA-Anbindung
+- `src/main.js` Custom Element, Kompass, Editier-Werkzeugleiste, Link-Check, HA-Anbindung · `src/menu.js` Einstellungsmenü
+  (Zahnrad: Tageszeit, Qualität, Bearbeiten, Link-Check, Info; Ansicht pro Gerät in localStorage)
 - `src/model/` Datenmodell: `model.js` (Parsen, `toScene()` = Adapter Modell → Szene, `writeBack()` Editor → Modell,
   Gesten/Aktionen), `migrate.js` (Version, Migrationen), `catalog.js` (Modellkatalog mit Fähigkeiten), `yaml.js`
   (YAML-Schreiber) · `schema/model.schema.json` JSON-Schema
@@ -78,12 +80,13 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen)
 - `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE`
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
+- `src/environment.js` Himmel als Umgebung (PMREM, Spiegelungen) · `src/refine.js` Ruhebild-Verfeinerung (GTAO)
 - `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (ganzes Modell
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
   · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige) · `src/ha.js` Zustand/Dienste
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
-  (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
+  (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `performance.mjs` (Leistungsbudget), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
 - `custom_components/ha_3d_dashboard/` HA-Integration: Config-Flow (ein Klick), liefert `frontend/ha-3d-dashboard.js`
   aus (nur im Release-Zip) und registriert das Panel `/haus-3d`; Optionen Titel, Symbol, `data_url`; `storage.py`
   gemeinsames Modell (WebSocket `ha_3d_dashboard/model/get|save|subscribe`)
@@ -165,3 +168,12 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   gewählte Ebene. Die Bodenplatte einer oberen Etage reicht als Geschossdecke bis auf die Wände darunter.
 - Version im Bundle (`__HA3D_VERSION__`, esbuild define aus package.json): Konsole und Link-Check zeigen Version und
   Datenquelle – zum Prüfen, ob nach einem Update wirklich das neue Bundle läuft.
+- Realismus ohne Dauerkosten (0.11.0): Render-on-demand heißt, Einmal- und Stillstands-Kosten sind fast gratis.
+  Umgebung (PMREM-Himmel je Tageszeit, nur bei merklicher Änderung neu) für Spiegelungen; Normalen-Karten aus den
+  vorhandenen Texturen (Fugen/Maserung), Putz, Gewebe; Kontaktschatten als weiche Rechtecke unter Objekten statt
+  teurer Verdeckung pro Bild; Sockelleisten; Lichtschein vor erleuchteten Fenstern (lampIdx der ersten Leuchte).
+  Qualität „Hoch“: im Stillstand GTAO (`refine.js`, ohne Trefferflächen/Durchsichtiges), in Bewegung das schnelle
+  Bild. „Automatisch“ misst Bildabstände beim Drehen (> 45 ms im Mittel -> „Sparsam“: kleinere Schatten-Map,
+  geringere Auflösung, keine Verfeinerung). `tests/performance.mjs` begrenzt Zeichenaufrufe/Dreiecke.
+- Einstellungsmenü (0.11.0): Zahnrad statt Stift und Ketten-Knopf; Bearbeiten nur für Administratoren
+  (`readonly`); Tageszeit Automatisch/Tag/Nacht überschreibt sun.sun (zum Testen, Wand-Tablets).

@@ -296,7 +296,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
 | `toy_storage` | Möbel | | | `columns` |
-| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`), `color` |
+| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`, `column`, `birch`), `color` |
 | `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
 | `ball` | Leuchte | `light` | | `radius` |
 | `chandelier_candles` | Leuchte | `light` | | `arms` |
@@ -485,6 +485,7 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.11.0, abwärtskompatibel):** `tree` mit `shape: column` (Säulenbaum) und `birch` (Birke).
 - **Version 2, Ergänzung (0.9.0, abwärtskompatibel):** Gelände – Eckpunkte von Außenbereichen mit Höhe
   `[x, y, z]`; Katalog-Art „Pflanze“ mit `tree`, `shrub`, `flowers`.
 - **Version 2, Ergänzung (0.8.0, abwärtskompatibel):** `ha.badge`; Standardaktionen für Leuchten; „Umschalten“ schaltet

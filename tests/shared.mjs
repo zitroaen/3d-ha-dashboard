@@ -96,9 +96,10 @@ try {
   const user = await guardedPage(browser, base, errors, { viewport: { width: 1600, height: 1000 }, label: 'benutzer', query: '?shared=1&user=1' });
   const ro = await user.evaluate(() => ({
     readonly: window.panel.hasAttribute('readonly'),
-    pen: getComputedStyle(window.panel.shadowRoot.querySelector('.edit-toggle')).display,
+    edit: (window.panel._toggleMenu(true), !!window.panel.shadowRoot.querySelector('.settings button[data-act="edit"]')),
+    links: !!window.panel.shadowRoot.querySelector('.settings button[data-act="links"]'),
   }));
-  ok(ro.readonly && ro.pen === 'none', 'gemeinsam: ohne Administratorrechte kein Stift', `Benutzer ${JSON.stringify(ro)}`);
+  ok(ro.readonly && !ro.edit && ro.links, 'gemeinsam: ohne Administratorrechte kein „Bearbeiten“ im Menü', `Benutzer ${JSON.stringify(ro)}`);
   await user.close();
 
   // weder Datei noch gespeichertes Modell -> Demo-Haus; gespeichertes Modell ohne Datei -> das Modell

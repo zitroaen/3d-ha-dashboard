@@ -25,6 +25,10 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   und Blumen aus dem Katalog.
 - **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden.
 - **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
+- **Einstellungen (Zahnrad):** Tageszeit Automatisch/Tag/Nacht, Qualität Automatisch/Hoch/Sparsam, Bearbeiten,
+  Link-Check, Version.
+- **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten; im Stillstand ein
+  verfeinertes Bild mit Raumschatten. Gerechnet wird nur, wenn sich etwas ändert.
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,
   mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), Gesten und Zustandsanzeige je
   Objekt einstellen, speichern.
@@ -45,7 +49,7 @@ Ohne Build, ohne YAML und ohne eigene Hausdaten – das Panel bringt das erfunde
    [![Integration hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ha_3d_dashboard)
 
 In der Seitenleiste erscheint **Haus 3D**. Ohne eigene Daten zeigt es das Demo-Haus: Seine Leuchten sind mit nichts
-verknüpft und schalten **lokal**; Sonne und Mond folgen `sun.sun`. Zum Ausprobieren mit echten Lampen: Stift → Leuchte
+verknüpft und schalten **lokal**; Sonne und Mond folgen `sun.sun`. Zum Ausprobieren mit echten Lampen: Zahnrad → Bearbeiten → Leuchte
 antippen → **Verknüpfen** → eigene Lampe wählen – dann schaltet sie über HA, und langes Drücken öffnet ihren HA-Dialog.
 **Fertig** speichert Änderungen am Demo-Haus in deinem HA-Benutzerkonto, getrennt von den Daten deines eigenen Hauses;
 **Abbrechen** verwirft sie.

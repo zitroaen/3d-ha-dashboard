@@ -145,6 +145,18 @@ export function groundTexture() {
   const r = rng(11);
   g.fillStyle = '#26352a';
   g.fillRect(0, 0, size, size);
+  // großflächige Schwankung (trockenere und sattere Stellen), kachelbar durch Wiederholung an den Rändern
+  for (let k = 0; k < 14; k++) {
+    const x = r() * size, y = r() * size, rad = size * (0.12 + r() * 0.18);
+    const light = r() > 0.5;
+    for (const [ox, oy] of [[0, 0], [size, 0], [-size, 0], [0, size], [0, -size]]) {
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, rad);
+      gr.addColorStop(0, light ? 'rgba(80,100,55,0.07)' : 'rgba(12,26,16,0.08)');
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, size, size);
+    }
+  }
   for (let k = 0; k < 9000; k++) {
     const l = 14 + r() * 16;
     g.fillStyle = `hsla(${95 + r() * 25}, 30%, ${l}%, 0.5)`;
@@ -166,5 +178,112 @@ export function glowTexture() {
   g.fillRect(0, 0, size, size);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Oberflächenstruktur: Normalen-Karten (Fugen, Maserung, Putz, Gewebe) – einmal pro Szene berechnet, pro Bild kostenlos.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Normalen-Karte aus der Helligkeit eines Canvas (dunkel = tiefer, z. B. Fugen). Halbe Auflösung reicht.
+ * @param strength  Steilheit der Kanten
+ */
+export function normalFromCanvas(src, metersPerRepeat, strength = 2, size = 512) {
+  const c = canvas(size, size);
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(src, 0, 0, size, size);
+  const px = g.getImageData(0, 0, size, size).data;
+  const h = new Float32Array(size * size);
+  for (let i = 0; i < h.length; i++) h[i] = (px[i * 4] * 0.299 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.114) / 255;
+  const out = g.createImageData(size, size);
+  const at = (x, y) => h[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * strength, dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+      const len = Math.hypot(dx, dy, 1);
+      const o = (y * size + x) * 4;
+      out.data[o] = (-dx / len * 0.5 + 0.5) * 255;
+      out.data[o + 1] = (dy / len * 0.5 + 0.5) * 255;
+      out.data[o + 2] = (1 / len * 0.5 + 0.5) * 255;
+      out.data[o + 3] = 255;
+    }
+  }
+  g.putImageData(out, 0, 0);
+  return toTexture(c, metersPerRepeat, false);
+}
+
+/** Kachelbares Rauschen (Wertrauschen, mehrere Oktaven) als Graustufen-Canvas */
+export function noiseCanvas(size = 256, seed = 11, cells = 8, octaves = 4) {
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const img = g.createImageData(size, size);
+  const r = rng(seed);
+  const grids = [];
+  for (let o = 0; o < octaves; o++) {
+    const n = cells << o;
+    grids.push({ n, v: Float32Array.from({ length: n * n }, () => r()) });
+  }
+  const smooth = (t) => t * t * (3 - 2 * t);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let v = 0, amp = 1, sum = 0;
+      for (const { n, v: gv } of grids) {
+        const fx = (x / size) * n, fy = (y / size) * n;
+        const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = smooth(fx - x0), ty = smooth(fy - y0);
+        const G = (i, j) => gv[((j % n) * n) + (i % n)];
+        const a = G(x0, y0) + (G(x0 + 1, y0) - G(x0, y0)) * tx;
+        const b = G(x0, y0 + 1) + (G(x0 + 1, y0 + 1) - G(x0, y0 + 1)) * tx;
+        v += (a + (b - a) * ty) * amp;
+        sum += amp;
+        amp *= 0.5;
+      }
+      const o = (y * size + x) * 4, k = (v / sum) * 255;
+      img.data[o] = img.data[o + 1] = img.data[o + 2] = k;
+      img.data[o + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+/** Feines Gewebe (Leinwandbindung) als Graustufen-Canvas für Polster, Teppiche, Vorhänge */
+export function weaveCanvas(size = 128, threads = 32) {
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const s = size / threads;
+  g.fillStyle = '#808080';
+  g.fillRect(0, 0, size, size);
+  for (let i = 0; i < threads; i++) {
+    for (let j = 0; j < threads; j++) {
+      const over = (i + j) % 2 === 0;
+      const grad = g.createLinearGradient(i * s, j * s, over ? (i + 1) * s : i * s, over ? j * s : (j + 1) * s);
+      grad.addColorStop(0, '#5a5a5a');
+      grad.addColorStop(0.5, '#c8c8c8');
+      grad.addColorStop(1, '#5a5a5a');
+      g.fillStyle = grad;
+      g.fillRect(i * s + 0.5, j * s + 0.5, s - 1, s - 1);
+    }
+  }
+  return c;
+}
+
+/** Farbtextur aus Rauschen (Kies, Erde): Grundfarbe [r, g, b] mit Helligkeitsschwankung */
+export function speckleTexture(rgb, metersPerRepeat, seed = 5, spread = 0.35) {
+  const n = noiseCanvas(256, seed, 24, 3);
+  const c = canvas(256, 256);
+  const g = c.getContext('2d');
+  const src = n.getContext('2d').getImageData(0, 0, 256, 256).data;
+  const img = g.createImageData(256, 256);
+  for (let i = 0; i < src.length; i += 4) {
+    const f = 1 + (src[i] / 255 - 0.5) * spread * 2;
+    img.data[i] = Math.min(255, rgb[0] * f);
+    img.data[i + 1] = Math.min(255, rgb[1] * f);
+    img.data[i + 2] = Math.min(255, rgb[2] * f);
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = toTexture(c, metersPerRepeat);
+  t.userData.source = n;
   return t;
 }
