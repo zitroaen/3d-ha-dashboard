@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.13.0
+
+- **Glas-Design:** Alle Bedienelemente sind durchscheinend mit Weichzeichner und feiner Lichtkante, die Formen sind
+  eckiger. Ausgewählte Optionen erscheinen invertiert.
+- **Stockwerk-Auswahl** als eine durchgehende Glas-Leiste (obere Ebene oben, gewählte Ebene invertiert).
+- **Darstellung Automatisch / Hell / Dunkel** im Zahnrad-Menü; Automatisch folgt dem Hell-/Dunkel-Modus von Home
+  Assistant. Die 3D-Szene bleibt davon unberührt (sie folgt Tageszeit und Wetter).
+
 ## 0.12.0
 
 - **Wetter:** Das Panel nimmt das Wetter aus Home Assistant (`weather.home` bzw. die erste `weather.*`, oder fest

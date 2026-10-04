@@ -183,3 +183,7 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   (Compositing, kein Neurendern; reduzierte Bewegung respektiert) – die Regel „keine Dauerschleife“ gilt fürs WebGL.
   Wetter-Entity: `site.weather` oder automatisch. Testschalter im Menü wie bei der Tageszeit.
 - Kompass: Nadel ohne CSS-Übergang und im `onRender` nachgeführt (vorher 80 ms Verzögerung beim Drehen).
+- Glas-Design (0.13.0): Farben und Radien als CSS-Variablen auf `:host` (`--g-*`, `--r-*`), Hell über
+  `:host([theme="light"])`. Darstellung Automatisch folgt `hass.themes.darkMode` (ohne HA: prefers-color-scheme).
+  Ausgewählt = invertiert (`--g-sel-*`), Bernstein (`--g-accent`) nur für Zustände. Neue Elemente nutzen die
+  Variablen statt fester Farben.

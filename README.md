@@ -27,7 +27,7 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Temperatur oben, antippen zeigt die Vorhersage.
 - **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden.
 - **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
-- **Einstellungen (Zahnrad):** Tageszeit Automatisch/Tag/Nacht, Qualität Automatisch/Hoch/Sparsam, Bearbeiten,
+- **Einstellungen (Zahnrad):** Darstellung Hell/Dunkel (Glas-Design, folgt HA), Tageszeit Automatisch/Tag/Nacht, Qualität Automatisch/Hoch/Sparsam, Bearbeiten,
   Link-Check, Version.
 - **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten; im Stillstand ein
   verfeinertes Bild mit Raumschatten. Gerechnet wird nur, wenn sich etwas ändert.
