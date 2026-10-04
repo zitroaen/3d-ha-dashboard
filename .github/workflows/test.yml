@@ -15,8 +15,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Schnelle Prüfungen ohne Browser: Datenschutz, Integration, Daten, Unit-Tests, Link-Check
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run checks
+
+  # Browser-Tests parallel auf eigenen Runnern (Software-WebGL ist langsam; zusammen dauerte es über 10 Minuten)
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [screens, interaction, rest]
     env:
       # Google Chrome ist auf den GitHub-Runnern vorinstalliert – kein Browser-Download nötig
       PW_CHANNEL: chrome
@@ -27,9 +44,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm run build
+      - if: matrix.suite == 'screens'
+        run: npm run test:screens
+      - if: matrix.suite == 'interaction'
+        run: npm run test:interaction
+      - if: matrix.suite == 'rest'
+        run: npm run test:demo && npm run test:shared && npm run test:perf
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && matrix.suite == 'screens'
         with:
           name: screenshots
           path: tests/output/
