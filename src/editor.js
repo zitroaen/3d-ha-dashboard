@@ -61,6 +61,7 @@ export class Editor {
       tc.addEventListener('change', () => view.requestRender());
       tc.addEventListener('dragging-changed', (e) => {
         view.controls.enabled = !e.value;
+        view._dragging = e.value; // beim Ziehen schnelle Bilder, danach verfeinern
         if (e.value) {
           this._pushUndo();
           view.suppressTap = true;

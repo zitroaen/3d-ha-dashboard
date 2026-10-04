@@ -461,6 +461,7 @@ class Ha3dDashboard extends HTMLElement {
       objectGestures: (ref) => this._gesturesOf(ref),
       onViewChange: () => this._updateCompass(),
       onRender: () => this._placeBadges(),
+      onQualityChange: () => this.menu?.isOpen && this._toggleMenu(true),
     });
     this._updateCompass();
     this.areaMap = data.areaMap || {};
