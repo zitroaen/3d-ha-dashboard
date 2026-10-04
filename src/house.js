@@ -4,8 +4,9 @@
 import * as THREE from 'three';
 import { Builder, pointInPoly } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
-import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture } from './textures.js';
+import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
+import { buildPitchedRoof, ceilingFn, ceilingProfile } from './roof.js';
 
 const DOOR_HEIGHT = 2.05;
 // Jeder Raumboden liegt minimal höher als der vorige: Raumpolygone überlappen in den Türöffnungen,
@@ -34,6 +35,8 @@ export class FloorModel {
     });
 
     this.H = floor.ceiling;
+    // Oberste Etage unter einem Steildach: Wände enden unter der Dachfläche
+    this.ceilingAt = floor.roofCut ? ceilingFn(floor.roofCut, this.H) : null;
     this._build();
   }
 
@@ -76,7 +79,11 @@ export class FloorModel {
     // --- Böden pro Raum (Hit-Meshes zum Antippen + gemeinsame Geometrie je Bodenbelag)
     for (const r of this.rooms.values()) {
       const y = (r.room.elevation || 0) + r.order * FLOOR_STEP;
-      const kind = this.shared.mat[r.room.floor] ? r.room.floor : 'parquet';
+      if (r.room.roof) {
+        this._pitchedRoof(r, floors, walls, B);
+        continue;
+      }
+      const kind = this.shared.surface(r.room.floor, r.room.color);
       const fb = (floors[kind] ??= new Builder());
       const uvStart = fb.uv.length;
       const hs = r.room.heights; // Gelände: Höhe je Eckpunkt
@@ -117,6 +124,7 @@ export class FloorModel {
 
     // --- Prismen (Wände, Brüstungen, Stürze): Seitenflächen bekommen den Raum, in den sie zeigen
     const prism = (poly, y0, y1, capRoom = 0) => {
+      const cut = this.ceilingAt && y1 >= H - 0.01;
       for (let i = 0; i < poly.length; i++) {
         let a = poly[i], b = poly[(i + 1) % poly.length];
         const dx = b[0] - a[0], dz = b[1] - a[1];
@@ -128,10 +136,18 @@ export class FloorModel {
           [a, b] = [b, a];
           n = [-n[0], -n[1]];
         }
-        walls.quadV(a, b, y0, y1, this.roomBeside(mid, n));
+        if (cut) {
+          // unter dem Steildach: Oberkante folgt der Dachfläche
+          const prof = ceilingProfile(floor.roofCut, this.ceilingAt, a, b);
+          for (let k = 0; k + 1 < prof.length; k++) {
+            const A = prof[k], C = prof[k + 1];
+            if (A.y > y0 + 1e-3 || C.y > y0 + 1e-3) walls.quadVT(A.p, C.p, y0, Math.max(A.y, y0), Math.max(C.y, y0), this.roomBeside(mid, n));
+          }
+        } else walls.quadV(a, b, y0, y1, this.roomBeside(mid, n));
       }
       // Oben auf Wandhöhe: dunkle Schnittfläche; darunter (Fensterbank): Wandmaterial
-      if (y1 >= H - 0.01) caps.polyH(poly, y1, 0);
+      if (cut) this._cutCap(caps, poly, y0);
+      else if (y1 >= H - 0.01) caps.polyH(poly, y1, 0);
       else walls.polyH(poly, y1, capRoom);
     };
 
@@ -167,10 +183,11 @@ export class FloorModel {
       const edge = (floors.roof_edge ??= new Builder());
       const t = floor.roofThickness ?? 0.2;
       for (const r of this.rooms.values()) {
-        const poly = r.room.polygon;
+        if (r.room.roof) continue;
+        const poly = r.room.polygon, y = r.room.elevation || 0, rt = r.room.thickness ?? t;
         for (let i = 0; i < poly.length; i++) {
           const a = poly[i], b = poly[(i + 1) % poly.length];
-          edge.skirt(a, -t - 0.01, 0.12, b, -t - 0.01, 0.12, r.idx);
+          edge.skirt(a, y - rt - 0.01, y + 0.12, b, y - rt - 0.01, y + 0.12, r.idx);
         }
       }
     }
@@ -188,7 +205,7 @@ export class FloorModel {
       this.group.add(m);
       return m;
     };
-    for (const [kind, b] of Object.entries(floors)) add(b, S.mat[kind]);
+    for (const [kind, b] of Object.entries(floors)) add(b, S.mat[kind], { cast: kind.startsWith('roof') || kind === 'soffit' || kind === 'chimney' });
     add(walls, S.mat.wall, { cast: true });
     add(caps, S.mat.cap, { cast: true });
     add(B.pvc, S.mat.pvc, { cast: true });
@@ -197,6 +214,55 @@ export class FloorModel {
     add(B.doorDark, S.mat.doorDark, { cast: true });
     add(B.metal, S.mat.metal);
     add(B.glass, S.mat.glass, { receive: false, order: 2 });
+  }
+
+  /** Steildach-Teil der Dach-Etage: Flächen, Untersicht, Blende, Giebel, Gauben, Schornsteine; Antippen auf der Fläche */
+  _pitchedRoof(r, floors, walls, B) {
+    const surf = new Builder();
+    const kind = this.shared.surface(r.room.floor, r.room.color);
+    buildPitchedRoof(r.room, r.idx, {
+      surf,
+      under: (floors.soffit ??= new Builder()),
+      edge: (floors.roof_edge ??= new Builder()),
+      chimney: (floors.chimney ??= new Builder()),
+      walls,
+      glass: B.glass,
+      pvc: B.pvc,
+    }, -(this.floor.roofThickness ?? 0.2));
+    // Dachfläche in den gemeinsamen Builder des Belags übernehmen, eigene Kopie als Treffer-Fläche
+    const fb = (floors[kind] ??= new Builder());
+    fb.pos.push(...surf.pos);
+    fb.uv.push(...surf.uv);
+    fb.room.push(...surf.room);
+    const mesh = new THREE.Mesh(surf.geometry(), this.shared.hitMaterial);
+    mesh.userData.roomId = r.room.id;
+    r.hitMesh = mesh;
+    this.group.add(mesh);
+  }
+
+  /** Oberseite einer Wand unter dem Steildach: Band entlang der Wand, Höhe aus der Dachfläche */
+  _cutCap(caps, poly, y0) {
+    const C = this.ceilingAt, cut = this.floor.roofCut;
+    if (poly.length !== 4) {
+      // Sonderform: Ecken auf die Dachfläche (Näherung)
+      caps.polyT(poly, poly.map((p) => Math.max(y0, C(p))), 0);
+      return;
+    }
+    // Rechteck: an der längeren Seite entlang, gegenüberliegende Seite parallel
+    const d = (i) => Math.hypot(poly[(i + 1) % 4][0] - poly[i][0], poly[(i + 1) % 4][1] - poly[i][1]);
+    const s = d(0) >= d(1) ? 0 : 1;
+    const a0 = poly[s], a1 = poly[(s + 1) % 4], b0 = poly[(s + 3) % 4], b1 = poly[(s + 2) % 4];
+    const ts = new Set([...ceilingProfile(cut, C, a0, a1), ...ceilingProfile(cut, C, b0, b1)].map((x) => x.t));
+    const L = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    const list = [...ts].sort((x, y) => x - y);
+    for (let i = 0; i + 1 < list.length; i++) {
+      const [t0, t1] = [list[i], list[i + 1]];
+      const q = [L(a0, a1, t0), L(a0, a1, t1), L(b0, b1, t1), L(b0, b1, t0)];
+      const Y = q.map((p) => Math.max(y0, C(p)));
+      const v = q.map((p, k) => [p[0], Y[k], p[1]]);
+      caps.triUV(v[0], v[1], v[2], [0, 0], [0, 0], [0, 0], 0, true);
+      caps.triUV(v[0], v[2], v[3], [0, 0], [0, 0], [0, 0], 0, true);
+    }
   }
 
   /**
@@ -323,6 +389,8 @@ export function createSharedMaterials() {
   soil.repeat.set(1 / 0.8, 1 / 0.8);
   const roofTex = speckleTexture([78, 80, 84], 0.7, 13, 0.25);
   roofTex.repeat.set(1 / 0.7, 1 / 0.7);
+  const tilesRoof = roofTileTexture();
+  tilesRoof.repeat.set(1 / 1.2, 1 / 1.2);
   const slabs = slabTexture();
   slabs.repeat.set(1 / 1.2, 1 / 1.2);
   const stone = stoneTexture();
@@ -343,6 +411,10 @@ export function createSharedMaterials() {
     // Flachdach: dunkle Dachbahn; Dachrand/Attika in hellem Metall
     roof: lit({ map: roofTex, normalMap: relief(roofTex, 4), normalScale: N(0.6), roughness: 0.95 }, { weather: true }),
     roof_edge: lit({ color: 0xa9adb1, roughness: 0.5, metalness: 0.3 }, { weather: true }),
+    // Steildach: Ziegel (Farbe je Dach über `color`, Standard Ziegelrot), Untersicht des Überstands, Schornstein
+    roof_tiles: lit({ map: tilesRoof, normalMap: relief(tilesRoof, 6), normalScale: N(0.9), color: 0xa4553b, roughness: 0.8 }, { weather: true }),
+    soffit: lit({ color: 0xe9e4da, roughness: 0.8 }),
+    chimney: lit({ color: 0x8a5a48, normalMap: plaster, normalScale: N(0.4), roughness: 0.9 }, { weather: true }),
     slabs: lit({ map: slabs, normalMap: relief(slabs, 8), normalScale: N(0.7), roughness: 0.75 }, { weather: true }),
     stone: lit({ map: stone, normalMap: relief(stone, 10), normalScale: N(1.2), roughness: 0.95 }, { weather: true }),
     wood: lit({ color: 0x8a6440, roughness: 0.7 }, { weather: true }),
@@ -364,7 +436,19 @@ export function createSharedMaterials() {
     // Lichtschein vor erleuchteten Fenstern (schwächer als eine Außenleuchte)
     windowPool: lampMaterial({ map: glowTexture(), strength: 0.06, additive: true }),
   };
+  // Oberfläche mit eigener Farbe (z. B. Dachziegel anthrazit): Kopie des Materials, einmal je Farbe
+  const surface = (kind, color) => {
+    if (!mat[kind]) kind = 'parquet';
+    if (color == null) return kind;
+    const key = `${kind}:${color}`;
+    if (!mat[key]) {
+      const m = mat[kind].clone();
+      m.color = new THREE.Color(color);
+      mat[key] = withRoomLight(m, mat[kind].userData.roomLightOpts || {});
+    }
+    return key;
+  };
   const hitMaterial = new THREE.MeshBasicMaterial({ visible: false });
   const lampHitGeometry = new THREE.SphereGeometry(0.35, 8, 6);
-  return { mat, hitMaterial, lampHitGeometry };
+  return { mat, surface, hitMaterial, lampHitGeometry };
 }

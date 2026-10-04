@@ -150,13 +150,14 @@ export class FurnishingLayer {
     target.begin(at.x, at.z, at.rot, this._roomIdx(it.room), at.y - (it.elevation ?? 0));
     target.objId = it.id;
     const room = this.floorModel.rooms.get(it.room)?.room;
-    make(target, it, { ceiling: room?.ceiling ?? this.floorModel.floor.ceiling });
+    make(target, it, { ceiling: this.floorModel.ceilingAt?.([at.x, at.z]) ?? room?.ceiling ?? this.floorModel.floor.ceiling });
     return target.bounds.clone().translate(new THREE.Vector3(0, -(it.elevation ?? 0), 0));
   }
 
   _buildLamp(P, lamp, at, skip = false) {
     const room = this.floorModel.rooms.get(lamp.room);
-    const ceiling = room?.ceiling ?? this.floorModel.floor.ceiling;
+    // unter einer Dachschräge hängt die Leuchte an der Schräge
+    const ceiling = this.floorModel.ceilingAt?.([at.x, at.z]) ?? room?.ceiling ?? this.floorModel.floor.ceiling;
     let model = lamp.model || (lamp.kind === 'wall' ? 'wall_box' : 'disc');
     if (!LAMPS[model]) {
       this.warnings.push(`Leuchte ${lamp.id}: unbekanntes Modell "${lamp.model}"`);

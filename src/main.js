@@ -535,8 +535,10 @@ class Ha3dDashboard extends HTMLElement {
     this.shadowRoot.querySelector('.floor').textContent = v.levelName();
     const el = this.shadowRoot.querySelector('.levels');
     el.hidden = v.levels.length < 2;
+    // Ebene nur mit Dächern (über der obersten): „Dach“
+    const label = (l) => (v.levelName(l) === 'Dach' ? 'Dach' : Ha3dDashboard.levelLabel(l));
     el.innerHTML = [...v.levels].reverse().map((l) =>
-      `<button data-level="${l}" class="${l === v.level ? 'on' : ''}" aria-label="Ebene ${Ha3dDashboard.levelLabel(l)}">${Ha3dDashboard.levelLabel(l)}</button>`).join('');
+      `<button data-level="${l}" class="${l === v.level ? 'on' : ''}" aria-label="Ebene ${label(l)}">${label(l)}</button>`).join('');
   }
 
   _createView(data) {

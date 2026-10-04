@@ -12,7 +12,8 @@
 import { load as parseYaml } from 'js-yaml';
 import { CATALOG, DEFAULT_MOUNT, hasCapability } from './catalog.js';
 import { migrate } from './migrate.js';
-import { heightAt } from '../geometry.js';
+import { heightAt, pointInPoly } from '../geometry.js';
+import { roofShape } from '../roofshape.js';
 
 export { MODEL_VERSION, ModelVersionError } from './migrate.js';
 
@@ -48,8 +49,9 @@ export function spacesOf(model) {
     }
   }
   for (const b of model.buildings || []) {
-    const roof = roofOf(b);
-    if (roof && !out.has(roof.id)) out.set(roof.id, { kind: 'roof', building: b, floorKey: `${b.id}/${ROOF_FLOOR}`, room: roof, base: roof.elevation, height: 3 });
+    for (const roof of roofParts(b)) {
+      if (!out.has(roof.id)) out.set(roof.id, { kind: 'roof', building: b, floorKey: `${b.id}/${ROOF_FLOOR}`, room: roof, base: roof.elevation + roof.offset, height: 3 });
+    }
   }
   for (const z of model.outdoor || []) {
     out.set(z.id, { kind: 'outdoor', floorKey: OUTDOOR_FLOOR, room: z, base: z.elevation || 0, height: 3 });
@@ -82,20 +84,50 @@ function convexHull(pts) {
 }
 
 /**
- * Dach eines Gebäudes (Flachdach über der obersten Etage): sichtbar, sobald eine höhere Ebene gezeigt wird (z. B.
- * die Garage, wenn das 1. OG des Hauses gewählt ist). Ein eigener Bereich – Objekte darauf (Balkonkraftwerk …) haben
- * `space: <Dach-ID>`. `roof: false` = kein Dach. Standard-ID `<Gebäude-ID>_dach`, Umriss = Hülle der obersten Etage.
+ * Dächer eines Gebäudes: sichtbar, sobald eine höhere Ebene gezeigt wird (z. B. die Garage, wenn das 1. OG des
+ * Hauses gewählt ist). `roof` ist ein Dachteil oder eine Liste (Hauptdach + Anbau, Dachterrasse …); `roof: false` =
+ * kein Dach. Jeder Teil ist ein eigener Bereich (Objekte darauf: `space: <ID>`). Standard-ID `<Gebäude-ID>_dach`
+ * (weitere `_dach_2` …), Umriss = konvexe Hülle der obersten Etage.
+ *
+ * Höhen: `eaves` (Traufe/Kniestock) über dem Fußboden der obersten Etage, Standard deren Höhe (Dach auf der
+ * Geschossdecke). Die Dach-Etage liegt auf Geschosshöhe + Dicke des ersten Teils; `offset` = Lage eines Teils darin
+ * (Oberseite an der Traufe), `elevation` = Höhe der Dach-Etage.
  */
-export function roofOf(b) {
-  if (b.roof === false || !b.floors?.length) return null;
-  const r = b.roof || {};
+export function roofParts(b) {
+  if (b.roof === false || !b.floors?.length) return [];
+  const list = Array.isArray(b.roof) ? b.roof : [b.roof || {}];
   const top = topFloor(b);
-  const polygon = r.polygon || convexHull([...top.walls.flatMap((w) => w.polygon), ...top.rooms.flatMap((x) => x.polygon)]);
-  return {
-    id: r.id || `${b.id}_dach`, name: r.name || 'Dach', surface: r.surface || 'roof', polygon,
-    level: (top.level ?? 0) + 1, thickness: r.thickness ?? 0.2,
-    elevation: (top.elevation || 0) + (top.height ?? 2.5) + (r.thickness ?? 0.2),
-  };
+  const H = top.height ?? 2.5;
+  const hull = () => convexHull([...top.walls.flatMap((w) => w.polygon), ...top.rooms.flatMap((x) => x.polygon)]);
+  const t0 = list[0]?.thickness ?? 0.2;
+  return list.map((r, i) => {
+    const type = r.type || 'flat';
+    const t = r.thickness ?? 0.2, eaves = r.eaves ?? H;
+    const part = {
+      ...r,
+      id: r.id || (i ? `${b.id}_dach_${i + 1}` : `${b.id}_dach`),
+      name: r.name || 'Dach',
+      type,
+      pitched: type !== 'flat',
+      surface: r.surface || (type === 'flat' ? 'roof' : 'roof_tiles'),
+      polygon: r.polygon || hull(),
+      level: (top.level ?? 0) + 1,
+      thickness: t,
+      eaves,
+      elevation: (top.elevation || 0) + H + t0,
+      offset: eaves - H + t - t0,
+    };
+    if (part.pitched) part.shape = roofShape(part);
+    // Liegt der Teil über der obersten Etage (sonst Anbau über einer tieferen)? Davon hängen die Giebelwände ab.
+    const c = part.polygon.reduce((m, p) => [m[0] + p[0] / part.polygon.length, m[1] + p[1] / part.polygon.length], [0, 0]);
+    part.overTop = pointInPoly(c, hull());
+    return part;
+  });
+}
+
+/** Höhe der Dachoberseite eines Dachteils an einer Stelle, relativ zur Dach-Etage */
+export function roofHeightAt(part, pos) {
+  return part.offset + (part.shape && pos ? Math.max(0, part.shape.height(pos)) : 0);
 }
 
 export const ROOF_FLOOR = '__dach';
@@ -192,12 +224,26 @@ export function toScene(model) {
       });
     }
     // Dach als eigene Etage eine Ebene über der obersten (ohne Wände); die Ebene selbst bekommt keinen Knopf
-    const roof = roofOf(b);
-    if (roof && roof.polygon.length >= 3) {
+    const parts = roofParts(b).filter((r) => r.polygon.length >= 3);
+    if (parts.length) {
+      const top = topFloor(b), H = top.height ?? 2.5;
+      // Steildächer schneiden die Wände der obersten Etage (Kniestock, Giebel): Unterseite = Traufe + Dachfläche
+      const cut = parts.filter((r) => r.pitched && r.overTop).map((r) => ({ shape: r.shape, eaves: r.eaves }));
+      if (cut.length) floors.find((f) => f.id === floorKey(b, top)).roofCut = cut;
+      // Aussparung (Dachterrasse): Brüstung bis auf den flachen Teil darin
+      for (const r of parts) {
+        if (!r.shape?.opening) continue;
+        const c = r.shape.opening.reduce((m, p) => [m[0] + p[0] / r.shape.opening.length, m[1] + p[1] / r.shape.opening.length], [0, 0]);
+        const inner = parts.find((q) => !q.pitched && pointInPoly(c, q.polygon));
+        r.openingFloor = inner ? inner.offset : null;
+      }
       floors.push({
-        id: `${b.id}/${ROOF_FLOOR}`, building: b.id, name: roof.name, buildingName: b.name, roof: true, roofThickness: roof.thickness,
-        level: roof.level, elevation: roof.elevation, ceiling: 2.5,
-        rooms: [{ id: roof.id, name: `${roof.name} ${b.name || ''}`.trim(), polygon: roof.polygon, floor: roof.surface }],
+        id: `${b.id}/${ROOF_FLOOR}`, building: b.id, name: parts[0].name, buildingName: b.name, roof: true, roofThickness: parts[0].thickness,
+        level: parts[0].level, elevation: parts[0].elevation, ceiling: 2.5, topCeiling: H, buildingTop: (top.elevation || 0),
+        rooms: parts.map((r) => ({
+          id: r.id, name: `${r.name} ${b.name || ''}`.trim(), polygon: r.shape ? r.shape.ext : r.polygon, floor: r.surface, color: r.color,
+          elevation: r.offset, thickness: r.thickness, roof: r.pitched ? r : null,
+        })),
         walls: [], windows: [], doors: [],
       });
     }
@@ -229,7 +275,7 @@ export function toScene(model) {
     const floor = sp ? sp.floorKey : OUTDOOR_FLOOR;
     const room = sp ? o.space : OPEN_GROUND;
     // Außenbereiche liegen auf der Außen-Etage (Höhe 0): ihre eigene Höhe kommt zu den Objekthöhen dazu
-    const base = sp?.kind === 'outdoor' ? outdoorHeightAt(sp.room, o.pos) : 0;
+    const base = sp?.kind === 'outdoor' ? outdoorHeightAt(sp.room, o.pos) : sp?.kind === 'roof' ? roofHeightAt(sp.room, o.pos) : 0;
     // ha: Kopie, die der Editor bearbeitet (writeBack schreibt sie zurück)
     const common = { id: o.id, name: o.name, floor, room, pos: o.pos, rot: o.rot, ...(o.params || {}), src: o, base, ha: o.ha ? structuredClone(o.ha) : undefined, state: o.state };
     if (hasCapability(o.model, 'light')) {
