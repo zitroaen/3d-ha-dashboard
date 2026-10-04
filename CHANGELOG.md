@@ -1,5 +1,18 @@
 # Änderungen
 
+## 0.11.0
+
+- **Einstellungsmenü (Zahnrad):** ersetzt Stift und Ketten-Knopf. Darin: Tageszeit **Automatisch / Tag / Nacht**
+  (zum Testen oder für Wand-Tablets), Qualität **Automatisch / Hoch / Sparsam**, **Bearbeiten** (nur Administratoren),
+  **Verknüpfungen prüfen** (Link-Check), Version und Datenquelle. Tageszeit und Qualität gelten pro Gerät.
+- **Realistischer:** Spiegelungen von Himmel und Licht (Glas, Böden, Lack), Struktur auf Parkett, Fliesen, Pflaster,
+  Rasen, Kies, Putz und Stoffen, schärfere Böden bei flachem Blick, weiche Kontaktschatten unter Möbeln, Bäumen und
+  Sträuchern, Sockelleisten, nachts Lichtschein vor erleuchteten Fenstern, Horizont in Himmelsfarbe.
+- **Ruhebild-Verfeinerung:** Steht die Ansicht still, wird das Bild mit weichen Raumschatten (Ecken, unter Möbeln)
+  gerechnet; beim Drehen bleibt das schnelle Bild. „Automatisch“ schaltet bei ruckelnder Darstellung auf „Sparsam“.
+- Neue Baumformen `column` (Säulenbaum) und `birch` (Birke); das Demo-Haus hat je einen.
+- Neuer Test: Leistungsbudget (Zeichenaufrufe und Dreiecke pro Bild).
+
 ## 0.10.0
 
 - **Ebenen gestapelt:** Das Obergeschoss steht jetzt auf dem Erdgeschoss – darunterliegende Geschosse und der Garten
