@@ -5,6 +5,10 @@ import * as THREE from 'three';
 import { Builder, heightAt } from './geometry.js';
 import { PartCollector, PALETTE, FURNITURE, LAMPS } from './models.js';
 import { withRoomLight, lampMaterial } from './roomlight.js';
+import { normalFromCanvas, weaveCanvas } from './textures.js';
+
+// Stoffe bekommen ein feines Gewebe (Normalen-Karte), sonst wirken Polster wie Kunststoff
+const FABRIC = /^(fabric|cushion|rug|curtain)/;
 
 // Leuchtende Teile: Farbe im ausgeschalteten Zustand
 const GLOW_OFF = { shade: 0x8f897d, bulb: 0x7d786f, disc: 0x1f1e1c };
@@ -190,7 +194,18 @@ export class FurnishingLayer {
       else if (key.startsWith('tex:')) {
         // Bildtextur aus dem Datenordner (z. B. tex:textures/gemaelde.jpg)
         cache.set(k, withRoomLight(new THREE.MeshStandardMaterial({ map: this.shared.loadTexture(key.slice(4)), roughness: 0.85 })));
-      } else cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(PALETTE[key] || { color: 0xff00ff })));
+      } else {
+        const params = { ...(PALETTE[key] || { color: 0xff00ff }) };
+        if (FABRIC.test(key)) {
+          this.shared.weave ??= (() => {
+            const t = normalFromCanvas(weaveCanvas(), 1, 2.5, 128);
+            t.repeat.set(10, 10);
+            return t;
+          })();
+          Object.assign(params, { normalMap: this.shared.weave, normalScale: new THREE.Vector2(0.5, 0.5) });
+        }
+        cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(params)));
+      }
     }
     return cache.get(k);
   }

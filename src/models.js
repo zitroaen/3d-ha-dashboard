@@ -469,7 +469,7 @@ export const FURNITURE = {
         // innen höher als am Rand (Hügelform des Laubs)
         const e = 1 - Math.max(Math.abs(x) / (W / 2), Math.abs(z) / (D / 2)) ** 2;
         const c = it.color || mix[Math.floor(jitter(i * 3 + 1, k * 5 + 2) * mix.length)];
-        P.sphere(c, 0.045, x, H * (0.45 + 0.5 * e), z, { seg: 6 });
+        P.sphere(c, 0.045, x, H * (0.45 + 0.5 * e), z, { seg: 8 });
       }
     }
   },

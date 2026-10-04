@@ -55,6 +55,9 @@ export class HouseScene {
     this.scene.fog = new THREE.Fog(0x0a0d13, 45, 95);
 
     this.shared = createSharedMaterials();
+    // scharfe Böden auch bei flachem Blickwinkel (anisotrope Filterung, kostet kaum etwas)
+    const aniso = Math.min(8, r.capabilities.getMaxAnisotropy());
+    for (const m of Object.values(this.shared.mat)) for (const t of [m.map, m.normalMap]) if (t) t.anisotropy = aniso;
     // Texturen aus dem Datenordner (z. B. Gemälde), einmal geladen und geteilt; nach dem Laden neu rendern
     const texCache = new Map();
     this.shared.loadTexture = (path) => {
