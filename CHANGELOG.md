@@ -3,6 +3,13 @@
 ## 0.14.0
 
 - **Logo:** Die Integration hat ein eigenes Symbol und Logo; Home Assistant zeigt es ab 2026.3 unter Geräte & Dienste.
+- **Demo-Haus: Terrasse am Nordhang,** in den Hang gegraben: Großformatplatten, Trockenmauern aus Naturstein mit
+  Hochbeet (Gräser, Lavendel, Leuchtkugeln, Strahler), Blockstufen hinauf zum Rasen, Pollerleuchte, Lichterkette,
+  Gartentisch mit Bank und Stühlen, Kinder-Picknicktisch, Grill und Regentonne.
+- **Datenmodell (abwärtskompatibel):** Außenbereiche mit `edge` (z. B. Naturstein-Kante für Mauern, Hochbeete, Stufen)
+  und `extend` (ein Hang läuft über den Rand hinaus weiter, auch bergauf); Oberflächen `slabs` und `stone`; neue
+  Katalog-Modelle `garden_table`, `garden_chair`, `bench`, `picnic_table`, `grill`, `barrel`, `grass`, `bollard`,
+  `spike_spot`, `string_lights`; Bäume mit Pfahl-Dreibock (`stakes`).
 
 ## 0.13.0
 

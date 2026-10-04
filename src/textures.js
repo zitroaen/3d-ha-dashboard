@@ -137,6 +137,79 @@ export function tileTexture(seed = 3, tone = [38, 8, 62]) {
   return toTexture(c, meters);
 }
 
+// Großformatplatten (Terrasse): 60 × 30 cm hellgrau im Läuferverband, feine Fugen; 1,2 m kachelbar
+export function slabTexture(seed = 17) {
+  const size = 512, meters = 1.2;
+  const px = size / meters;
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const r = rng(seed);
+  const w = 0.6 * px, h = 0.3 * px;
+  g.fillStyle = '#6f7275';
+  g.fillRect(0, 0, size, size);
+  for (let row = 0; row * h < size; row++) {
+    const off = (row % 2) * w / 2;
+    for (let x = -w; x < size + w; x += w) {
+      const l = 70 + (r() - 0.5) * 5;
+      g.fillStyle = `hsl(210, 3%, ${l}%)`;
+      const X = x + off;
+      // kachelbar: am rechten Rand umlaufen
+      for (const ox of [0, -size]) g.fillRect(X + ox + 1.2, row * h + 1.2, w - 2.4, h - 2.4);
+      for (let k = 0; k < 160; k++) {
+        g.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '0,0,0'},${r() * 0.035})`;
+        g.fillRect(((X + r() * w) % size + size) % size, row * h + r() * h, 1 + r() * 3, 1 + r() * 3);
+      }
+    }
+  }
+  return toTexture(c, meters);
+}
+
+// Naturstein-Trockenmauer (auch Blockstufen): Lagen unregelmäßiger Sandsteinblöcke, dunkle Fugen; 1,2 m kachelbar
+export function stoneTexture(seed = 23) {
+  const size = 512, meters = 1.2;
+  const px = size / meters;
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const r = rng(seed);
+  g.fillStyle = '#3d3a35';
+  g.fillRect(0, 0, size, size);
+  // Lagenhöhen so wählen, dass sie genau die Kachel füllen
+  const rows = [];
+  let y = 0;
+  while (y < size) {
+    const hh = Math.min(size - y, (0.13 + r() * 0.1) * px);
+    rows.push([y, size - y - hh < 0.08 * px ? size - y : hh]);
+    y += rows.at(-1)[1];
+  }
+  const tones = [[38, 18, 66], [34, 14, 58], [30, 10, 70], [40, 22, 52], [28, 8, 62]];
+  for (const [y0, hh] of rows) {
+    let x = -r() * 0.3 * px;
+    while (x < size) {
+      const ww = (0.22 + r() * 0.4) * px;
+      const [hu, sa, li] = tones[Math.floor(r() * tones.length)];
+      g.fillStyle = `hsl(${hu}, ${sa}%, ${li + (r() - 0.5) * 8}%)`;
+      // leicht unregelmäßige Kanten (Bruchstein)
+      for (const ox of [0, -size, size]) {
+        g.beginPath();
+        const j = () => (r() - 0.5) * 0.02 * px;
+        g.moveTo(x + ox + 2 + j(), y0 + 2 + j());
+        g.lineTo(x + ox + ww - 2 + j(), y0 + 2 + j());
+        g.lineTo(x + ox + ww - 2 + j(), y0 + hh - 2 + j());
+        g.lineTo(x + ox + 2 + j(), y0 + hh - 2 + j());
+        g.closePath();
+        g.fill();
+      }
+      // Struktur und Flechten
+      for (let k = 0; k < 60; k++) {
+        g.fillStyle = r() < 0.15 ? `rgba(70,80,60,${r() * 0.12})` : `rgba(${r() < 0.5 ? '255,255,255' : '0,0,0'},${r() * 0.06})`;
+        g.fillRect(((x + r() * ww) % size + size) % size, y0 + r() * hh, 2 + r() * 6, 1 + r() * 4);
+      }
+      x += ww;
+    }
+  }
+  return toTexture(c, meters);
+}
+
 // Dunkler Rasen / Erde für die Umgebung
 export function groundTexture() {
   const size = 512, meters = 6;

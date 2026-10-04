@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FloorModel, createSharedMaterials } from './house.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
-import { pointInPoly, heightAt, terrainHeightNear } from './geometry.js';
+import { pointInPoly, heightAt, nearestTerrain } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
 import { SkyEnvironment } from './environment.js';
 import { Refiner } from './refine.js';
@@ -161,7 +161,9 @@ export class HouseScene {
    */
   _groundGeometry(cx, cz) {
     const R = 80;
-    const areas = this.floors.flatMap((f) => f.floor.rooms.filter((r) => r.heights).map((r) => ({ polygon: r.polygon, heights: r.heights })));
+    const areas = this.floors.flatMap((f) => f.floor.rooms.filter((r) => r.heights).map((r) => ({ polygon: r.polygon, heights: r.heights, extend: r.extend })));
+    // Flächen ohne Gelände (Gebäude, ebene Außenbereiche): darunter bleibt der Boden unten, auch neben ansteigendem Hang
+    const flat = this.floors.flatMap((f) => f.floor.rooms.filter((r) => !r.heights).map((r) => r.polygon));
     const axis = (c, lo, hi) => {
       const out = [c - R];
       for (let v = Math.floor(lo - 14); v <= hi + 14; v += 0.5) out.push(v);
@@ -175,8 +177,11 @@ export class HouseScene {
     const pos = [], uv = [], idx = [];
     for (const z of zs) {
       for (const x of xs) {
-        const h = areas.length ? terrainHeightNear(areas, [x, z]) : null;
-        pos.push(x, h == null ? GROUND_Y : Math.min(GROUND_Y, h - 0.012), z);
+        // Tiefer liegendes Gelände setzt sich nach außen fort, höheres nur mit `extend` (sonst Erdkante)
+        const t = areas.length ? nearestTerrain(areas, [x, z]) : null;
+        let y = t == null ? GROUND_Y : t.area.extend && !t.inside ? t.h - 0.012 : Math.min(GROUND_Y, t.h - 0.012);
+        if (y > GROUND_Y && flat.some((poly) => pointInPoly([x, z], poly))) y = GROUND_Y;
+        pos.push(x, y, z);
         uv.push(x, z);
       }
     }

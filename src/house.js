@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Builder, pointInPoly } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
-import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture } from './textures.js';
+import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
 
 const DOOR_HEIGHT = 2.05;
@@ -13,6 +13,8 @@ const DOOR_HEIGHT = 2.05;
 const FLOOR_STEP = 0.0008;
 /** Höhe der Bodenfläche außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen */
 export const GROUND_Y = -0.12;
+// Weiche Oberflächen: ihre Kante ist Erde; Beläge (Platten, Kies, Stein …) zeigen ihren Belag auch an der Kante
+const SOFT = new Set(['lawn', 'soil']);
 
 export class FloorModel {
   /**
@@ -49,6 +51,20 @@ export class FloorModel {
     return 0;
   }
 
+  /** Grenzt an die Kante i–j des Polygons von außen ein anderer Bereich? */
+  _neighborAt(poly, i, j, self) {
+    const a = poly[i], b = poly[j], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const n = [-(b[1] - a[1]) / len, (b[0] - a[0]) / len];
+    for (const s of [1, -1]) {
+      const p = [mid[0] + n[0] * s * 0.05, mid[1] + n[1] * s * 0.05];
+      if (pointInPoly(p, poly)) continue;
+      const idx = this.roomAt(p);
+      return idx !== 0 && idx !== self;
+    }
+    return false;
+  }
+
   _build() {
     const { floor, H } = this;
     const walls = new Builder();   // Wandseiten (innen + außen)
@@ -64,17 +80,23 @@ export class FloorModel {
       const fb = (floors[kind] ??= new Builder());
       const uvStart = fb.uv.length;
       const hs = r.room.heights; // Gelände: Höhe je Eckpunkt
-      if (hs) {
-        fb.polyT(r.room.polygon, hs, r.idx, r.order * FLOOR_STEP);
-        // Liegt das Gelände über dem Boden (Hügel, Böschung nach oben): Erdkante bis zum Boden wie beim
-        // Geländemodell. Tiefer liegendes Gelände setzt der Boden selbst fort (scene._groundGeometry).
-        const sk = (floors.soil ??= new Builder());
-        const poly = r.room.polygon;
+      if (hs) fb.polyT(r.room.polygon, hs, r.idx, r.order * FLOOR_STEP);
+      else fb.polyH(r.room.polygon, y, r.idx);
+      if (floor.outdoor) {
+        // Liegt ein Außenbereich über dem Boden (Hügel, Hochbeet, Mauer, Stufe): Kante bis zum Boden – Erde wie beim
+        // Geländemodell oder `edge` (z. B. Naturstein). Tiefer liegendes Gelände setzt der Boden selbst fort
+        // (scene._groundGeometry). Kanten zu höheren Nachbarn verschwinden in deren Kante.
+        const ek = this.shared.mat[r.room.edge] ? r.room.edge : SOFT.has(kind) ? 'soil' : kind;
+        const sk = (floors[ek] ??= new Builder());
+        const poly = r.room.polygon, h = hs || poly.map(() => y);
         for (let i = 0; i < poly.length; i++) {
           const j = (i + 1) % poly.length;
-          if (hs[i] > GROUND_Y + 0.1 || hs[j] > GROUND_Y + 0.1) sk.skirt(poly[i], GROUND_Y, Math.max(hs[i], GROUND_Y), poly[j], GROUND_Y, Math.max(hs[j], GROUND_Y), r.idx);
+          if (!(h[i] > GROUND_Y + 0.1 || h[j] > GROUND_Y + 0.1)) continue;
+          // `extend`: außen setzt der Boden das Gelände fort – Kante nur zu Nachbarbereichen (Stufe, Mauer)
+          if (r.room.extend && !this._neighborAt(poly, i, j, r.idx)) continue;
+          sk.skirt(poly[i], GROUND_Y, Math.max(h[i], GROUND_Y), poly[j], GROUND_Y, Math.max(h[j], GROUND_Y), r.idx);
         }
-      } else fb.polyH(r.room.polygon, y, r.idx);
+      }
       // floor_rot: Verlegerichtung des Bodens in Grad (z. B. 45 für diagonal verlegtes Würfelparkett)
       if (r.room.floor_rot) {
         const a = (r.room.floor_rot * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
@@ -286,6 +308,10 @@ export function createSharedMaterials() {
   gravel.repeat.set(1 / 0.6, 1 / 0.6);
   const soil = speckleTexture([74, 54, 38], 0.8, 9, 0.35);
   soil.repeat.set(1 / 0.8, 1 / 0.8);
+  const slabs = slabTexture();
+  slabs.repeat.set(1 / 1.2, 1 / 1.2);
+  const stone = stoneTexture();
+  stone.repeat.set(1 / 1.2, 1 / 1.2);
 
   const mat = {
     // Bodenbeläge und Oberflächen (`surface` im Modell, docs/DATA_MODEL.md)
@@ -299,6 +325,8 @@ export function createSharedMaterials() {
     paving: lit({ map: paving, normalMap: relief(paving, 6), normalScale: N(0.8), roughness: 0.85 }, { weather: true }),
     gravel: lit({ map: gravel, normalMap: relief(gravel, 8), normalScale: N(1), roughness: 1 }, { weather: true }),
     soil: lit({ map: soil, normalMap: relief(soil, 5), normalScale: N(0.8), roughness: 1 }, { weather: true }),
+    slabs: lit({ map: slabs, normalMap: relief(slabs, 8), normalScale: N(0.7), roughness: 0.75 }, { weather: true }),
+    stone: lit({ map: stone, normalMap: relief(stone, 10), normalScale: N(1.2), roughness: 0.95 }, { weather: true }),
     wood: lit({ color: 0x8a6440, roughness: 0.7 }, { weather: true }),
     water: lit({ color: 0x2f5468, roughness: 0.15, metalness: 0.1 }),
     pvc: lit({ color: 0xf1f0eb, roughness: 0.45 }),

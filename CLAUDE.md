@@ -192,3 +192,7 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   (SVG, PNG über den Test-Browser). HA zeigt ab 2026.3 die Bilder aus `custom_components/ha_3d_dashboard/brand/`
   (icon/logo, @2x, dark_logo) ohne Eintrag in home-assistant/brands; der Datenschutz-Check erlaubt genau diese PNGs.
   Die HACS-Liste zeigt eigene Markenbilder noch nicht (hacs/integration#5171).
+- Mauern, Hochbeete, Stufen (0.14.0): keine eigene Objektart, sondern schmale Außenbereiche mit `elevation` und
+  `edge` (Material der Kante; ebene erhöhte Bereiche bekommen jetzt auch Kanten). `extend` lässt den Boden
+  ansteigendes Gelände fortsetzen (Nordhang des Demo-Hauses); unter Gebäuden und ebenen Bereichen bleibt der Boden
+  unten, Kanten von `extend`-Bereichen nur zu Nachbarbereichen. Kanten-UV = Länge × Höhe (Mauerwerk liegt waagrecht).

@@ -138,6 +138,8 @@ Bereiche wie Räume: Objekte können darin stehen, Außenleuchten beleuchten sie
 | `polygon` | ja | | Fläche; Eckpunkte `[x, y]` oder mit Höhe `[x, y, z]` (Gelände, siehe unten) |
 | `surface` | nein | `lawn` | Oberfläche |
 | `elevation` | nein | 0 | Höhe der Fläche (Terrasse auf Fußbodenhöhe, Garten tiefer); bei Gelände: Höhe der Eckpunkte ohne `z` |
+| `extend` | nein | false | Gelände: der Boden setzt den Bereich nach außen fort, auch wo er höher liegt (Hang, der über das Grundstück hinausläuft) – statt Erdkante |
+| `edge` | nein | Erde bzw. Belag | Oberfläche der Kante, wo der Bereich über dem Boden liegt (z. B. `stone` für Mauern, Hochbeete, Stufen); ohne Angabe Erde bei `lawn`/`soil`, sonst der Belag selbst |
 | `ha_area` | nein | nach Name | HA-Bereich |
 
 **Gelände (Hang, Böschung):** Hat mindestens ein Eckpunkt eine dritte Koordinate `z`, ist der Bereich schräg: `z` ist
@@ -146,7 +148,13 @@ Ein Hang mit gleichmäßigem Gefälle braucht also nur ein Viereck, dessen obere
 für einen geknickten Hang mehr Eckpunkte am Rand setzen (Punkte im Inneren gibt es nicht). Objekte im Bereich stehen auf dem Gelände (Höhe an ihrer Position),
 `elevation` und `light.height` zählen ab dort. Liegt das Gelände tiefer als der umgebende Boden (`site.ground`, Höhe ≈ 0),
 setzt der Boden es nach außen fort (ein Hang läuft seitlich weiter, unterhalb bleibt es unten); liegt es höher (Hügel,
-Wall), zeigt das Panel eine Erdkante wie bei einem Geländemodell.
+Wall), zeigt das Panel eine Erdkante wie bei einem Geländemodell. Das gilt auch für ebene Bereiche mit `elevation` über
+dem Boden.
+
+**Mauern, Hochbeete, Stufen:** als schmale Außenbereiche mit `elevation` und `edge: stone`. Eine Trockenmauer ist ein
+Streifen mit `surface: stone`, ein Hochbeet dahinter `surface: soil`, Blockstufen sind Streifen mit steigender Höhe. Eine
+in den Hang gegrabene Terrasse: Terrasse auf Fußbodenhöhe, rundherum Mauerstreifen, dahinter ansteigendes Gelände
+(Beispiel: `northTerrace()` in `examples/demo/build-house.mjs`). Kanten zu höheren Nachbarn verschwinden in deren Kante.
 
 ```yaml
 - id: garten
@@ -262,6 +270,8 @@ die keine Leuchte sind (Leuchten zeigen ihren Zustand durch ihr Licht). Keine An
 | `soil` | Erde/Beet |
 | `wood` | Holzdeck |
 | `water` | Wasser |
+| `slabs` | Großformatplatten (60 × 30 cm, hellgrau) |
+| `stone` | Naturstein (Trockenmauer, Blockstufen) |
 
 ## Katalog
 
@@ -270,7 +280,9 @@ Standard `[B, T, H]` in Metern. Parameter gehören nach `params`. Farben (`param
 (`PALETTE` in `src/models.js`): `fabric_grey`, `fabric_dark`, `fabric_chair`, `cushion_green`, `cushion_light`, `oak_light`,
 `teak`, `wood_dark`, `white`, `plaster`, `black_gloss`, `black_matte`, `slate`, `brass`, `steel_dark`, `rug_red`,
 `rug_navy`, `curtain_green`, `curtain_grey`, `teal`, `book_brown`, `book_mix`, `frame_dark`, `canvas_art`, `screen`,
-`glass_fire`, `bin_clear`, `toy_red`, `toy_yellow`, `toy_blue`.
+`glass_fire`, `bin_clear`, `toy_red`, `toy_yellow`, `toy_blue`; Garten: `bark`, `birch_bark`, `leaf_green`, `leaf_dark`,
+`leaf_light`, `leaf_silver`, `conifer`, `flower_red`, `flower_yellow`, `flower_violet`, `flower_white`, `flower_pink`, `grass_straw`,
+`grass_green`, `alu_dark`, `sling_grey`, `table_top`, `pine`, `barrel_green`.
 
 Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` prüft, dass beide übereinstimmen).
 
@@ -278,15 +290,22 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | Modell | Art | Fähigkeiten | Standardmaß | Parameter |
 |---|---|---|---|---|
 | `armchair` | Möbel | | 0.66 × 0.78 | `color` |
+| `barrel` | Möbel | | 0.6 × 0.6 × 0.9 | `color` (Regentonne) |
+| `bench` | Möbel | | 1.6 × 0.62 × 0.85 | `color` (Auflage; Gartenbank) |
 | `bookshelf` | Möbel | | 2.0 × 0.3 × 2.0 | |
 | `box` | Gerät | | 0.6 × 0.6 × 0.85 | `color` |
 | `chair` | Möbel | | | `guitar` |
 | `chest_table` | Möbel | | 0.8 × 0.6 × 0.48 | |
 | `curtain` | Möbel | | | `color` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
+| `garden_chair` | Möbel | | | `color` (Bespannung; Gartenstuhl) |
+| `garden_table` | Möbel | | 1.6 × 0.9 × 0.74 | `color` (Platte; Gartentisch) |
 | `grand_piano` | Möbel | | 1.48 × 1.6 | |
+| `grass` | Pflanze | | 0.6 × 0.6 × 0.7 | `color` (Ziergras: `grass_straw`, `grass_green`) |
+| `grill` | Möbel | | 1.3 × 0.55 × 1.15 | (Gasgrill) |
 | `hearth` | Möbel | | | |
 | `marker` | Gerät | | 0.12 | `color` |
+| `picnic_table` | Möbel | | 0.9 × 0.9 × 0.5 | `color` (Kinder-Picknicktisch) |
 | `picture` | Möbel | | | `frame`, `mat`, `color`, `texture` |
 | `radiator` | Möbel | | | |
 | `rug` | Möbel | | 2.0 × 3.0 | `color` |
@@ -297,14 +316,17 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
 | `toy_storage` | Möbel | | | `columns` |
-| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`, `column`, `birch`), `color` |
+| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`, `column`, `birch`), `color`, `stakes` (Dreibock aus Baumpfählen) |
 | `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
 | `ball` | Leuchte | `light` | | `radius` |
+| `bollard` | Leuchte | `light` | | (Pollerleuchte, Licht unter dem Schirm) |
 | `chandelier_candles` | Leuchte | `light` | | `arms` |
 | `chandelier_tulip` | Leuchte | `light` | | `arms` |
 | `disc` | Leuchte | `light` | | |
 | `floor_spots` | Leuchte | `light` | | |
 | `sconce` | Leuchte | `light` | | |
+| `spike_spot` | Leuchte | `light` | | (Erdspießstrahler im Beet) |
+| `string_lights` | Leuchte | `light` | | `length` (8), `sag` (0.4), `bulbs` (12), `poles` (true) – Lichterkette entlang der x-Achse, `light.height` = Höhe der Enden |
 | `wall_box` | Leuchte | `light` | | |
 <!-- katalog:end -->
 
@@ -486,6 +508,9 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.14.0, abwärtskompatibel):** `outdoor[].edge`, `outdoor[].extend`; Kanten auch bei ebenen, erhöhten
+  Außenbereichen; Oberflächen `slabs`, `stone`; Katalog `garden_table`, `garden_chair`, `bench`, `picnic_table`,
+  `grill`, `barrel`, `grass`, `bollard`, `spike_spot`, `string_lights`; `tree` mit `stakes`.
 - **Version 2, Ergänzung (0.12.0, abwärtskompatibel):** `site.weather` (Wetter-Entity).
 - **Version 2, Ergänzung (0.11.0, abwärtskompatibel):** `tree` mit `shape: column` (Säulenbaum) und `birch` (Birke).
 - **Version 2, Ergänzung (0.9.0, abwärtskompatibel):** Gelände – Eckpunkte von Außenbereichen mit Höhe

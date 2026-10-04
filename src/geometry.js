@@ -62,20 +62,21 @@ export function heightAt(poly, heights, [x, y]) {
 }
 
 /**
- * Gelände nach außen fortsetzen: Höhe im Punkt p aus den Geländeflächen [{ polygon, heights }] – innen wie
- * heightAt, außen die Höhe des nächstgelegenen Randpunkts der nächsten Fläche (ein Hang läuft seitlich weiter,
- * unterhalb bleibt es unten). null ohne Geländeflächen.
+ * Gelände nach außen fortsetzen: nächste Geländefläche zum Punkt p aus [{ polygon, heights }] – innen die Höhe wie
+ * heightAt, außen die Höhe des nächstgelegenen Randpunkts (ein Hang läuft seitlich weiter). Liefert { h, area, inside }
+ * oder null ohne Geländeflächen.
  */
-export function terrainHeightNear(areas, p) {
+export function nearestTerrain(areas, p) {
   let best = null, bd = Infinity;
-  for (const { polygon: poly, heights } of areas) {
-    if (pointInPoly(p, poly)) return heightAt(poly, heights, p);
+  for (const area of areas) {
+    const { polygon: poly, heights } = area;
+    if (pointInPoly(p, poly)) return { h: heightAt(poly, heights, p), area, inside: true };
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
       const [ax, ay] = poly[j], [bx, by] = poly[i];
       const dx = bx - ax, dy = by - ay;
       const t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy || 1)));
       const d = Math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy);
-      if (d < bd) { bd = d; best = heights[j] + t * (heights[i] - heights[j]); }
+      if (d < bd) { bd = d; best = { h: heights[j] + t * (heights[i] - heights[j]), area, inside: false }; }
     }
   }
   return best;
@@ -138,10 +139,21 @@ export class Builder {
     }
   }
 
-  /** Senkrechte Fläche zwischen zwei Punkten mit eigener Ober-/Unterkante (Geländekante), beidseitig */
+  /**
+   * Senkrechte Fläche zwischen zwei Punkten mit eigener Ober-/Unterkante (Geländekante, Mauer), beidseitig.
+   * UV: Länge entlang der Kante × Höhe (Mauerwerk liegt waagrecht).
+   */
   skirt(a, ya0, ya1, b, yb0, yb1, roomIdx) {
     const A0 = [a[0], ya0, a[1]], A1 = [a[0], ya1, a[1]], B0 = [b[0], yb0, b[1]], B1 = [b[0], yb1, b[1]];
-    for (const [p, q, r] of [[A0, B0, B1], [A0, B1, A1], [A0, B1, B0], [A0, A1, B1]]) this.tri(p, q, r, roomIdx);
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const uv = (p) => [p === B0 || p === B1 ? a[0] + a[1] + len : a[0] + a[1], p[1]];
+    for (const tri of [[A0, B0, B1], [A0, B1, A1], [A0, B1, B0], [A0, A1, B1]]) {
+      for (const p of tri) {
+        this.pos.push(p[0], p[1], p[2]);
+        this.room.push(roomIdx);
+        this.uv.push(...uv(p));
+      }
+    }
   }
 
   /** @param attr Name des Index-Attributs (Raum oder Lampe) */
