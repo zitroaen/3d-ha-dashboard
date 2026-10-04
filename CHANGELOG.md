@@ -1,5 +1,9 @@
 # Änderungen
 
+## 0.14.0
+
+- **Logo:** Die Integration hat ein eigenes Symbol und Logo; Home Assistant zeigt es ab 2026.3 unter Geräte & Dienste.
+
 ## 0.13.0
 
 - **Glas-Design:** Alle Bedienelemente sind durchscheinend mit Weichzeichner und feiner Lichtkante, die Formen sind

@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" alt="" width="96" align="right">
+
 # 3D-HA-Dashboard
 
 Ein interaktiver 3D-Grundriss deines Hauses als Panel in [Home Assistant](https://www.home-assistant.io/):

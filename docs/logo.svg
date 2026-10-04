@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="kachel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a3b52"/><stop offset="1" stop-color="#101a28"/>
+    </linearGradient>
+    <linearGradient id="glanz" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="parkett" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e2b170"/><stop offset="1" stop-color="#b98348"/>
+    </linearGradient>
+    <radialGradient id="schein">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity=".95"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lampe">
+      <stop offset="0" stop-color="#ffe2a6" stop-opacity=".9"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="248" height="248" rx="40.96" fill="url(#kachel)"/>
+    <rect x="4" y="4" width="248" height="248" rx="40.96" fill="url(#glanz)"/>
+    <rect x="4.75" y="4.75" width="246.5" height="246.5" rx="40.21" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1.5"/>
+  <g>
+    <polygon points="230.88,155.39 139.43,208.19 139.43,198.29 230.88,145.49" fill="#53657b"/><polygon points="25.12,142.19 139.43,208.19 139.43,198.29 25.12,132.29" fill="#43546a"/><polygon points="116.57,79.49 230.88,145.49 139.43,198.29 25.12,132.29" fill="#5d6d80"/>
+    <polygon points="116.57,79.49 185.16,119.09 93.71,171.89 25.12,132.29" fill="url(#parkett)"/>
+    <polygon points="185.16,119.09 230.88,145.49 189.73,169.25 144,142.85" fill="#7f93a8"/>
+    <polygon points="144,142.85 189.73,169.25 139.43,198.29 93.71,171.89" fill="#71859b"/>
+    <ellipse cx="102.85" cy="127.01" rx="68.64" ry="39.6" fill="url(#schein)"/>
+    <polygon points="230.88,145.49 226.08,148.26 226.08,116.58 230.88,113.81" fill="#c3ccd7"/><polygon points="111.77,82.26 226.08,148.26 226.08,116.58 111.77,50.58" fill="#9eabba"/><polygon points="116.57,47.81 230.88,113.81 226.08,116.58 111.77,50.58" fill="#f5f7fa"/>
+    <polygon points="116.57,85.03 29.92,135.06 29.92,103.38 116.57,53.35" fill="#c3ccd7"/><polygon points="25.12,132.29 29.92,135.06 29.92,103.38 25.12,100.61" fill="#9eabba"/><polygon points="111.77,50.58 116.57,53.35 29.92,103.38 25.12,100.61" fill="#f5f7fa"/>
+    <polygon points="182.76,123.25 162.41,135 162.41,120.48 182.76,108.73" fill="#c3ccd7"/><polygon points="157.61,132.22 162.41,135 162.41,120.48 157.61,117.7" fill="#9eabba"/><polygon points="177.96,105.96 182.76,108.73 162.41,120.48 157.61,117.7" fill="#f5f7fa"/>
+    <polygon points="148.69,142.92 100.91,170.5 100.91,155.98 148.69,128.4" fill="#c3ccd7"/><polygon points="96.11,167.73 100.91,170.5 100.91,155.98 96.11,153.21" fill="#9eabba"/><polygon points="143.89,125.62 148.69,128.4 100.91,155.98 96.11,153.21" fill="#f5f7fa"/>
+    <polygon points="187.33,165.09 182.53,167.86 182.53,153.34 187.33,150.57" fill="#c3ccd7"/><polygon points="144,145.62 182.53,167.86 182.53,153.34 144,131.1" fill="#9eabba"/><polygon points="148.81,128.33 187.33,150.57 182.53,153.34 144,131.1" fill="#f5f7fa"/>
+    <polygon points="226.08,148.26 139.43,198.29 139.43,183.77 226.08,133.74" fill="#c3ccd7"/><polygon points="134.63,195.52 139.43,198.29 139.43,183.77 134.63,181" fill="#9eabba"/><polygon points="221.28,130.97 226.08,133.74 139.43,183.77 134.63,181" fill="#f5f7fa"/>
+    <polygon points="48.21,140.08 43.41,142.85 43.41,128.33 48.21,125.56" fill="#c3ccd7"/><polygon points="25.12,132.29 43.41,142.85 43.41,128.33 25.12,117.77" fill="#9eabba"/><polygon points="29.92,115 48.21,125.56 43.41,128.33 25.12,117.77" fill="#f5f7fa"/>
+    <polygon points="139.43,192.75 134.63,195.52 134.63,181 139.43,178.23" fill="#c3ccd7"/><polygon points="79.99,163.97 134.63,195.52 134.63,181 79.99,149.45" fill="#9eabba"/><polygon points="84.79,146.68 139.43,178.23 134.63,181 79.99,149.45" fill="#f5f7fa"/>
+    <polygon points="43.41,142.85 79.99,163.97 79.99,149.45 43.41,128.33" fill="#bfe3ff" opacity=".28"/>
+    <circle cx="102.85" cy="109.85" r="7.26" fill="#fff4dc"/>
+    <circle cx="102.85" cy="109.85" r="19.8" fill="url(#lampe)"/>
+  </g>
+</svg>
