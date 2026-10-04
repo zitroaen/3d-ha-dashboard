@@ -39,7 +39,7 @@ const errors = [];
 try {
   for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
     const page = await guardedPage(browser, base, errors, { viewport, label: vpName });
-    // Bilder in voller Qualität (Ruhebild-Verfeinerung), unabhängig von der automatischen Wahl auf dem Testrechner
+    // Bilder in voller Qualität („Hoch“), unabhängig von der automatischen Wahl auf dem Testrechner
     await page.evaluate((q) => window.panel.view.setQuality(q), process.env.QUALITY || 'high');
     // Ebene 0 mit allen Szenarien, weitere Ebenen nur "abend" (alle Räume an)
     const runs = [

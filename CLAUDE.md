@@ -81,7 +81,7 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen)
 - `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE`
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
-- `src/environment.js` Himmel als Umgebung (PMREM, Spiegelungen) · `src/refine.js` Ruhebild-Verfeinerung (GTAO)
+- `src/environment.js` Himmel als Umgebung (PMREM, Spiegelungen)
 - `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (ganzes Modell
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
   · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige) · `src/ha.js` Zustand/Dienste
@@ -173,9 +173,11 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Umgebung (PMREM-Himmel je Tageszeit, nur bei merklicher Änderung neu) für Spiegelungen; Normalen-Karten aus den
   vorhandenen Texturen (Fugen/Maserung), Putz, Gewebe; Kontaktschatten als weiche Rechtecke unter Objekten statt
   teurer Verdeckung pro Bild; Sockelleisten; Lichtschein vor erleuchteten Fenstern (lampIdx der ersten Leuchte).
-  Qualität „Hoch“: im Stillstand GTAO (`refine.js`, ohne Trefferflächen/Durchsichtiges), in Bewegung das schnelle
-  Bild. „Automatisch“ misst Bildabstände beim Drehen (> 45 ms im Mittel -> „Sparsam“: kleinere Schatten-Map,
-  geringere Auflösung, keine Verfeinerung). `tests/performance.mjs` begrenzt Zeichenaufrufe/Dreiecke.
+  Qualität „Hoch“ = große Schatten-Map, volle Auflösung. „Automatisch“ misst Bildabstände beim Drehen (> 45 ms im
+  Mittel -> „Sparsam“: kleinere Schatten-Map, geringere Auflösung). `tests/performance.mjs` begrenzt
+  Zeichenaufrufe/Dreiecke.
+- Keine Ruhebild-Verfeinerung (0.14.1 entfernt): GTAO im Stillstand ließ das Bild nach dem Anhalten sichtbar
+  „nachschärfen“ – störte mehr, als es brachte. Jedes Bild wird gleich gerechnet.
 - Einstellungsmenü (0.11.0): Zahnrad statt Stift und Ketten-Knopf; Bearbeiten nur für Administratoren
   (`readonly`); Tageszeit Automatisch/Tag/Nacht überschreibt sun.sun (zum Testen, Wand-Tablets).
 - Wetter (0.12.0): `src/weather.js` bildet `weather.*`-Zustände auf { cloud, rain, snow, fog } ab; `scene.setWeather`

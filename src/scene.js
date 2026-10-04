@@ -7,14 +7,13 @@ import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_L
 import { pointInPoly, heightAt, nearestTerrain } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
 import { SkyEnvironment } from './environment.js';
-import { Refiner } from './refine.js';
 
 const NO_WEATHER = { cloud: 0, rain: 0, snow: 0, fog: 0 };
 
-/** Qualitätsstufen: Schattenauflösung und -weichheit, Bildauflösung, Ruhebild-Verfeinerung */
+/** Qualitätsstufen: Schattenauflösung und -weichheit, Bildauflösung */
 const QUALITY = {
-  high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2, refine: true },
-  low: { shadowMap: 1024, shadowRadius: 3, maxPixelRatio: 1.25, refine: false },
+  high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2 },
+  low: { shadowMap: 1024, shadowRadius: 3, maxPixelRatio: 1.25 },
 };
 
 // Warmweiß ~2700 K
@@ -467,7 +466,6 @@ export class HouseScene {
     this.renderer.setSize(w, h, false);
     this.renderer.domElement.style.width = w + 'px';
     this.renderer.domElement.style.height = h + 'px';
-    this._refiner?.setSize();
     this._fitFrustum(w / h);
     this.camera.updateProjectionMatrix();
     this.requestRender();
@@ -556,7 +554,7 @@ export class HouseScene {
     this._raf = requestAnimationFrame((t) => {
       this._raf = 0;
       const moving = this.controls.update() || this._dragging || !!this._anim;
-      this._draw(!moving);
+      this._draw();
       this.frames = (this.frames || 0) + 1;
       if (moving) {
         this._measure(t);
@@ -568,16 +566,12 @@ export class HouseScene {
   /** Sofort rendern (für Tests). */
   renderNow() {
     this.controls.update();
-    this._draw(true);
+    this._draw();
   }
 
-  /** Ein Bild: in Bewegung schnell, im Stillstand bei Qualität „Hoch“ verfeinert (Umgebungsverdeckung) */
-  _draw(still) {
-    if (still && QUALITY[this.quality]?.refine) {
-      this._refiner ??= new Refiner(this.renderer, this.scene, this.camera);
-      this._refiner.render();
-      this.refined = (this.refined || 0) + 1;
-    } else this.renderer.render(this.scene, this.camera);
+  /** Ein Bild (immer dasselbe, ob in Bewegung oder im Stillstand – kein Nachschärfen nach dem Anhalten) */
+  _draw() {
+    this.renderer.render(this.scene, this.camera);
     this.onRender?.();
   }
 
@@ -825,7 +819,6 @@ export class HouseScene {
 
   dispose() {
     this.skyEnv.dispose();
-    this._refiner?.dispose();
     this._resizeObs.disconnect();
     this.controls.dispose();
     this.renderer.dispose();
