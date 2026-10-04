@@ -146,6 +146,16 @@ export class Editor {
     this._emit();
   }
 
+  /** Auswahl aufheben, ohne die Einrichtung neu zu bauen (der Aufrufer baut sie ohnehin neu) */
+  clearSelection() {
+    if (!this.sel) return;
+    this.move.detach();
+    this.rotate.detach();
+    this.sel.proxy.removeFromParent();
+    this._faceMarker = null;
+    this.sel = null;
+  }
+
   _entry({ type, id }) {
     const d = this.view.furnishingData;
     return (type === 'lamp' ? d.devices : d.items).find((e) => e.id === id);
@@ -245,6 +255,7 @@ export class Editor {
   undo() {
     const u = this.undoStack.pop();
     if (!u) return;
+    if (u.restore) return u.restore(); // Objektbestand (Hinzufügen/Einlagern/Löschen), siehe main.js
     const e = this._entry(u);
     Object.assign(e, u.values);
     this._applyHa(u.type, u.id, e, e.ha);

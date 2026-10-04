@@ -40,6 +40,11 @@ export function objectOverride(o) {
 
 /** Overrides auf ein Modell anwenden (null = Feld entfernen). */
 export function applyOverrides(model, overrides) {
+  // im Editor gelöschte und neu angelegte Objekte
+  if (overrides?.removed?.length) model.objects = (model.objects || []).filter((o) => !overrides.removed.includes(o.id));
+  for (const o of Object.values(overrides?.added || {})) {
+    if (!(model.objects ||= []).some((x) => x.id === o.id)) model.objects.push(structuredClone(o));
+  }
   const ov = overrides?.objects;
   if (!ov) return model;
   for (const o of model.objects || []) {
@@ -86,9 +91,10 @@ export class LayoutStore {
    * @param model    Modell (bereits mit den Änderungen)
    * @param ids      IDs der geänderten Objekte
    * @param header   Kopfkommentar für model.yaml
+   * @param added    neu angelegte Objekt-IDs, removed gelöschte (nur für die Benutzerdaten-Overrides)
    * @returns model.yaml-Text
    */
-  async save(model, ids, header = '') {
+  async save(model, ids, header = '', { added = [], removed = [] } = {}) {
     const text = toYaml(model, header);
     if (this.saveUrl) {
       const res = await fetch(new URL(MODEL_FILE, new URL(this.saveUrl, location.href)), { method: 'POST', body: text });
@@ -103,7 +109,17 @@ export class LayoutStore {
       if (!this.hass?.callWS) throw new Error('Kein Home Assistant verbunden');
       const prev = (await this.loadOverrides()) || {};
       prev.objects ??= {};
-      for (const o of model.objects || []) if (ids.includes(o.id)) prev.objects[o.id] = objectOverride(o);
+      prev.added ??= {};
+      for (const o of model.objects || []) {
+        if (!ids.includes(o.id)) continue;
+        if (added.includes(o.id) || prev.added[o.id]) prev.added[o.id] = structuredClone(o); // neu: ganzes Objekt
+        else prev.objects[o.id] = objectOverride(o);
+      }
+      for (const id of removed) {
+        delete prev.objects[id];
+        if (prev.added[id]) delete prev.added[id];
+        else prev.removed = [...new Set([...(prev.removed || []), id])];
+      }
       await this.hass.callWS({ type: 'frontend/set_user_data', key: this.key, value: prev });
     }
     return text;
