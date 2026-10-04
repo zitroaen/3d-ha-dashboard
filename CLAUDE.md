@@ -187,3 +187,6 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   `:host([theme="light"])`. Darstellung Automatisch folgt `hass.themes.darkMode` (ohne HA: prefers-color-scheme).
   Ausgewählt = invertiert (`--g-sel-*`), Bernstein (`--g-accent`) nur für Zustände. Neue Elemente nutzen die
   Variablen statt fester Farben.
+- Im Konstruktor des Elements keine Attribute setzen (auch nicht indirekt): HA legt das Panel mit
+  `document.createElement` an, das wirft dann NotSupportedError (0.13.0: weiße Seite). `tests/harness.html?ha=1`
+  legt das Panel wie HA an (createElement, Properties, einhängen); `tests/demo.mjs` und `tests/webkit.mjs` nutzen das.

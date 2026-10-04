@@ -20,12 +20,19 @@
     } catch { /* ohne Speicher: Standard */ }
   </script>
   <span class="resolver"><div class="panel-custom"><ha-3d-dashboard></ha-3d-dashboard></div></span>
+  <script>
+    // ?ha=1: das Panel legt erst das Modul unten an (wie HA), das geparste Element fliegt vor dem Upgrade raus
+    if (new URLSearchParams(location.search).has('ha')) document.querySelector('ha-3d-dashboard').remove();
+  </script>
   <script type="module">
     import '../dist/ha-3d-dashboard.js';
     import { createMockHass, statesFromModel } from './mock-hass.js';
     import { load as parseYaml } from '../node_modules/js-yaml/dist/js-yaml.mjs';
 
-    const el = document.querySelector('ha-3d-dashboard');
+    // ?ha=1: wie HA (partial-panel-resolver) – Element mit document.createElement anlegen, Properties setzen, dann
+    // einhängen. Im Konstruktor sind dann z. B. keine Attribute erlaubt (0.13.0: weiße Seite in HA).
+    const embedded = new URLSearchParams(location.search).has('ha');
+    const el = embedded ? document.createElement('ha-3d-dashboard') : document.querySelector('ha-3d-dashboard');
     // Daten direkt aus dem Repo laden: Änderungen in data/ sind nach einem Neuladen sichtbar, ohne Build
     // save_url: der Dev-Server (npm run serve) schreibt Editor-Änderungen direkt nach data/
     // Varianten für die Demo-Tests: ?demo=1 (config.demo) bzw. ?nodata=1 (Daten nicht erreichbar -> Demo-Fallback)
@@ -72,6 +79,7 @@
     if (q.has('user')) hass.user = { name: 'Gast', is_admin: false };
     el.hass = hass;
     el.narrow = matchMedia('(max-width: 870px)').matches;
+    if (embedded) document.querySelector('.panel-custom').append(el);
     window.panel = el;
     window.mockHass = hass;
     el.whenReady().then(() => { window.panelReady = true; });
