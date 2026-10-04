@@ -154,6 +154,8 @@
         "elevation": { "type": "number" },
         "size": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 1, "maxItems": 3 },
         "params": { "type": "object" },
+        "state": { "enum": ["on", "off"] },
+        "stored": { "type": "boolean" },
         "light": { "$ref": "#/$defs/light" },
         "ha": { "$ref": "#/$defs/ha" }
       }

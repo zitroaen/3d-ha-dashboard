@@ -86,6 +86,28 @@ export class PartCollector {
     this.matrix.makeRotationY(-THREE.MathUtils.degToRad(rotDeg || 0)).setPosition(x, y, z);
     this.idx = idx;
     this.bounds = new THREE.Box3();
+    this._anim = null;
+    return this;
+  }
+
+  /**
+   * Bewegliche Teile (Animation): Alles bis endAnim() kommt in eine eigene kleine Gruppe, die sich um `pivot`
+   * (lokale Koordinaten des Modells) dreht – der Rest bleibt zusammengefasst. spec: { type: 'spin', axis: 'y',
+   * speed: Umdrehungen/s bei voller Stufe }. Ohne Animationen (Szene) werden die Teile wie alle anderen gebaut.
+   */
+  beginAnim(spec, pivot = [0, 0, 0]) {
+    if (this.static) return this;
+    const node = this.matrix.clone().multiply(new THREE.Matrix4().makeTranslation(...pivot));
+    this._anim = { spec, node, groups: new Map(), saved: this.matrix.clone(), id: this.objId };
+    this.matrix.makeTranslation(-pivot[0], -pivot[1], -pivot[2]);
+    (this.anims ??= []).push(this._anim);
+    return this;
+  }
+
+  endAnim() {
+    if (!this._anim) return this;
+    this.matrix.copy(this._anim.saved);
+    this._anim = null;
     return this;
   }
 
@@ -93,15 +115,16 @@ export class PartCollector {
     let g = geo.index ? geo.toNonIndexed() : geo;
     if (local) g.applyMatrix4(local);
     g.computeBoundingBox();
-    this.bounds?.union(g.boundingBox);
+    this.bounds?.union(g.boundingBox); // Modellkoordinaten (vor Lage und Drehpunkt)
     g.applyMatrix4(this.matrix);
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     g.deleteAttribute('uv1');
     const attr = kind === 'glow' ? 'lampIdx' : 'roomIdx';
     g.setAttribute(attr, new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(this.idx), 1));
     const k = `${kind}:${key}`;
-    if (!this.groups.has(k)) this.groups.set(k, { kind, key, geos: [] });
-    this.groups.get(k).geos.push(g);
+    const groups = this._anim ? this._anim.groups : this.groups;
+    if (!groups.has(k)) groups.set(k, { kind, key, geos: [] });
+    groups.get(k).geos.push(g);
     return this;
   }
 
@@ -152,10 +175,28 @@ export class PartCollector {
     return this.add(g, key, kind, new THREE.Matrix4().makeRotationX(-Math.PI / 2).setPosition(0, y, 0));
   }
 
+  /**
+   * Bewegliche Teile als Gruppen: [{ node: Object3D am Drehpunkt (Welt), spec, id }]. Pro Teil und Material ein
+   * Mesh – nur diese wenigen Meshes werden je Bild bewegt.
+   */
+  buildAnims(materialFor) {
+    return (this.anims || []).map((a) => {
+      const node = new THREE.Group();
+      a.node.decompose(node.position, node.quaternion, node.scale);
+      node.userData.baseQuaternion = node.quaternion.clone();
+      for (const m of this._meshes(a.groups.values(), materialFor)) node.add(m);
+      return { node, spec: a.spec, id: a.id };
+    });
+  }
+
   /** Pro Material ein Mesh. */
   build(materialFor) {
+    return this._meshes(this.groups.values(), materialFor);
+  }
+
+  _meshes(groups, materialFor) {
     const meshes = [];
-    for (const { kind, key, geos } of this.groups.values()) {
+    for (const { kind, key, geos } of groups) {
       const merged = mergeGeometries(geos, false);
       if (!merged) continue;
       merged.computeVertexNormals();
@@ -594,6 +635,49 @@ export const FURNITURE = {
     P.cyl(c, Dm * 0.46, Dm * 0.44, H * 0.5, 0, 0, 0, { seg: 16 });
     P.cyl(c, Dm * 0.44, Dm * 0.5, H * 0.5, 0, H * 0.5, 0, { seg: 16 });
     P.cyl('black_matte', Dm * 0.48, Dm * 0.48, 0.03, 0, H, 0, { seg: 16 });
+  },
+
+  /**
+   * Deckenventilator: hängt an der Decke des Raums; size = [Durchmesser]; params.color = Flügel (Standard Holz).
+   * Animation: Flügel drehen sich, solange das Gerät an ist (Tempo aus `percentage`).
+   */
+  ceiling_fan(P, it, { ceiling = 2.5 } = {}) {
+    const Dm = it.size?.[0] ?? 1.2, r = Dm / 2;
+    const yb = ceiling - 0.42; // Flügelebene
+    P.cyl('white', 0.07, 0.07, 0.03, 0, ceiling - 0.03, 0, { seg: 16 });
+    P.cyl('white', 0.012, 0.012, 0.3, 0, ceiling - 0.33, 0, { seg: 8 });
+    P.cyl('white', 0.11, 0.09, 0.12, 0, yb - 0.03, 0, { seg: 16 });
+    P.beginAnim({ type: 'spin', axis: 'y', speed: 1.4 }, [0, yb, 0]);
+    const c = it.color || 'teak';
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      // Flügel leicht angestellt, Ansatz am Motor
+      P.add(new THREE.BoxGeometry(r - 0.1, 0.012, 0.13), c, 'lit',
+        new THREE.Matrix4().makeRotationY(a).multiply(new THREE.Matrix4().makeRotationX(0.12)).setPosition(Math.cos(a) * (r / 2 + 0.05), yb, -Math.sin(a) * (r / 2 + 0.05)));
+      P.add(new THREE.BoxGeometry(0.12, 0.02, 0.03), 'white', 'lit',
+        new THREE.Matrix4().makeRotationY(a).setPosition(Math.cos(a) * 0.1, yb, -Math.sin(a) * 0.1));
+    }
+    P.endAnim();
+  },
+
+  /**
+   * Standventilator: size = [–, –, Höhe]. Animation: Rotor dreht sich um die Blasrichtung (+z), solange er an ist.
+   */
+  floor_fan(P, it) {
+    const H = it.size?.[2] ?? 1.15, y = H - 0.2;
+    P.cyl('white', 0.16, 0.18, 0.04, 0, 0, 0, { seg: 20 });
+    P.cyl('white', 0.015, 0.015, y - 0.04, 0, 0.04, 0, { seg: 8 });
+    P.cyl('white', 0.06, 0.07, 0.14, 0, y, -0.1, { seg: 12, rot: new THREE.Euler(Math.PI / 2, 0, 0) });
+    // Schutzgitter: zwei Ringe
+    for (const z of [-0.01, 0.07]) P.add(new THREE.TorusGeometry(0.2, 0.006, 4, 32), 'steel_dark', 'lit', new THREE.Matrix4().setPosition(0, y, z));
+    P.beginAnim({ type: 'spin', axis: 'z', speed: 3 }, [0, y, 0.03]);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      P.add(new THREE.BoxGeometry(0.15, 0.08, 0.006), it.color || 'bin_clear', 'lit',
+        new THREE.Matrix4().makeRotationZ(a).multiply(new THREE.Matrix4().makeRotationX(0.35)).setPosition(Math.cos(a) * 0.1, y + Math.sin(a) * 0.1, 0.03));
+    }
+    P.cyl('white', 0.03, 0.03, 0.04, 0, y, 0.03, { seg: 10, rot: new THREE.Euler(Math.PI / 2, 0, 0) });
+    P.endAnim();
   },
 
   /** Plattenheizkörper (Rippen). Später ein Gerät, das beim Heizen glüht. */

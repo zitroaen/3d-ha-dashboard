@@ -16,6 +16,7 @@ switch.demo_kaffeemaschine | Kaffeemaschine
 ## Schlafzimmer
 light.demo_schlafen | Deckenlicht Schlafzimmer
 light.demo_nachttisch | Nachttischlampe
+fan.demo_ventilator | Deckenventilator
 ## Bad
 light.demo_bad | Deckenlicht Bad
 ## Außen

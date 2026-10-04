@@ -218,6 +218,16 @@ export class Editor {
     this._emit();
   }
 
+  /** Fester Zustand des gewählten Objekts ohne Entity ('on' oder undefined = aus) */
+  setState(state) {
+    const s = this.sel;
+    if (!s) return;
+    this._pushUndo();
+    s.entry.state = state;
+    this.changes.set(refKey(s.type, s.id), { type: s.type, id: s.id, values: layoutValues(s.type, s.entry) });
+    this._emit();
+  }
+
   _applyHa(type, id, e, ha) {
     e.ha = ha;
     if (type === 'lamp') {

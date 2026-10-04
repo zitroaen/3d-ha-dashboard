@@ -113,6 +113,9 @@ export class FurnishingLayer {
     }
 
     for (const m of P.build((key, kind) => this._material(key, kind))) this.group.add(m);
+    // bewegliche Teile (Ventilatorflügel …): eigene kleine Gruppen, die die Szene im Takt dreht
+    this.animated = P.buildAnims((key, kind) => this._material(key, kind));
+    for (const a of this.animated) this.group.add(a.node);
     if (!wpools.empty) {
       const m = new THREE.Mesh(wpools.geometry('lampIdx'), shared.mat.windowPool);
       m.renderOrder = 3;
@@ -145,7 +148,9 @@ export class FurnishingLayer {
     }
     const target = skip ? new PartCollector() : P;
     target.begin(at.x, at.z, at.rot, this._roomIdx(it.room), at.y - (it.elevation ?? 0));
-    make(target, it);
+    target.objId = it.id;
+    const room = this.floorModel.rooms.get(it.room)?.room;
+    make(target, it, { ceiling: room?.ceiling ?? this.floorModel.floor.ceiling });
     return target.bounds.clone().translate(new THREE.Vector3(0, -(it.elevation ?? 0), 0));
   }
 
@@ -159,6 +164,7 @@ export class FurnishingLayer {
     }
     const target = skip ? new PartCollector() : P;
     target.begin(at.x, at.z, at.rot, this._roomIdx(lamp.room), at.y - lamp.height);
+    target.objId = lamp.id;
     LAMPS[model](target, lamp, { ceiling, roomIdx: this._roomIdx(lamp.room), lampIdx: lamp.idx });
     return target.bounds.clone().translate(new THREE.Vector3(0, -lamp.height, 0));
   }
@@ -205,6 +211,7 @@ export class FurnishingLayer {
    */
   buildSingle(type, e) {
     const P = new PartCollector();
+    P.static = true; // im Editor: bewegliche Teile stehen still
     const at = { x: 0, y: 0, z: 0, rot: 0 };
     const box = type === 'lamp' ? this._buildLamp(P, e, at) : this._buildItem(P, e, at);
     const group = new THREE.Group();

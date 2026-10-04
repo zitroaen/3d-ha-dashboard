@@ -24,11 +24,12 @@ export function layoutValues(type, e) {
     v.entity = e.entity ?? null; // power-Entities (Liste), für das Licht
   } else if (e.elevation != null) v.elevation = e.elevation;
   v.ha = e.ha ? structuredClone(e.ha) : undefined; // HA-Verknüpfung und Gesten
+  v.state = e.state; // fester Zustand ohne Entity
   return v;
 }
 
 /** Was ein Override eines Objekts überschreibt (alles, was der Editor ändern kann) */
-const OVERRIDE_KEYS = ['pos', 'rot', 'elevation', 'light', 'ha'];
+const OVERRIDE_KEYS = ['pos', 'rot', 'elevation', 'light', 'ha', 'state', 'stored'];
 
 /** Override eines Modell-Objekts (für die Benutzerdaten) */
 export function objectOverride(o) {

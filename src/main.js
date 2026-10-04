@@ -7,7 +7,8 @@ import { loadData, loadShared, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
 import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides, download } from './store.js';
-import { toScene, writeBack, gestureAction, roleEntities, showsBadge, GESTURES } from './model/model.js';
+import { toScene, writeBack, gestureAction, roleEntities, showsBadge, GESTURES, activityOf } from './model/model.js';
+import { CATALOG } from './model/catalog.js';
 import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
 import { EntityPicker, areaForRoom } from './picker.js';
@@ -78,6 +79,11 @@ button { touch-action: manipulation; }
 .levels button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); }
 .levels button.on + button, .levels button:has(+ button.on) { border-color: transparent; }
 /* Wetter oben: Symbol und Temperatur, antippen öffnet den HA-Wetterdialog */
+.fps { position: absolute; right: 12px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); padding: 6px 10px; border-radius: var(--r-item);
+  background: var(--g-bg); border: 1px solid var(--g-line); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur);
+  font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--g-fg); pointer-events: none; text-align: right; }
+.fps b { font-size: 15px; } .fps small { color: var(--g-fg-dim); }
+:host([editing]) .fps { bottom: calc(var(--ha3d-editbar-h, 80px) + 30px + env(safe-area-inset-bottom, 0px)); }
 .weather { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; white-space: nowrap; flex-shrink: 0; margin-left: auto; margin-right: 140px; padding: 0 12px;
   border: 1px solid var(--g-line); border-radius: var(--r-btn); background: var(--g-bg); color: inherit; font: inherit; font-size: 14px; cursor: pointer;
   backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); }
@@ -120,10 +126,10 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .settings .body { overflow-y: auto; padding: 0 12px 12px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .settings h3 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
 .settings label { display: block; margin: 8px 0 4px; font-size: 14px; }
-.settings .seg { display: flex; gap: 4px; padding: 4px; border-radius: var(--r-btn); background: var(--g-well); }
-.settings .seg button { flex: 1; min-height: 48px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.settings .seg, .objcfg .seg { display: flex; gap: 4px; padding: 4px; border-radius: var(--r-btn); background: var(--g-well); }
+.settings .seg button, .objcfg .seg button { flex: 1; min-height: 48px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .settings .seg.wrap { flex-wrap: wrap; } .settings .seg.wrap button { flex: 1 0 30%; }
-.settings .seg button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); font-weight: 600; }
+.settings .seg button.on, .objcfg .seg button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); font-weight: 600; }
 .settings .hint { margin: 6px 2px 0; font-size: 12px; opacity: 0.6; }
 .settings .item { width: 100%; min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
   margin-bottom: 6px; padding: 8px 14px; border: 1px solid var(--g-line); border-radius: var(--r-item); background: var(--g-hover); color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -298,6 +304,7 @@ class Ha3dDashboard extends HTMLElement {
       <button class="demo-note" hidden aria-label="Hinweis ausblenden"></button>
       <div class="toast"></div>
       <div class="confirm"><div><p></p><div class="row"><button class="no">Abbrechen</button><button class="yes">OK</button></div></div></div>
+      <div class="fps" hidden aria-live="off"></div>
       <div class="error"></div>`;
     this.shadowRoot.querySelector('button.menu').addEventListener('click', () => {
       this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
@@ -350,6 +357,7 @@ class Ha3dDashboard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    clearInterval(this._fpsTimer);
     document.removeEventListener('visibilitychange', this._onVisible);
     window.removeEventListener('resize', this._onResize);
     window.visualViewport?.removeEventListener('resize', this._onResize);
@@ -456,6 +464,7 @@ class Ha3dDashboard extends HTMLElement {
           this.view.setFurnishing({ devices: scene.devices, items: scene.items });
           this.areaMap = scene.areaMap;
           if (this._hass) this._applyHass(); // neue Leuchten-Objekte -> Zustand aus HA neu setzen
+          else this._applyActivity();
         }
       } catch (e) {
         console.error('ha-3d-dashboard:', e);
@@ -552,6 +561,11 @@ class Ha3dDashboard extends HTMLElement {
     });
     this.settings ??= new ObjectSettings(this.shadowRoot.querySelector('.objcfg'), {
       onChange: (ha) => this.editor?.setHa(ha),
+      onState: (state) => {
+        this.editor?.setState(state);
+        this._applyActivity();
+        this.settings.render();
+      },
       onPick: (role) => this._openPicker(role),
       onClose: () => this.editor?._emit(),
     });
@@ -560,11 +574,13 @@ class Ha3dDashboard extends HTMLElement {
     this._renderLevel();
     this.view.setQuality?.(this.prefs.quality);
     this.setAttribute('quality', this.view.quality);
+    this._applyMotion();
     if (this._hass) this._applyHass();
     else {
       this._applyWeather();
       this._applySky();
       this._updateBadges();
+      this._applyActivity();
     }
     this._resolveReady(this);
   }
@@ -661,7 +677,7 @@ class Ha3dDashboard extends HTMLElement {
     const s = this.editor?.sel;
     this.picker.close();
     if (!show || !s) return this.settings.close();
-    this.settings.open({ entry: s.entry, light: s.type === 'lamp', hass: this._hass });
+    this.settings.open({ entry: s.entry, light: s.type === 'lamp', hass: this._hass, anim: !!CATALOG[s.entry.kind || s.entry.model]?.anim });
     this.editor._emit();
   }
 
@@ -773,6 +789,7 @@ class Ha3dDashboard extends HTMLElement {
       this.view.setLamp(id, l.on, { color: l.color ?? s.baseColor, brightness: l.on ? l.brightness : undefined });
     }
     this._updateBadges();
+    this._applyActivity();
     if (this.shadowRoot.querySelector('.links.show')) this._renderLinks();
   }
 
@@ -997,6 +1014,52 @@ class Ha3dDashboard extends HTMLElement {
     this.setAttribute('quality', this.view.quality);
     this._applyWeather();
     this._applySky();
+    this._applyMotion();
+  }
+
+  /** Animationen (global an/aus; Automatisch = aus bei „Bewegung reduzieren“) und Leistungsanzeige */
+  _applyMotion() {
+    const pref = this.prefs?.animations || 'auto';
+    const on = pref === 'auto' ? !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches : pref === 'on';
+    this.view?.setAnimations(on);
+    this._applyFps();
+  }
+
+  /**
+   * Aktivität animierter Objekte (Ventilator …): verknüpfte Entities (Demo-Modus: nur in HA vorhandene) oder der
+   * im Editor feste Zustand. Nur Objekte, deren Modell eine Animation hat.
+   */
+  _applyActivity() {
+    const d = this.view?.furnishingData;
+    if (!d) return;
+    const states = this._hass?.states || {};
+    for (const e of [...d.items, ...d.devices]) {
+      if (!CATALOG[e.kind || e.model]?.anim) continue;
+      const ents = this._live(roleEntities(e, 'power'));
+      this.view.setActivity(e.id, activityOf(ents.map((x) => states[x]), e.state));
+    }
+  }
+
+  /** Leistungsanzeige (Einstellungen): Bilder/s, Rechenzeit je Bild, Zeichenaufrufe, Dreiecke – alle 0,5 s */
+  _applyFps() {
+    const el = this.shadowRoot.querySelector('.fps');
+    const on = this.prefs?.fps === 'on';
+    el.hidden = !on;
+    clearInterval(this._fpsTimer);
+    if (!on) return;
+    let last = { t: performance.now(), frames: this.view?.frames || 0 };
+    this._fpsTimer = setInterval(() => {
+      const v = this.view;
+      if (!v) return;
+      const now = performance.now(), frames = v.frames || 0;
+      const fps = ((frames - last.frames) * 1000) / (now - last.t);
+      last = { t: now, frames };
+      const info = v.renderer.info.render;
+      el.innerHTML = `<b>${fps.toFixed(fps < 10 ? 1 : 0)}</b> Bilder/s${fps < 0.5 ? ' <small>(Ruhe)</small>' : ''}<br>`
+        + `${(v.frameMs || 0).toFixed(1)} ms je Bild · ${v.quality === 'low' ? 'Sparsam' : 'Hoch'}<br>`
+        + `${info.calls} Zeichenaufrufe · ${Math.round(info.triangles / 1000)}k Dreiecke<br>`
+        + `${v._runningAnims().length} Animationen`;
+    }, 500);
   }
 
   /**
