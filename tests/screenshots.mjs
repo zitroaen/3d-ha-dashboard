@@ -1,7 +1,8 @@
 // Headless-Screenshots gegen das simulierte HA – für beliebige Daten (Demo-Haus oder eigenes Haus).
 //   node tests/screenshots.mjs [szenario …]          -> tests/output/ebene<n>_<szenario>_<viewport>.png
 // Standard-Szenarien beleuchten Räume nach ihrer Reihenfolge im Modell (erste Gebäude-Etage); weitere Ebenen
-// (Stockwerke) bekommen je ein Bild "abend". Eigene Ansichten (z. B. Zoom auf einen Raum) kommen aus VIEWS:
+// (Stockwerke) bekommen je ein Bild "abend", die Dächer (Ebene über der obersten) ein Bild "dach". Eigene Ansichten
+// (z. B. Zoom auf einen Raum) kommen aus VIEWS:
 //   { "wohnzimmer-abend": { "rooms": ["wohnzimmer"], "outdoor": true, "view": { "at": [3, 7.5], "zoom": 1.9, "az": 0 } } }
 // rooms: Raum-IDs oder "all"; sun: { azimuth, elevation } (sonst Nacht); view.at: Plan-Punkt [x, y].
 import { mkdir, readFile } from 'node:fs/promises';
@@ -45,11 +46,13 @@ try {
     const runs = [
       ...Object.entries(SCENARIOS).map(([name, sc]) => [sc.level ?? firstFloor.level, name, sc]),
       ...levels.filter((l) => l !== firstFloor.level).map((l) => [l, 'abend', { rooms: 'all', outdoor: false }]),
+      // Dächer (Knopf „Dach“ über der obersten Ebene) am Tag
+      [levels.at(-1) + 1, 'dach', { rooms: [], outdoor: false, sun: { azimuth: 215, elevation: 38 } }],
     ];
     for (const [level, name, sc] of runs) {
       if (only.length && !only.includes(name)) continue;
       if (vpName !== 'desktop' && (name !== 'abend' || level !== firstFloor.level)) continue; // andere Größen nur im Hauptszenario
-      await page.evaluate(([level, sc]) => {
+      const shown = await page.evaluate(([level, sc]) => {
         // Sonnenstand über das simulierte HA setzen (wie im echten Betrieb über hass.states)
         const sun = sc.sun || { azimuth: 330, elevation: -25 };
         const mh = window.mockHass;
@@ -59,6 +62,7 @@ try {
           'weather.home': { state: sc.weather || (sun.elevation > 0 ? 'sunny' : 'clear-night'), attributes: { temperature: 14, temperature_unit: '°C' } },
         };
         window.panel.hass = mh;
+        if (!window.panel.view.levels.includes(level)) return false; // z. B. keine Dächer über der obersten Ebene
         window.panel.setLevel(level);
         const v = window.panel.view;
         for (const f of v.activeFloors) for (const id of f.rooms.keys()) v.setRoomLight(id, sc.rooms === 'all' || sc.rooms.includes(id));
@@ -88,7 +92,9 @@ try {
         v.camera.updateProjectionMatrix();
         v.renderer.shadowMap.needsUpdate = true;
         v.renderNow();
+        return true;
       }, [level, sc]);
+      if (!shown) continue;
       await page.waitForTimeout(150);
       const file = join(OUT, `ebene${level}_${name}_${vpName}.png`);
       await page.screenshot({ path: file });

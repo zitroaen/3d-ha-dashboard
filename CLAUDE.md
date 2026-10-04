@@ -78,6 +78,7 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/data.js` lädt `model.yaml` zur Laufzeit (js-yaml im Browser) · `src/demo.js` eingebettetes Demo-Haus
 - `src/scene.js` Kamera, Himmel (Sonne/Mond aus `sun.sun`), Render-on-demand, Antippen, Licht-Zustand
 - `src/house.js` Bauwerk einer Etage (Räume, Wände, Böden) · `src/openings.js` Fenster und Türen im Detail
+  · `src/roofshape.js` Dachform (Ebenen, Flächen, Profile) · `src/roof.js` Steildach zeichnen, Wände unter der Schräge
 - `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen)
 - `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE`
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
@@ -224,6 +225,16 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Sektionaltor (0.16.1, statt Schwingtor): Animation `sectional` – die Lamellen eines Meshes (ein Zeichenaufruf)
   werden je Bild direkt in der Geometrie entlang der Schiene (senkrecht, Viertelbogen, waagrecht) als Sehne gelegt;
   Zuordnung Dreieck → Lamelle über die Höhe im geschlossenen Tor. Fortschritt wie `swing` (`PROGRESS` in scene.js).
+- Steildächer (0.17.0): `roof` ist ein Dachteil oder eine Liste (`roofParts()` in model.js). Form in
+  `src/roofshape.js` ohne three.js: jede Traufkante trägt eine Ebene, Dachfläche = untere Hülle der Ebenen (exakt für
+  konvexe Umrisse, daher Teile konvex; L-Form = zwei Teile). Flächen per Halbebenen-Schnitt (konvexe Polygone),
+  Aussparung als konvexe Differenz, Profile entlang von Strecken für Giebelwände. Zeichnen in `src/roof.js`. Die
+  oberste Etage bekommt `roofCut` (nur Teile über ihr): Wände enden bei min(Etagenhöhe, Traufe + Dachfläche)
+  (`ceilingFn`, adaptives Profil, Wandkappen als Band). Dach-Etage liegt wie bisher auf Geschosshöhe + Dicke des
+  ersten Teils; `offset` je Teil. Knopf „Dach“ nur, wenn Dächer über der obersten Ebene liegen.
+- Ebenen zusammenfassen (0.17.0): `scene._mergeLevels()` fasst Bauwerk-Meshes aller Etagen einer Ebene je Material in
+  der ersten Etage zusammen (Etagen einer Ebene sind immer gemeinsam sichtbar), Bodenplatten je Ebene ebenso;
+  Treffer-Flächen bleiben je Etage. Spart ~20 Zeichenaufrufe je Ebene im Demo-Haus.
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).

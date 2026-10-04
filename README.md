@@ -23,8 +23,10 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Waschmaschine, Kamin, PV, Staubsauger. Antippen, Doppeltippen und langes Drücken lösen wählbare Aktionen aus
   (Umschalten, HA-Dialog, Dienst, Seite, optional mit Rückfrage); ein Schild über dem Objekt zeigt den Zustand
   (z. B. „42 min“).
-- **Dächer:** Gebäude ohne Obergeschoss (Garage, Gartenhaus) zeigen ab der Ebene darüber ihr Flachdach – samt
-  Objekten darauf wie einem Balkonkraftwerk.
+- **Dächer:** Flach-, Sattel-, Walm-, Krüppelwalm- und Pultdächer mit Überstand, Gauben und Schornsteinen; mehrere
+  Dachteile je Gebäude (Anbau, Dachterrasse, abgesetztes Pultdach). Dächer erscheinen ab der Ebene darüber (Knopf
+  „Dach“ über der obersten) – samt Objekten darauf wie einem Balkonkraftwerk. Unter einem Steildach zeigen die Wände
+  der obersten Etage Kniestock und Dachschräge.
 - **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände mit Höhen (z. B. Südhang); Trockenmauern,
   Hochbeete und Stufen; Bäume, Sträucher, Gräser, Blumen, Gartenmöbel und Gartenleuchten (Poller, Strahler,
   Lichterkette) aus dem Katalog.

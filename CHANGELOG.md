@@ -1,5 +1,21 @@
 # Änderungen
 
+## 0.17.0
+
+- **Steildächer:** `buildings[].roof` kennt `type` = Satteldach (`gable`), Walmdach (`hip`), Krüppelwalm
+  (`half_hip`) und Pultdach (`shed`) mit Neigung, Firstrichtung, Dachüberstand und Traufhöhe/Kniestock (`eaves`);
+  Dachziegel (`roof_tiles`) in frei wählbarer Farbe.
+- **Mehrere Dachteile** je Gebäude (Liste): Hauptdach + Anbau, ein Walmdach rund um eine Dachterrasse (`opening`,
+  die Terrasse bleibt ein begehbarer Bereich mit Objekten), abgesetzte Pultdächer.
+- **Gauben** (Schlepp-, Flach-, Satteldachgaube mit Fenster) und **Schornsteine**.
+- **Dachgeschoss:** Wände der obersten Etage enden unter der Dachfläche – Kniestock, Giebel und Dachschrägen sind zu
+  sehen; Deckenleuchten hängen an der Schräge.
+- **Knopf „Dach“** über der obersten Ebene zeigt alle Gebäude mit ihren Dächern.
+- **Schneller:** Bauwerk-Meshes gleicher Ebene und gleichen Materials werden zusammengefasst (weniger
+  Zeichenaufrufe, z. B. 1. OG im Demo-Haus 131 statt 152).
+- **Demo-Haus:** Krüppelwalmdach mit Gaube und Schornstein, Dachterrasse auf dem Anbau, neues Gartenhaus mit
+  abgesetztem Pultdach.
+
 ## 0.16.1
 
 - **Garagentor als Sektionaltor:** Das Torblatt aus Lamellen sitzt innen hinter der Öffnung und fährt in seitlichen

@@ -1,5 +1,6 @@
 // Erzeugt das Bauwerk des erfundenen Demo-Hauses in examples/demo/model.yaml (Datenmodell v2, docs/DATA_MODEL.md):
-// Wohnhaus 10 × 8 m (Erdgeschoss: Wohnzimmer, Küche, Schlafzimmer, Bad; Obergeschoss: Studio), Garage daneben und
+// Wohnhaus 10 × 8 m (Erdgeschoss: Wohnzimmer, Küche, Schlafzimmer, Bad; Obergeschoss: Studio unter einem
+// Krüppelwalmdach, Dachterrasse auf dem Anbau), Garage daneben, Gartenhaus mit abgesetztem Pultdach und
 // Außenbereiche (Terrasse, Einfahrt, Beete, Südhang; im Norden eine in den Hang gegrabene Terrasse mit Trockenmauern). Die Objekte (objects) in model.yaml bleiben unverändert.
 //   node examples/demo/build-house.mjs
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -109,6 +110,17 @@ const buildings = [
       { id: 'eg', name: 'Erdgeschoss', level: 0, elevation: 0, height: 2.6, rooms, walls: walls.map((polygon) => ({ polygon })), windows, doors },
       { id: 'og', name: 'Obergeschoss', level: 1, elevation: OG_EL, height: OG_H, rooms: ogRooms, walls: ogWalls.map((polygon) => ({ polygon })), windows: ogWindows },
     ],
+    // Krüppelwalmdach über dem Obergeschoss (Kniestock 1 m, First Nord–Süd) mit Schleppgaube und Schornstein;
+    // über dem eingeschossigen Ostteil ein Walmdach rund um eine Dachterrasse
+    roof: [
+      {
+        type: 'half_hip', ridge: 'y', pitch: 40, eaves: 1.0, overhang: 0.4,
+        dormers: [{ pos: [0.9, 4.0], width: 1.8, height: 1.3, type: 'shed' }],
+        chimneys: [{ pos: [4.3, 2.4], size: [0.5, 0.5], height: 0.7 }],
+      },
+      { id: 'haus_anbau', name: 'Dach Anbau', type: 'hip', polygon: rect(6 + INT / 2, 0, 10, 8), pitch: 30, eaves: -0.25, overhang: 0.3, opening: rect(6.7, 1.2, 9.4, 6.8) },
+      { id: 'dachterrasse', name: 'Dachterrasse', polygon: rect(6.7, 1.2, 9.4, 6.8), eaves: -0.25, surface: 'slabs' },
+    ],
   },
   {
     id: 'garage',
@@ -121,7 +133,38 @@ const buildings = [
       doors: garageDoors,
     }],
   },
+  gardenHouse(),
 ];
+
+/**
+ * Gartenhaus im Schwedenstil östlich der Einfahrt, 3 × 2,4 m: abgesetztes Pultdach – zwei Pultflächen nach Süden,
+ * die nördliche höher, dazwischen ein schmales Wandband.
+ */
+function gardenHouse() {
+  const X0 = 16.5, X1 = 19.5, Y0 = 7.0, Y1 = 9.4, T = 0.12, MID = 8.2;
+  const ws = [
+    ...wall({ axis: 'x', from: X0, to: X1, at0: Y0, at1: Y0 + T }),
+    ...wall({ axis: 'x', from: X0, to: X1, at0: Y1 - T, at1: Y1, gaps: [[17.6, 18.6]] }),
+    ...wall({ axis: 'y', from: Y0 + T, to: Y1 - T, at0: X0, at1: X0 + T, gaps: [[7.8, 8.7]] }),
+    ...wall({ axis: 'y', from: Y0 + T, to: Y1 - T, at0: X1 - T, at1: X1 }),
+  ];
+  return {
+    id: 'gartenhaus',
+    name: 'Gartenhaus',
+    kind: 'garden_house',
+    floors: [{
+      id: 'eg', name: 'Gartenhaus', level: 0, elevation: 0, height: 2.2,
+      rooms: [{ id: 'gartenhaus', name: 'Gartenhaus', polygon: rect(X0 + T, Y0 + T, X1 - T, Y1 - T), surface: 'parquet' }],
+      walls: ws.map((polygon) => ({ polygon })),
+      windows: [{ rect: [17.6, Y1 - T, 18.6, Y1].map(r3), room: 'gartenhaus', sill: 0.9, top: 1.8 }],
+      doors: [{ hinge: [r3(X0 + T / 2), 7.8], end: [r3(X0 + T / 2), 8.7], swing: -1, jamb: [-T / 2, T / 2].map(r3), type: 'exterior', leaf: 'solid', rooms: ['gartenhaus'], height: 1.95 }],
+    }],
+    roof: [
+      { type: 'shed', slope: '+y', polygon: rect(X0, MID, X1, Y1), pitch: 18, eaves: 2.0, overhang: 0.3, thickness: 0.15, surface: 'roof' },
+      { type: 'shed', slope: '+y', polygon: rect(X0, Y0, X1, MID), pitch: 18, eaves: 2.9, overhang: 0.3, thickness: 0.15, surface: 'roof' },
+    ],
+  };
+}
 
 const outdoor = [
   { id: 'terrasse', name: 'Terrasse', polygon: rect(0, 8, 6.5, 10.5), surface: 'paving' },
