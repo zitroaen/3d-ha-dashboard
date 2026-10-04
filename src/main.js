@@ -13,6 +13,7 @@ import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js
 import { EntityPicker, areaForRoom } from './picker.js';
 import { ObjectSettings } from './objsettings.js';
 import { SettingsMenu } from './menu.js';
+import { WEATHER_PRESETS, weatherParams, weatherKind, weatherLabel, pickWeatherEntity, temperatureText, weatherIcon } from './weather.js';
 
 const ICON = {"edit": "M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z", "move": "M13 6v5h5V7.75L22.25 12 18 16.25V13h-5v5h3.25L12 22.25 7.75 18H11v-5H6v3.25L1.75 12 6 7.75V11h5V6H7.75L12 1.75 16.25 6H13z", "align": "M3 2h2v20H3V2zm4 5h14v4H7V7zm0 6h9v4H7v-4z", "undo": "M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62A8 8 0 0 1 20.1 16l2.37-.78A10.5 10.5 0 0 0 12.5 8z", "save": "M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z", "export": "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z", "done": "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"};
 ICON.link = 'M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8v2zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z';
@@ -51,13 +52,33 @@ button { touch-action: manipulation; }
 .levels button { min-width: 48px; height: 48px; padding: 0 8px; border-radius: 24px; border: 1px solid #ffffff22; background: #12151bcc;
   color: #e8e2d8; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; backdrop-filter: blur(6px); }
 .levels button.on { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
+/* Wetter oben: Symbol und Temperatur, antippen öffnet den HA-Wetterdialog */
+.weather { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; white-space: nowrap; flex-shrink: 0; margin-left: auto; margin-right: 140px; padding: 0 12px;
+  border: 0; border-radius: 24px; background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.weather[hidden] { display: none; }
+:host([narrow]) .weather { margin-right: 78px; padding: 0 6px; }
+/* Niederschlag als Bildschirm-Effekt: nur verschobene Ebenen (GPU-Compositing), das 3D-Bild rechnet dafür nicht neu */
+.precip { position: absolute; inset: 0; pointer-events: none; overflow: hidden; display: none; }
+:host([precip="rain"]) .precip, :host([precip="snow"]) .precip { display: block; }
+.precip::before, .precip::after { content: ''; position: absolute; left: -10%; right: -10%; top: -200px; bottom: 0; will-change: transform; }
+:host([precip="rain"]) .precip::before { background: repeating-linear-gradient(103deg, transparent 0 18px, #b9d3ee2e 18px 19px, transparent 19px 41px);
+  background-size: 160px 200px; animation: ha3d-fall .45s linear infinite; }
+:host([precip="rain"]) .precip::after { background: repeating-linear-gradient(103deg, transparent 0 33px, #b9d3ee1f 33px 34px, transparent 34px 67px);
+  background-size: 230px 200px; animation: ha3d-fall .7s linear infinite; }
+:host([precip="snow"]) .precip::before { background-image: radial-gradient(circle, #ffffffd0 0 1.6px, transparent 2.2px), radial-gradient(circle, #ffffff90 0 1.1px, transparent 1.6px);
+  background-size: 90px 100px, 60px 50px; background-position: 0 0, 25px 30px; animation: ha3d-fall 5s linear infinite; }
+:host([precip="snow"]) .precip::after { background-image: radial-gradient(circle, #ffffffa0 0 2px, transparent 2.8px);
+  background-size: 140px 200px; animation: ha3d-fall 8s linear infinite; }
+@keyframes ha3d-fall { from { transform: translateY(0); } to { transform: translateY(200px); } }
+@media (prefers-reduced-motion: reduce) { .precip::before, .precip::after { animation: none; } }
+:host([quality="low"]) .precip::after { display: none; } /* sparsam: nur eine Ebene */
 button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
 /* Kompass: zeigt, wo Norden im Bild liegt; antippen = einnorden. Touch-Ziel 56 px */
 .compass { position: absolute; top: 10px; right: 12px; width: 56px; height: 56px; padding: 0; border-radius: 50%;
   border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; cursor: pointer; backdrop-filter: blur(6px); }
 .compass:active { background: #1d222bdd; }
 .compass svg { width: 100%; height: 100%; display: block; }
-.compass .needle { transform-origin: 28px 28px; transition: transform .08s linear; }
+.compass .needle { transform-origin: 28px 28px; } /* kein Übergang: folgt dem Bild ohne Verzögerung */
 /* Editiermodus: Stift unter dem Kompass, Werkzeugleiste unten (Touch-Ziele >= 56 px) */
 .settings-toggle { position: absolute; top: 76px; right: 12px; width: 56px; height: 56px; border-radius: 50%;
   border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -75,6 +96,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .settings label { display: block; margin: 8px 0 4px; font-size: 14px; }
 .settings .seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #0b0d12; }
 .settings .seg button { flex: 1; min-height: 48px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.settings .seg.wrap { flex-wrap: wrap; } .settings .seg.wrap button { flex: 1 0 30%; }
 .settings .seg button.on { background: #f0b45a; color: #1a1408; font-weight: 600; }
 .settings .hint { margin: 6px 2px 0; font-size: 12px; opacity: 0.6; }
 .settings .item { width: 100%; min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
@@ -204,10 +226,12 @@ class Ha3dDashboard extends HTMLElement {
       <style>${STYLE}</style>
       <div id="stage"></div>
       <div class="vignette"></div>
+      <div class="precip"></div>
       <div class="badges"></div>
       <div class="bar">
         <button class="menu" title="Menü"><svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg></button>
         <span class="title"></span><span class="floor"></span>
+        <button class="weather" hidden title="Wetter"></button>
       </div>
       <div class="levels" hidden></div>
       <button class="compass" title="Ansicht einnorden" aria-label="Ansicht einnorden">
@@ -265,6 +289,11 @@ class Ha3dDashboard extends HTMLElement {
     });
     this.prefs = this.menu.prefs;
     this.shadowRoot.querySelector('.settings-toggle').addEventListener('click', () => this._toggleMenu());
+    // Wetter antippen: HA-Wetterdialog (Vorhersage)
+    this.shadowRoot.querySelector('.weather').addEventListener('click', () => {
+      const entityId = this._weatherEntity();
+      if (entityId) this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId }, bubbles: true, composed: true }));
+    });
     this.shadowRoot.querySelector('.links-close').addEventListener('click', () => this._toggleLinks(false));
     this.shadowRoot.querySelector('.tools').addEventListener('click', (e) => {
       const act = e.target.closest('button')?.dataset.act;
@@ -460,8 +489,14 @@ class Ha3dDashboard extends HTMLElement {
       onObjectGesture: (ref, g) => this._onGesture(ref, g),
       objectGestures: (ref) => this._gesturesOf(ref),
       onViewChange: () => this._updateCompass(),
-      onRender: () => this._placeBadges(),
-      onQualityChange: () => this.menu?.isOpen && this._toggleMenu(true),
+      onRender: () => {
+        this._placeBadges();
+        this._updateCompass(); // im selben Bild wie die Szene, sonst hinkt die Nadel beim Drehen nach
+      },
+      onQualityChange: (q) => {
+        this.setAttribute('quality', q);
+        if (this.menu?.isOpen) this._toggleMenu(true);
+      },
     });
     this._updateCompass();
     this.areaMap = data.areaMap || {};
@@ -494,8 +529,10 @@ class Ha3dDashboard extends HTMLElement {
     this.shadowRoot.querySelector('.title').textContent = data.house.name || '';
     this._renderLevel();
     this.view.setQuality?.(this.prefs.quality);
+    this.setAttribute('quality', this.view.quality);
     if (this._hass) this._applyHass();
     else {
+      this._applyWeather();
       this._applySky();
       this._updateBadges();
     }
@@ -653,7 +690,10 @@ class Ha3dDashboard extends HTMLElement {
 
   _updateCompass() {
     const deg = this.view?.northScreenAngle() ?? 0;
-    this.shadowRoot.querySelector('.compass .needle').style.transform = `rotate(${deg.toFixed(1)}deg)`;
+    const t = `rotate(${deg.toFixed(1)}deg)`;
+    if (t === this._needle) return;
+    this._needle = t;
+    this.shadowRoot.querySelector('.compass .needle').style.transform = t;
   }
 
   _showError(text) {
@@ -683,6 +723,7 @@ class Ha3dDashboard extends HTMLElement {
   /** Zustände aus HA übernehmen: Sonne und alle verknüpften Leuchten. */
   _applyHass() {
     const states = this._hass?.states || {};
+    this._applyWeather();
     this._applySky();
 
     // Im Demo-Modus folgen nur Leuchten, die mit einer echten Entity verknüpft wurden, HA; die übrigen schalten lokal
@@ -908,7 +949,9 @@ class Ha3dDashboard extends HTMLElement {
     this._toggleLinks(false);
     if (!show) return this.menu.close();
     const canEdit = !this.hasAttribute('readonly');
-    this.menu.open({ canEdit, version: VERSION, source: this._source || '', quality: this.view?.quality });
+    const we = this._weatherEntity(), ws = we && this._hass?.states?.[we];
+    const weather = we ? `${we}${ws ? ` (${[weatherLabel(weatherKind(ws)), temperatureText(ws)].filter(Boolean).join(', ')})` : ''}` : '';
+    this.menu.open({ canEdit, version: VERSION, source: this._source || '', quality: this.view?.quality, weather });
   }
 
   /** Ansichts-Einstellungen anwenden: Tageszeit (Sonne aus HA oder fest) und Qualität */
@@ -916,7 +959,41 @@ class Ha3dDashboard extends HTMLElement {
     this.prefs = prefs;
     if (!this.view) return;
     this.view.setQuality?.(prefs.quality);
+    this.setAttribute('quality', this.view.quality);
+    this._applyWeather();
     this._applySky();
+  }
+
+  /** Wetter-Entity: site.weather im Modell oder automatisch (weather.home, sonst die erste) */
+  _weatherEntity() {
+    return pickWeatherEntity(this._hass?.states, this.model?.site?.weather);
+  }
+
+  /** Wetter in die Szene und die Anzeige: aus HA oder fest (Einstellungsmenü, zum Testen) */
+  _applyWeather() {
+    if (!this.view) return;
+    const pref = this.prefs?.weather || 'auto';
+    const id = this._weatherEntity();
+    const st = id ? this._hass?.states?.[id] : null;
+    const kind = pref === 'auto' ? weatherKind(st) : pref;
+    const params = pref === 'auto' ? weatherParams(st) : WEATHER_PRESETS[pref];
+    this.view.setWeather(params);
+    // Niederschlag als Bildschirm-Effekt; Anzeige oben mit Symbol und Temperatur
+    const precip = params?.snow > 0.4 ? 'snow' : params?.rain > 0.3 ? 'rain' : null;
+    if (precip) this.setAttribute('precip', precip);
+    else this.removeAttribute('precip');
+    const el = this.shadowRoot.querySelector('.weather');
+    el.hidden = !kind;
+    if (!kind) return;
+    // Nacht: Tageszeit-Schalter, sonst die Sonne aus HA (sun.sun) bzw. „clear-night“ der Wetter-Entity
+    const dt = this.prefs?.daytime;
+    const night = dt === 'night' || (dt !== 'day' && (st?.state === 'clear-night' || this._hass?.states?.['sun.sun']?.state === 'below_horizon'));
+    const html = `${weatherIcon(kind, night)}<span>${pref === 'auto' ? temperatureText(st) || weatherLabel(kind) : `${weatherLabel(kind)} (Test)`}</span>`;
+    if (html !== this._weatherHtml) {
+      this._weatherHtml = html;
+      el.innerHTML = html;
+      el.setAttribute('aria-label', `Wetter: ${weatherLabel(kind)}`);
+    }
   }
 
   /** Sonnenstand: aus sun.sun – oder fest Tag/Nacht (Einstellungsmenü, zum Testen und für Wand-Tablets) */

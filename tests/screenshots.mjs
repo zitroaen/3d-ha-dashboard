@@ -23,6 +23,10 @@ const SCENARIOS = {
   // Tag: Sonne am Nachmittag im Südwesten; Dämmerung: Sonne knapp unter dem Horizont
   'tag': { rooms: [], outdoor: false, sun: { azimuth: 215, elevation: 38 } },
   'daemmerung': { rooms: firstRooms(2), outdoor: true, sun: { azimuth: 290, elevation: -3 } },
+  // Wetter (weather.home im simulierten HA): Regen am Tag, Schnee am Tag, Nebel in der Dämmerung
+  'regen': { rooms: [], outdoor: false, sun: { azimuth: 200, elevation: 30 }, weather: 'rainy' },
+  'schnee': { rooms: [], outdoor: false, sun: { azimuth: 200, elevation: 25 }, weather: 'snowy' },
+  'nebel': { rooms: firstRooms(2), outdoor: true, sun: { azimuth: 250, elevation: 2 }, weather: 'fog' },
   ...(VIEWS ? JSON.parse(await readFile(VIEWS, 'utf8')) : {}),
 };
 const VIEWPORTS = { desktop: { width: 1600, height: 1000 }, tablet: { width: 1024, height: 768 }, phone: { width: 390, height: 844 } };
@@ -49,7 +53,11 @@ try {
         // Sonnenstand über das simulierte HA setzen (wie im echten Betrieb über hass.states)
         const sun = sc.sun || { azimuth: 330, elevation: -25 };
         const mh = window.mockHass;
-        mh.states = { ...mh.states, 'sun.sun': { state: sun.elevation > 0 ? 'above_horizon' : 'below_horizon', attributes: { ...sun } } };
+        mh.states = {
+          ...mh.states,
+          'sun.sun': { state: sun.elevation > 0 ? 'above_horizon' : 'below_horizon', attributes: { ...sun } },
+          'weather.home': { state: sc.weather || (sun.elevation > 0 ? 'sunny' : 'clear-night'), attributes: { temperature: 14, temperature_unit: '°C' } },
+        };
         window.panel.hass = mh;
         window.panel.setLevel(level);
         const v = window.panel.view;

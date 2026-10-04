@@ -48,10 +48,11 @@ export class SkyEnvironment {
    * @param dir      Richtung zum Gestirn (Welt, normiert)
    * @param isSun    Sonne (sonst Mond)
    * @param warm     0 = tief stehende, warme Sonne … 1 = hoch
+   * @param cloud    Bewölkung 0..1: Himmel grauer, Gestirn verdeckt
    * @returns Umgebungstextur (neu nur bei merklicher Änderung)
    */
-  update(day, dir, isSun, warm) {
-    const key = [day.toFixed(2), dir.x.toFixed(1), dir.y.toFixed(1), dir.z.toFixed(1), isSun, warm.toFixed(1)].join();
+  update(day, dir, isSun, warm, cloud = 0) {
+    const key = [day.toFixed(2), dir.x.toFixed(1), dir.y.toFixed(1), dir.z.toFixed(1), isSun, warm.toFixed(1), cloud.toFixed(1)].join();
     if (key === this.key && this.target) return this.target.texture;
     this.key = key;
     const mix = (a, b) => new THREE.Color(a).lerp(new THREE.Color(b), day);
@@ -60,6 +61,11 @@ export class SkyEnvironment {
     u.uHorizon.value.copy(mix(0x161b26, 0xbfd3e6).lerp(new THREE.Color(0xffc48a), isSun ? (1 - warm) * 0.5 * day : 0));
     u.uGround.value.copy(mix(0x0c0b0a, 0x5d5446));
     u.uSunColor.value.copy(isSun ? new THREE.Color(0xffd7a8).lerp(new THREE.Color(0xfff6ea), warm) : new THREE.Color(0x8796b8).multiplyScalar(0.25));
+    // Wolken: Zenit und Horizont gleichen sich an ein helles bzw. dunkles Grau an, die Scheibe verschwindet
+    const grey = mix(0x15171b, 0x9ea4ab);
+    u.uZenith.value.lerp(grey, cloud * 0.85);
+    u.uHorizon.value.lerp(grey.clone().multiplyScalar(1.1), cloud * 0.7);
+    u.uSunColor.value.multiplyScalar(1 - cloud * 0.95);
     u.uSunDir.value.copy(dir);
     u.uSunSize.value = isSun ? 0.0015 : 0.0008;
     const old = this.target;

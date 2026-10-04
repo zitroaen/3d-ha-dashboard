@@ -9,6 +9,8 @@ import { makeFloorAO, GROUND_Y } from './house.js';
 import { SkyEnvironment } from './environment.js';
 import { Refiner } from './refine.js';
 
+const NO_WEATHER = { cloud: 0, rain: 0, snow: 0, fog: 0 };
+
 /** Qualitätsstufen: Schattenauflösung und -weichheit, Bildauflösung, Ruhebild-Verfeinerung */
 const QUALITY = {
   high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2, refine: true },
@@ -322,9 +324,11 @@ export class HouseScene {
    * Horizont). null = kein Sonnen-Sensor -> Nacht. Zwischen -6° (bürgerliche Dämmerung) und +8° wird übergeblendet.
    */
   setSky(sun) {
+    this._sun = sun;
     const elev = sun?.elevation ?? -20;
     const azim = sun?.azimuth ?? 20; // ohne Sensor: Mond im Süden (Sonne gegenüber)
-    const key = `${azim.toFixed(1)}/${elev.toFixed(1)}`;
+    const w = this.weather || NO_WEATHER;
+    const key = `${azim.toFixed(1)}/${elev.toFixed(1)}/${JSON.stringify(w)}`;
     if (key === this._skyKey) return;
     this._skyKey = key;
 
@@ -337,7 +341,10 @@ export class HouseScene {
     // Umgebung (scene.environment, unten) – sie bringt dazu die Spiegelungen auf Glas, Böden und Lack.
     this.hemi.color.copy(mix(0x525a6c, 0xc9d8ec));
     this.hemi.groundColor.copy(mix(0x1e1d1c, 0x6e6250));
-    this.hemi.intensity = L(0.95, 1.05);
+    this.hemi.intensity = L(0.95, 1.05) * (1 + 0.3 * w.cloud);
+    // Wolken: diffuses, graues Himmelslicht; Schnee hellt den Bodenreflex auf
+    this.hemi.color.lerp(mix(0x3e4247, 0xb9bec4), w.cloud * 0.7);
+    this.hemi.groundColor.lerp(mix(0x2a2c30, 0xc9ced6), w.snow * 0.8);
     // Hintergrund und Nebel: Richtung Horizont geht der Boden in die Himmelsfarbe über (Farbe aus der Umgebung unten)
     this.scene.background.copy(mix(0x0a0d13, 0x8d9aa8));
 
@@ -358,14 +365,37 @@ export class HouseScene {
     const d = 35;
     // Plan: "oben" = -z, im Uhrzeigersinn = +x
     light.position.set(this.center.x + Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d, this.center.z - Math.cos(a) * Math.cos(e) * d);
+    // Bewölkung: Gestirn schwächer, Schatten blasser
+    light.intensity *= 1 - 0.8 * w.cloud;
+    light.shadow.intensity = 1 - 0.75 * w.cloud;
     const dir = light.position.clone().sub(this.center).normalize();
-    this.scene.environment = this.skyEnv.update(day, dir, isSun, sunWarm);
+    this.scene.environment = this.skyEnv.update(day, dir, isSun, sunWarm, w.cloud);
     this.scene.background.lerp(this.skyEnv.horizon, 0.35 * day);
+    // Nebel: kürzere Sicht, Farbe hellgrau (tags) bzw. dunkelgrau (nachts)
+    // Abstand Kamera–Drehpunkt (orthografisch, fest): vorne bleibt klar, nach hinten verschwindet der Garten im Dunst
+    this.scene.background.lerp(mix(0x1d2024, 0xb4b9be), w.fog * 0.7);
     this.scene.fog.color.copy(this.scene.background);
+    const dist = this.camera ? this.camera.position.distanceTo(this.controls.target) : 40;
+    this.scene.fog.near = THREE.MathUtils.lerp(45, dist * 0.85, w.fog);
+    this.scene.fog.far = THREE.MathUtils.lerp(95, dist * 1.45, w.fog);
+    // Regen: nasse Flächen draußen; Schnee: weiße Oberseiten (roomlight.js)
+    lightUniforms.uWet.value = w.snow > 0.6 ? 0 : w.rain > 0 ? Math.max(0.6, w.rain) : 0;
+    lightUniforms.uSnow.value = w.snow;
     this.scene.environmentIntensity = L(0.35, 0.75);
     this.renderer.shadowMap.needsUpdate = true;
     this.onSkyChange?.(day);
     this.requestRender();
+  }
+
+  /**
+   * Wetter setzen: { cloud, rain, snow, fog } je 0..1 (src/weather.js), null = klar. Rechnet nur Himmel, Licht und
+   * Materialparameter neu – kein Rendern pro Bild.
+   */
+  setWeather(w) {
+    const next = w ? { cloud: w.cloud || 0, rain: w.rain || 0, snow: w.snow || 0, fog: w.fog || 0 } : NO_WEATHER;
+    if (JSON.stringify(next) === JSON.stringify(this.weather || NO_WEATHER)) return;
+    this.weather = next;
+    this.setSky(this._sun ?? null);
   }
 
   /** Außenkontur für die Bodenplatte: zeilenweise abgetastetes Treppenpolygon aus Räumen und Wänden. */

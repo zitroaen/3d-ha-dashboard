@@ -131,7 +131,39 @@ try {
   const autoL = await page.evaluate(() => window.panel.view.daylight); // Testumgebung: sun.sun unter dem Horizont
   ok(dayL > 0.9 && nightL < 0.1 && autoL < 0.1 && stored === 'night', `Tageszeit umschaltbar: Tag ${dayL.toFixed(2)}, Nacht ${nightL.toFixed(2)}, Automatisch folgt sun.sun`,
     `Tageszeit: Tag ${dayL}, Nacht ${nightL}, auto ${autoL}, gespeichert ${stored}`);
+  // Wetter: fest Regen bzw. Schnee (Testschalter), Automatisch folgt weather.home (klare Nacht, 14 °C)
+  await clickShadow('.settings button[data-pref="weather"][data-value="rain"]');
+  const rain = await page.evaluate(() => ({ precip: window.panel.getAttribute('precip'), rain: window.panel.view.weather.rain,
+    chip: window.panel.shadowRoot.querySelector('.weather').textContent }));
+  await clickShadow('.settings button[data-pref="weather"][data-value="snow"]');
+  const snow = await page.evaluate(() => ({ precip: window.panel.getAttribute('precip'), snow: window.panel.view.weather.snow }));
+  await clickShadow('.settings button[data-pref="weather"][data-value="auto"]');
+  const auto = await page.evaluate(() => ({ precip: window.panel.getAttribute('precip'), cloud: window.panel.view.weather.cloud,
+    chip: window.panel.shadowRoot.querySelector('.weather').textContent, hint: window.panel.shadowRoot.querySelector('.settings').textContent }));
+  ok(rain.precip === 'rain' && rain.rain > 0.5 && /Regen \(Test\)/.test(rain.chip) && snow.precip === 'snow' && snow.snow === 1
+    && !auto.precip && auto.cloud < 0.1 && /14 °C/.test(auto.chip) && /weather\.home/.test(auto.hint),
+    `Wetter: Regen und Schnee zum Testen, Automatisch folgt weather.home (${auto.chip.trim()})`, `Wetter: ${JSON.stringify({ rain, snow, auto })}`);
   await clickShadow('.settings header button');
+  // Wetter antippen öffnet den HA-Dialog der Wetter-Entity
+  const wInfo = await page.evaluate(() => new Promise((res) => {
+    window.addEventListener('hass-more-info', (e) => res(e.detail.entityId), { once: true });
+    window.panel.shadowRoot.querySelector('.weather').click();
+    setTimeout(() => res(null), 500);
+  }));
+  ok(wInfo === 'weather.home', 'Wetter antippen öffnet den HA-Wetterdialog', `Wetter-Dialog: ${wInfo}`);
+
+  // Kompass folgt der Ansicht im selben Bild (kein Nachlaufen)
+  const needle = await page.evaluate(() => {
+    const v = window.panel.view;
+    const t = v.controls.target, p = v.camera.position.clone().sub(t);
+    p.applyAxisAngle(new v.camera.up.constructor(0, 1, 0), 0.6);
+    v.camera.position.copy(t).add(p);
+    v.renderNow();
+    const shown = window.panel.shadowRoot.querySelector('.compass .needle').style.transform;
+    const want = `rotate(${v.northScreenAngle().toFixed(1)}deg)`;
+    return { shown, want, transition: getComputedStyle(window.panel.shadowRoot.querySelector('.compass .needle')).transitionDuration };
+  });
+  ok(needle.shown === needle.want && needle.transition === '0s', `Kompass folgt sofort (${needle.shown})`, `Kompass: ${JSON.stringify(needle)}`);
 
   // ---------------- Link-Check ----------------
   await menuAct('links');

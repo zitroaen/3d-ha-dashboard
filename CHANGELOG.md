@@ -1,5 +1,16 @@
 # Änderungen
 
+## 0.12.0
+
+- **Wetter:** Das Panel nimmt das Wetter aus Home Assistant (`weather.home` bzw. die erste `weather.*`, oder fest
+  per `site.weather` im Modell). Wolken dämpfen Sonne und Schatten und machen den Himmel grau, Regen macht Terrasse,
+  Wege und Rasen nass und glänzend, Schnee legt sich auf Rasen, Beete, Wege und Baumkronen, Nebel verschluckt den
+  hinteren Garten. Regen und Schneefall erscheinen als leichter Bildschirm-Effekt (das 3D-Bild wird dafür nicht neu
+  gerechnet; bei „Bewegung reduzieren“ steht er still).
+- **Wetteranzeige** oben mit Symbol und Temperatur; antippen öffnet den HA-Wetterdialog mit Vorhersage.
+- **Testschalter** im Zahnrad-Menü: Wetter Automatisch / Klar / Bewölkt / Regen / Schnee / Nebel.
+- **Kompass** folgt dem Drehen ohne Verzögerung (vorher lief die Nadel um 80 ms nach).
+
 ## 0.11.0
 
 - **Einstellungsmenü (Zahnrad):** ersetzt Stift und Ketten-Knopf. Darin: Tageszeit **Automatisch / Tag / Nacht**

@@ -294,11 +294,12 @@ export function createSharedMaterials() {
     // Würfelparkett: 35-cm-Quadrate aus je 4 Eichenstäben, Richtung wechselt
     parquet_cube: lit({ map: cubes, normalMap: relief(cubes, 3), normalScale: N(0.35), roughness: 0.4, metalness: 0 }, { floorAO: true }),
     concrete: lit({ color: 0x9a968f, normalMap: plaster, normalScale: N(0.5), roughness: 0.9 }, { floorAO: true }),
-    lawn: lit({ map: lawn, normalMap: relief(lawn, 4), normalScale: N(0.6), roughness: 1 }),
-    paving: lit({ map: paving, normalMap: relief(paving, 6), normalScale: N(0.8), roughness: 0.85 }),
-    gravel: lit({ map: gravel, normalMap: relief(gravel, 8), normalScale: N(1), roughness: 1 }),
-    soil: lit({ map: soil, normalMap: relief(soil, 5), normalScale: N(0.8), roughness: 1 }),
-    wood: lit({ color: 0x8a6440, roughness: 0.7 }),
+    // Flächen im Freien: nass bei Regen, weiß bei Schnee (weather)
+    lawn: lit({ map: lawn, normalMap: relief(lawn, 4), normalScale: N(0.6), roughness: 1 }, { weather: true }),
+    paving: lit({ map: paving, normalMap: relief(paving, 6), normalScale: N(0.8), roughness: 0.85 }, { weather: true }),
+    gravel: lit({ map: gravel, normalMap: relief(gravel, 8), normalScale: N(1), roughness: 1 }, { weather: true }),
+    soil: lit({ map: soil, normalMap: relief(soil, 5), normalScale: N(0.8), roughness: 1 }, { weather: true }),
+    wood: lit({ color: 0x8a6440, roughness: 0.7 }, { weather: true }),
     water: lit({ color: 0x2f5468, roughness: 0.15, metalness: 0.1 }),
     pvc: lit({ color: 0xf1f0eb, roughness: 0.45 }),
     board: lit({ color: 0xb48650, roughness: 0.5 }),
