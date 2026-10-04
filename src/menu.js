@@ -2,7 +2,7 @@
 // Ansichts-Einstellungen gelten pro Gerät (localStorage) – ein Wand-Tablet darf sparsam rechnen, der PC nicht.
 
 const PREFS_KEY = 'ha3d_view_prefs';
-export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto', weather: 'auto' };
+export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto', weather: 'auto', theme: 'auto' };
 
 /** Ansichts-Einstellungen dieses Geräts (ohne Speicher, z. B. privates Fenster: Standardwerte) */
 export function loadPrefs() {
@@ -19,6 +19,7 @@ export function savePrefs(prefs) {
   } catch { /* ohne Speicher gilt die Einstellung bis zum Neuladen */ }
 }
 
+const THEME = [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']];
 const DAYTIME = [['auto', 'Automatisch'], ['day', 'Tag'], ['night', 'Nacht']];
 const QUALITY = [['auto', 'Automatisch'], ['high', 'Hoch'], ['low', 'Sparsam']];
 const WEATHER = [['auto', 'Automatisch'], ['clear', 'Klar'], ['cloudy', 'Bewölkt'], ['rain', 'Regen'], ['snow', 'Schnee'], ['fog', 'Nebel']];
@@ -84,6 +85,8 @@ export class SettingsMenu {
       <header><h2>Einstellungen</h2><button data-act="close" aria-label="Schließen">✕</button></header>
       <div class="body">
         <section><h3>Ansicht</h3>
+          <label>Darstellung</label>${seg('theme', THEME)}
+          <p class="hint">Bedienelemente hell oder dunkel; Automatisch folgt Home Assistant.</p>
           <label>Tageszeit</label>${seg('daytime', DAYTIME)}
           <p class="hint">Automatisch folgt der Sonne aus Home Assistant (sun.sun).</p>
           <label>Wetter</label>${seg('weather', WEATHER).replace('class="seg"', 'class="seg wrap"')}

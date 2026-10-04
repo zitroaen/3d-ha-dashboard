@@ -10,6 +10,15 @@
     .resolver { display: inline; } .panel-custom { display: block; }</style>
 </head>
 <body>
+  <script>
+    // Vor dem Panel (es liest seine Ansichts-Einstellungen beim Anlegen): automatisierte Tests rechnen schnell
+    // (Qualität „Sparsam“, keine Ruhebild-Verfeinerung); Screenshots und Leistungstest schalten „Hoch“ selbst ein,
+    // ?quality= überschreibt. Die Vorschau im Browser bleibt unberührt.
+    try {
+      const want = new URLSearchParams(location.search).get('quality') || (navigator.webdriver ? 'low' : null);
+      if (want && !localStorage.getItem('ha3d_view_prefs')) localStorage.setItem('ha3d_view_prefs', JSON.stringify({ quality: want }));
+    } catch { /* ohne Speicher: Standard */ }
+  </script>
   <span class="resolver"><div class="panel-custom"><ha-3d-dashboard></ha-3d-dashboard></div></span>
   <script type="module">
     import '../dist/ha-3d-dashboard.js';
@@ -22,12 +31,6 @@
     // Varianten für die Demo-Tests: ?demo=1 (config.demo) bzw. ?nodata=1 (Daten nicht erreichbar -> Demo-Fallback)
     // ?shared=1: wie mit der Integration (gemeinsamer Speicher, simuliert in mock-hass.js), &user=1: kein Administrator
     const q = new URLSearchParams(location.search);
-    // Automatisierte Tests rechnen schnell (Qualität „Sparsam“, keine Ruhebild-Verfeinerung); Screenshots und
-    // Leistungstest schalten „Hoch“ selbst ein, ?quality= überschreibt. Die Vorschau im Browser bleibt unberührt.
-    try {
-      const want = q.get('quality') || (navigator.webdriver ? 'low' : null);
-      if (want && !localStorage.getItem('ha3d_view_prefs')) localStorage.setItem('ha3d_view_prefs', JSON.stringify({ quality: want }));
-    } catch { /* ohne Speicher: Standard */ }
     document.body.classList.toggle('ha', q.has('ha'));
     // ?top=47: Panel beginnt tiefer, wie in der iOS-App unter der Statusleiste
     if (q.has('top')) document.body.style.paddingTop = `${q.get('top')}px`;
@@ -64,7 +67,8 @@
       // Wetter wie die Wetter-Integration von HA (Standard-Entity weather.home)
       'weather.home': { state: 'clear-night', attributes: { temperature: 14.2, temperature_unit: '°C', friendly_name: 'Zuhause' } },
     }, (h) => { el.hass = h; });
-    Object.assign(hass, { entities, areas, devices: {} });
+    // Darstellung wie in HA (hass.themes.darkMode); ?light=1 = helles HA-Design
+    Object.assign(hass, { entities, areas, devices: {}, themes: { darkMode: !q.has('light') } });
     if (q.has('user')) hass.user = { name: 'Gast', is_admin: false };
     el.hass = hass;
     el.narrow = matchMedia('(max-width: 870px)').matches;

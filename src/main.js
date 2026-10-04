@@ -33,28 +33,54 @@ const STYLE = `
      unteren Bildschirmrand: --ha3d-fit-height misst _fitHeight() (in der iOS-App beginnt das Panel unter der
      Statusleiste, 100dvh wäre dort zu hoch). */
   min-height: var(--ha3d-fit-height, 100dvh);
-  font-family: var(--paper-font-body1_-_font-family, 'Segoe UI', Roboto, sans-serif); color: #e8e2d8;
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+  font-family: var(--paper-font-body1_-_font-family, 'Segoe UI', Roboto, sans-serif); color: var(--g-fg);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none;
+  /* Glas-Design (Darstellung Dunkel; Hell siehe unten): durchscheinende, weichgezeichnete Flächen, feine Lichtkante,
+     eher eckige Formen. Ausgewählt = invertiert (wie ein Schalter), Bernstein nur für Zustände (an, ungespeichert). */
+  --g-bg: rgba(20, 23, 29, 0.55); --g-panel: rgba(18, 21, 27, 0.8); --g-fg: #ece7de; --g-fg-dim: rgba(236, 231, 222, 0.6);
+  --g-line: rgba(255, 255, 255, 0.14); --g-line-strong: rgba(255, 255, 255, 0.3); --g-hover: rgba(255, 255, 255, 0.08);
+  --g-well: rgba(0, 0, 0, 0.28); --g-sel-bg: rgba(240, 236, 228, 0.94); --g-sel-fg: #15181d;
+  --g-accent: #f0b45a; --g-accent-fg: #1a1408; --g-ok: #6cc28a; --g-ok-bg: rgba(108, 194, 138, 0.18);
+  --g-blur: blur(18px) saturate(160%); --g-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --g-bar: linear-gradient(rgba(7, 9, 13, 0.75), rgba(7, 9, 13, 0));
+  --r-btn: 12px; --r-panel: 14px; --r-item: 8px;
+  color: var(--g-fg); }
+:host([theme="light"]) {
+  --g-bg: rgba(250, 250, 252, 0.62); --g-panel: rgba(248, 248, 250, 0.84); --g-fg: #1d2026; --g-fg-dim: rgba(29, 32, 38, 0.6);
+  --g-line: rgba(20, 24, 30, 0.12); --g-line-strong: rgba(20, 24, 30, 0.3); --g-hover: rgba(0, 0, 0, 0.06);
+  --g-well: rgba(0, 0, 0, 0.06); --g-sel-bg: #34373c; --g-sel-fg: #fff;
+  --g-accent: #c47d1c; --g-accent-fg: #fff; --g-ok: #3a9a5f; --g-ok-bg: rgba(60, 160, 95, 0.16);
+  --g-shadow: 0 6px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --g-bar: linear-gradient(rgba(245, 246, 248, 0.45), rgba(245, 246, 248, 0)); }
+/* Glasflächen: gemeinsamer Schatten und Lichtkante */
+.compass, .settings-toggle, .levels, .settings, .links, .picker, .objcfg, .tools, .editinfo, .toast, .demo-note, .confirm > div, .weather, .badge {
+  box-shadow: var(--g-shadow); }
 button { touch-action: manipulation; }
 #stage { position: absolute; inset: 0; }
 .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 55%, #000a 100%); transition: opacity 1s; }
 :host([day]) .vignette { opacity: 0.35; }
 .bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 10px 14px;
-  pointer-events: none; background: linear-gradient(#07090dcc, #07090d00); }
+  pointer-events: none; background: var(--g-bar); }
 .bar > * { pointer-events: auto; }
 .title { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
 .floor { font-size: 13px; opacity: 0.55; }
 /* Ebenen (Stockwerke): unten links (im Editor über der Werkzeugleiste), obere Ebenen oben; nur bei mehr als einer
    Ebene. Touch-Ziele 48 px */
-.levels { position: absolute; left: 12px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; }
+.levels { position: absolute; left: 12px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column;
+  border-radius: var(--r-panel); overflow: hidden; background: var(--g-bg); border: 1px solid var(--g-line);
+  backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); }
 :host([editing]) .levels { bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); }
 .levels[hidden] { display: none; }
-.levels button { min-width: 48px; height: 48px; padding: 0 8px; border-radius: 24px; border: 1px solid #ffffff22; background: #12151bcc;
-  color: #e8e2d8; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; backdrop-filter: blur(6px); }
-.levels button.on { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
+/* eine durchgehende Glas-Leiste, obere Ebene oben, gewählte Ebene invertiert */
+.levels button { min-width: 58px; height: 54px; padding: 0 8px; border: 0; border-radius: 0; background: transparent;
+  color: var(--g-fg); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.levels button + button { border-top: 1px solid var(--g-line); }
+.levels button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); }
+.levels button.on + button, .levels button:has(+ button.on) { border-color: transparent; }
 /* Wetter oben: Symbol und Temperatur, antippen öffnet den HA-Wetterdialog */
 .weather { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; white-space: nowrap; flex-shrink: 0; margin-left: auto; margin-right: 140px; padding: 0 12px;
-  border: 0; border-radius: 24px; background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+  border: 1px solid var(--g-line); border-radius: var(--r-btn); background: var(--g-bg); color: inherit; font: inherit; font-size: 14px; cursor: pointer;
+  backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); }
 .weather[hidden] { display: none; }
 :host([narrow]) .weather { margin-right: 78px; padding: 0 6px; }
 /* Niederschlag als Bildschirm-Effekt: nur verschobene Ebenen (GPU-Compositing), das 3D-Bild rechnet dafür nicht neu */
@@ -75,18 +101,18 @@ button { touch-action: manipulation; }
 button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
 /* Kompass: zeigt, wo Norden im Bild liegt; antippen = einnorden. Touch-Ziel 56 px */
 .compass { position: absolute; top: 10px; right: 12px; width: 56px; height: 56px; padding: 0; border-radius: 50%;
-  border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; cursor: pointer; backdrop-filter: blur(6px); }
-.compass:active { background: #1d222bdd; }
+  border: 1px solid var(--g-line); background: var(--g-bg); color: var(--g-fg); cursor: pointer; backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); }
+.compass:active { background: var(--g-hover); }
 .compass svg { width: 100%; height: 100%; display: block; }
 .compass .needle { transform-origin: 28px 28px; } /* kein Übergang: folgt dem Bild ohne Verzögerung */
 /* Editiermodus: Stift unter dem Kompass, Werkzeugleiste unten (Touch-Ziele >= 56 px) */
-.settings-toggle { position: absolute; top: 76px; right: 12px; width: 56px; height: 56px; border-radius: 50%;
-  border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.settings-toggle { position: absolute; top: 76px; right: 12px; width: 56px; height: 56px; border-radius: var(--r-btn);
+  border: 1px solid var(--g-line); background: var(--g-bg); color: var(--g-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 :host([editing]) .settings-toggle { display: none; } /* im Editor: Fertig/Abbrechen in der Leiste */
-.settings-toggle.on { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
+.settings-toggle.on { background: var(--g-sel-bg); color: var(--g-sel-fg); border-color: var(--g-sel-bg); }
 /* Einstellungsmenü: Seitenleiste rechts neben Kompass/Zahnrad, Touch-Ziele >= 48 px */
 .settings { position: absolute; top: 10px; right: 80px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100% - 100px)); display: none; flex-direction: column;
-  border-radius: 16px; background: #12151bf2; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
+  border-radius: var(--r-panel); background: var(--g-panel); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); border: 1px solid var(--g-line); overflow: hidden; }
 .settings.show { display: flex; }
 .settings header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
 .settings header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
@@ -94,18 +120,18 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .settings .body { overflow-y: auto; padding: 0 12px 12px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .settings h3 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
 .settings label { display: block; margin: 8px 0 4px; font-size: 14px; }
-.settings .seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #0b0d12; }
-.settings .seg button { flex: 1; min-height: 48px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.settings .seg { display: flex; gap: 4px; padding: 4px; border-radius: var(--r-btn); background: var(--g-well); }
+.settings .seg button { flex: 1; min-height: 48px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .settings .seg.wrap { flex-wrap: wrap; } .settings .seg.wrap button { flex: 1 0 30%; }
-.settings .seg button.on { background: #f0b45a; color: #1a1408; font-weight: 600; }
+.settings .seg button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); font-weight: 600; }
 .settings .hint { margin: 6px 2px 0; font-size: 12px; opacity: 0.6; }
 .settings .item { width: 100%; min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
-  margin-bottom: 6px; padding: 8px 14px; border: 1px solid #ffffff1a; border-radius: 12px; background: #ffffff08; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  margin-bottom: 6px; padding: 8px 14px; border: 1px solid var(--g-line); border-radius: var(--r-item); background: var(--g-hover); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .settings .item b { font-weight: 500; font-size: 15px; } .settings .item small { font-size: 12px; opacity: 0.6; }
 .settings .about { margin: 0 2px; font-size: 13px; opacity: 0.7; line-height: 1.5; }
 /* Link-Check: Liste aller Geräte mit Verknüpfungsstatus */
 .links { position: absolute; top: 10px; right: 80px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: min(420px, calc(100% - 100px)); display: none; flex-direction: column;
-  border-radius: 16px; background: #12151bf2; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
+  border-radius: var(--r-panel); background: var(--g-panel); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); border: 1px solid var(--g-line); overflow: hidden; }
 .links.show { display: flex; }
 .links header { display: flex; align-items: center; gap: 8px; padding: 10px 8px 6px 16px; }
 .links header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
@@ -115,7 +141,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .links .body { overflow-y: auto; padding: 0 8px 12px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .links h3 { margin: 12px 8px 4px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
 .links ul { list-style: none; margin: 0; padding: 0; }
-.links li { display: grid; grid-template-columns: 14px 1fr; column-gap: 8px; padding: 8px; border-radius: 10px; min-height: 40px; align-items: center; }
+.links li { display: grid; grid-template-columns: 14px 1fr; column-gap: 8px; padding: 8px; border-radius: var(--r-item); min-height: 40px; align-items: center; }
 .links li b { font-weight: 500; font-size: 14px; }
 .links li small { grid-column: 2; font-size: 12px; opacity: 0.6; word-break: break-all; }
 .links .dot { width: 10px; height: 10px; border-radius: 50%; background: #777; grid-row: span 2; }
@@ -123,32 +149,32 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .links li.free .dot { background: transparent; border: 1.5px solid #9aa; }
 /* Entity-Auswahl (Editor): Seitenleiste rechts, große Zeilen für Touch */
 .picker { position: absolute; top: 10px; right: 80px; bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 100px)); display: none; flex-direction: column;
-  border-radius: 16px; background: #12151bf5; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
+  border-radius: var(--r-panel); background: var(--g-panel); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); border: 1px solid var(--g-line); overflow: hidden; }
 .picker.show { display: flex; }
 .picker header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
 .picker header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
 .picker header button, .picker .chip button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
 .picker .linked { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 8px; }
-.picker .search { margin: 0 12px 8px; height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid #ffffff26; background: #0b0d12;
+.picker .search { margin: 0 12px 8px; height: 48px; padding: 0 14px; border-radius: var(--r-item); border: 1px solid var(--g-line); background: var(--g-well);
   color: inherit; font: inherit; font-size: 16px; user-select: text; -webkit-user-select: text; }
 .picker .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
-.picker .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 20px; border: 1px solid #ffffff26;
+.picker .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: var(--r-btn); border: 1px solid var(--g-line);
   background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
-.picker .chip.sel { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
-.picker .chip.on { background: #2b3a30; border-color: #6cc28a; padding-right: 0; flex-wrap: wrap; }
+.picker .chip.sel { background: var(--g-sel-bg); color: var(--g-sel-fg); border-color: var(--g-sel-bg); }
+.picker .chip.on { background: var(--g-ok-bg); border-color: var(--g-ok); padding-right: 0; flex-wrap: wrap; }
 .picker .chip.on small { font-size: 11px; opacity: 0.7; }
 .picker .hint { font-size: 13px; opacity: 0.6; padding: 6px 4px; }
 .picker .list { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .picker .list button { width: 100%; min-height: 56px; display: grid; grid-template-columns: 1fr 32px; text-align: left; padding: 6px 10px; border: 0;
-  border-radius: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-.picker .list button:active { background: #ffffff14; }
-.picker .list button.linked { background: #2b3a30; }
+  border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.picker .list button:active { background: var(--g-hover); }
+.picker .list button.linked { background: var(--g-ok-bg); }
 .picker .list b { font-weight: 500; font-size: 14px; } .picker .list small { grid-column: 1; font-size: 12px; opacity: 0.6; word-break: break-all; }
-.picker .list .mark { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 20px; text-align: center; color: #f0b45a; }
+.picker .list .mark { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 20px; text-align: center; color: var(--g-accent); }
 .picker .more { padding: 10px; font-size: 13px; opacity: 0.6; text-align: center; }
 /* Einstellungen eines Objekts (Editor): gleiche Stelle wie die Entity-Auswahl, die sich darüberlegt */
 .objcfg { position: absolute; top: 10px; right: 80px; bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 100px)); display: none; flex-direction: column;
-  border-radius: 16px; background: #12151bf5; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
+  border-radius: var(--r-panel); background: var(--g-panel); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); border: 1px solid var(--g-line); overflow: hidden; }
 .objcfg.show { display: flex; }
 .picker.show ~ .objcfg { display: none; }
 .objcfg header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
@@ -158,31 +184,31 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .objcfg h3 { margin: 12px 0 2px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
 .objcfg .hint { margin: 0 0 6px; font-size: 12px; opacity: 0.6; }
 .objcfg .linked { display: flex; flex-wrap: wrap; gap: 6px; }
-.objcfg .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 0 0 12px; border-radius: 20px; flex-wrap: wrap;
-  background: #2b3a30; border: 1px solid #6cc28a; font-size: 13px; }
+.objcfg .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 0 0 12px; border-radius: var(--r-btn); flex-wrap: wrap;
+  background: var(--g-ok-bg); border: 1px solid var(--g-ok); font-size: 13px; }
 .objcfg .chip small { font-size: 11px; opacity: 0.7; }
-.objcfg button.add { min-height: 48px; padding: 0 16px; border-radius: 24px; border: 1px dashed #ffffff40; background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.objcfg button.add { min-height: 48px; padding: 0 16px; border-radius: var(--r-btn); border: 1px dashed var(--g-line-strong); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .objcfg .gesture { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
 .objcfg label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
-.objcfg select, .objcfg input { min-height: 48px; padding: 0 12px; border-radius: 12px; border: 1px solid #ffffff26; background: #0b0d12; color: inherit;
+.objcfg select, .objcfg input { min-height: 48px; padding: 0 12px; border-radius: var(--r-item); border: 1px solid var(--g-line); background: var(--g-well); color: inherit;
   font: inherit; font-size: 16px; user-select: text; -webkit-user-select: text; }
 .objcfg label select { flex: 1; }
 .objcfg > .body > section > select { width: 100%; }
 /* Zustand über Objekten (Waschmaschine: Restzeit …): folgt der Kamera, lässt Taps durch */
 .badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 :host([editing]) .badges { display: none; }
-.badge { position: absolute; left: 0; top: 0; padding: 3px 9px; border-radius: 12px; background: #12151bd9; border: 1px solid #ffffff26;
+.badge { position: absolute; left: 0; top: 0; padding: 3px 9px; border-radius: 6px; background: var(--g-bg); border: 1px solid var(--g-line);
   font-size: 12px; font-weight: 600; white-space: nowrap; will-change: transform; }
-.badge.on { background: #f0b45ae6; color: #1a1408; border-color: #f0b45a; }
+.badge.on { background: var(--g-accent); color: var(--g-accent-fg); border-color: var(--g-accent); }
 .badge[hidden] { display: none; }
 /* Rückfrage vor einer Aktion */
 .confirm { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #0008; }
 .confirm.show { display: flex; }
-.confirm > div { max-width: min(360px, calc(100% - 32px)); padding: 18px; border-radius: 16px; background: #12151bf5; border: 1px solid #ffffff1a; }
+.confirm > div { max-width: min(360px, calc(100% - 32px)); padding: 18px; border-radius: var(--r-panel); background: var(--g-panel); border: 1px solid var(--g-line); }
 .confirm p { margin: 0 0 14px; font-size: 15px; }
 .confirm .row { display: flex; gap: 8px; justify-content: flex-end; }
-.confirm button { min-width: 96px; min-height: 48px; border-radius: 12px; border: 1px solid #ffffff26; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-.confirm button.yes { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
+.confirm button { min-width: 96px; min-height: 48px; border-radius: var(--r-item); border: 1px solid var(--g-line); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.confirm button.yes { background: var(--g-sel-bg); color: var(--g-sel-fg); border-color: var(--g-sel-bg); }
 /* volle Breite (mit left: 50% stünde nur die halbe Breite zur Verfügung und die Knöpfe brächen zu früh um);
    die leeren Ränder lassen Taps zur 3D-Ansicht durch */
 .editbar { position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: none; flex-direction: column; align-items: center; gap: 8px;
@@ -190,25 +216,25 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .editbar > * { pointer-events: auto; }
 :host([editing]) .editbar { display: flex; }
 :host([editing]) .toast { bottom: calc(var(--ha3d-editbar-h, 136px) + 24px + env(safe-area-inset-bottom, 0px)); }
-.editinfo { padding: 7px 14px; border-radius: 14px; background: #12151be6; font-size: 14px; text-align: center; max-width: 100%; }
-.editinfo b { color: #f0b45a; font-weight: 600; }
-.tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 6px; border-radius: 18px; background: #12151be6;
-  backdrop-filter: blur(8px); max-width: 100%; } /* schmale Bildschirme: zweite Zeile statt abgeschnittener Knöpfe */
-.tools button { min-width: 64px; height: 60px; padding: 4px 8px; border: 0; border-radius: 12px; background: transparent; color: #e8e2d8;
+.editinfo { padding: 7px 14px; border-radius: var(--r-btn); background: var(--g-bg); font-size: 14px; text-align: center; max-width: 100%; }
+.editinfo b { color: var(--g-accent); font-weight: 600; }
+.tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 6px; border-radius: var(--r-panel); background: var(--g-bg);
+  backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); max-width: 100%; } /* schmale Bildschirme: zweite Zeile statt abgeschnittener Knöpfe */
+.tools button { min-width: 64px; height: 60px; padding: 4px 8px; border: 0; border-radius: var(--r-item); background: transparent; color: var(--g-fg);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 11px; cursor: pointer; }
-.tools button:active { background: #ffffff1a; }
-.tools button.active { background: #f0b45a; color: #1a1408; }
+.tools button:active { background: var(--g-line); }
+.tools button.active { background: var(--g-sel-bg); color: var(--g-sel-fg); }
 .tools button:disabled { opacity: 0.35; }
-.tools button.dirty { color: #f0b45a; }
+.tools button.dirty { color: var(--g-accent); }
 .tools button[hidden] { display: none; }
 :host([narrow]) button.menu { display: inline-flex; align-items: center; justify-content: center; }
-.toast { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 14px; border-radius: 16px;
-  background: #1a1c20d9; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+.toast { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 14px; border-radius: var(--r-panel);
+  background: var(--g-bg); font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
 .toast.show { opacity: 1; }
 /* Demo-Hinweis: dezent oben links, antippen blendet ihn aus (Touch-Ziel >= 48 px) */
-.demo-note { position: absolute; top: 56px; left: 12px; max-width: calc(100% - 100px); min-height: 48px; padding: 6px 14px; border-radius: 24px;
-  border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; font: inherit; font-size: 13px; line-height: 1.3; text-align: left;
-  cursor: pointer; backdrop-filter: blur(6px); display: none; }
+.demo-note { position: absolute; top: 56px; left: 12px; max-width: calc(100% - 100px); min-height: 48px; padding: 6px 14px; border-radius: var(--r-btn);
+  border: 1px solid var(--g-line); background: var(--g-bg); color: var(--g-fg); font: inherit; font-size: 13px; line-height: 1.3; text-align: left;
+  cursor: pointer; backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); display: none; }
 .demo-note[hidden] { display: none; }
 :host([demo]) .demo-note:not([hidden]) { display: block; }
 :host([demo][editing]) .demo-note { display: none; } /* im Editor nicht über Lampenauswahl und Leiste */
@@ -236,11 +262,11 @@ class Ha3dDashboard extends HTMLElement {
       <div class="levels" hidden></div>
       <button class="compass" title="Ansicht einnorden" aria-label="Ansicht einnorden">
         <svg viewBox="0 0 56 56">
-          <circle cx="28" cy="28" r="22" fill="none" stroke="#ffffff1f" stroke-width="1"/>
+          <circle cx="28" cy="28" r="22" fill="none" style="stroke: var(--g-line)" stroke-width="1"/>
           <g class="needle">
             <path d="M28 7 L33 28 L23 28 Z" fill="#d9573f"/>
-            <path d="M28 49 L33 28 L23 28 Z" fill="#cfc8bb"/>
-            <circle cx="28" cy="28" r="2.2" fill="#12151b"/>
+            <path d="M28 49 L33 28 L23 28 Z" style="fill: var(--g-fg-dim)"/>
+            <circle cx="28" cy="28" r="2.2" style="fill: var(--g-fg)"/>
             <text x="28" y="5.5" text-anchor="middle" font-size="7" font-weight="600" fill="#d9573f" font-family="inherit">N</text>
           </g>
         </svg>
@@ -288,6 +314,8 @@ class Ha3dDashboard extends HTMLElement {
       onAction: (act) => (act === 'edit' ? this.setEditing(true) : this._toggleLinks(true)),
     });
     this.prefs = this.menu.prefs;
+    this._applyTheme();
+    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => this._applyTheme());
     this.shadowRoot.querySelector('.settings-toggle').addEventListener('click', () => this._toggleMenu());
     // Wetter antippen: HA-Wetterdialog (Vorhersage)
     this.shadowRoot.querySelector('.weather').addEventListener('click', () => {
@@ -704,6 +732,10 @@ class Ha3dDashboard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    if (hass?.themes?.darkMode !== this._darkMode) {
+      this._darkMode = hass?.themes?.darkMode;
+      this._applyTheme();
+    }
     this._resolveHass?.(hass);
     this._updateReadonly();
     if (this.view) this._applyHass();
@@ -957,11 +989,24 @@ class Ha3dDashboard extends HTMLElement {
   /** Ansichts-Einstellungen anwenden: Tageszeit (Sonne aus HA oder fest) und Qualität */
   _applyPrefs(prefs) {
     this.prefs = prefs;
+    this._applyTheme();
     if (!this.view) return;
     this.view.setQuality?.(prefs.quality);
     this.setAttribute('quality', this.view.quality);
     this._applyWeather();
     this._applySky();
+  }
+
+  /**
+   * Darstellung der Bedienelemente (Glas hell/dunkel): fest oder wie Home Assistant (hass.themes.darkMode), ohne HA
+   * wie das System.
+   */
+  _applyTheme() {
+    const pref = this.prefs?.theme || 'auto';
+    const dark = pref === 'auto'
+      ? this._hass?.themes?.darkMode ?? window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true
+      : pref === 'dark';
+    this.setAttribute('theme', dark ? 'dark' : 'light');
   }
 
   /** Wetter-Entity: site.weather im Modell oder automatisch (weather.home, sonst die erste) */
