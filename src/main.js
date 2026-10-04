@@ -12,10 +12,12 @@ import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
 import { EntityPicker, areaForRoom } from './picker.js';
 import { ObjectSettings } from './objsettings.js';
+import { SettingsMenu } from './menu.js';
 
 const ICON = {"edit": "M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z", "move": "M13 6v5h5V7.75L22.25 12 18 16.25V13h-5v5h3.25L12 22.25 7.75 18H11v-5H6v3.25L1.75 12 6 7.75V11h5V6H7.75L12 1.75 16.25 6H13z", "align": "M3 2h2v20H3V2zm4 5h14v4H7V7zm0 6h9v4H7v-4z", "undo": "M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62A8 8 0 0 1 20.1 16l2.37-.78A10.5 10.5 0 0 0 12.5 8z", "save": "M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z", "export": "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z", "done": "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"};
 ICON.link = 'M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8v2zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z';
 ICON.plug = 'M16 7V3h-2v4h-4V3H8v4h-.01C6.9 7 6 7.9 6 8.99v5.49L9.5 18v3h5v-3l3.5-3.51v-5.5C18 7.89 17.1 7 16 7z';
+ICON.cog = 'M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97s-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1s.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z';
 ICON.close = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
 const icon = (name) => `<svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="${ICON[name]}"/></svg>`;
 
@@ -57,10 +59,28 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .compass svg { width: 100%; height: 100%; display: block; }
 .compass .needle { transform-origin: 28px 28px; transition: transform .08s linear; }
 /* Editiermodus: Stift unter dem Kompass, Werkzeugleiste unten (Touch-Ziele >= 56 px) */
-.edit-toggle { position: absolute; top: 76px; right: 12px; width: 56px; height: 56px; border-radius: 50%;
+.settings-toggle { position: absolute; top: 76px; right: 12px; width: 56px; height: 56px; border-radius: 50%;
   border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.links-toggle { position: absolute; top: 140px; right: 12px; width: 56px; height: 56px; border-radius: 50%;
-  border: 1px solid #ffffff22; background: #12151bcc; color: #e8e2d8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+:host([editing]) .settings-toggle { display: none; } /* im Editor: Fertig/Abbrechen in der Leiste */
+.settings-toggle.on { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
+/* Einstellungsmenü: Seitenleiste rechts neben Kompass/Zahnrad, Touch-Ziele >= 48 px */
+.settings { position: absolute; top: 10px; right: 80px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100% - 100px)); display: none; flex-direction: column;
+  border-radius: 16px; background: #12151bf2; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
+.settings.show { display: flex; }
+.settings header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
+.settings header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
+.settings header button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
+.settings .body { overflow-y: auto; padding: 0 12px 12px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.settings h3 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
+.settings label { display: block; margin: 8px 0 4px; font-size: 14px; }
+.settings .seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #0b0d12; }
+.settings .seg button { flex: 1; min-height: 48px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.settings .seg button.on { background: #f0b45a; color: #1a1408; font-weight: 600; }
+.settings .hint { margin: 6px 2px 0; font-size: 12px; opacity: 0.6; }
+.settings .item { width: 100%; min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
+  margin-bottom: 6px; padding: 8px 14px; border: 1px solid #ffffff1a; border-radius: 12px; background: #ffffff08; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.settings .item b { font-weight: 500; font-size: 15px; } .settings .item small { font-size: 12px; opacity: 0.6; }
+.settings .about { margin: 0 2px; font-size: 13px; opacity: 0.7; line-height: 1.5; }
 /* Link-Check: Liste aller Geräte mit Verknüpfungsstatus */
 .links { position: absolute; top: 10px; right: 80px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: min(420px, calc(100% - 100px)); display: none; flex-direction: column;
   border-radius: 16px; background: #12151bf2; backdrop-filter: blur(8px); border: 1px solid #ffffff1a; overflow: hidden; }
@@ -141,8 +161,6 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .confirm .row { display: flex; gap: 8px; justify-content: flex-end; }
 .confirm button { min-width: 96px; min-height: 48px; border-radius: 12px; border: 1px solid #ffffff26; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .confirm button.yes { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
-:host([readonly]) .edit-toggle { display: none; } /* gemeinsames Modell: nur Administratoren bearbeiten */
-:host([editing]) .edit-toggle { background: #f0b45a; color: #1a1408; border-color: #f0b45a; }
 /* volle Breite (mit left: 50% stünde nur die halbe Breite zur Verfügung und die Knöpfe brächen zu früh um);
    die leeren Ränder lassen Taps zur 3D-Ansicht durch */
 .editbar { position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: none; flex-direction: column; align-items: center; gap: 8px;
@@ -203,8 +221,8 @@ class Ha3dDashboard extends HTMLElement {
           </g>
         </svg>
       </button>
-      <button class="edit-toggle" title="Bearbeiten" aria-label="Bearbeiten">${icon('edit')}</button>
-      <button class="links-toggle" title="Link-Check" aria-label="Link-Check">${icon('link')}</button>
+      <button class="settings-toggle" title="Einstellungen" aria-label="Einstellungen">${icon('cog')}</button>
+      <div class="settings"></div>
       <div class="links">
         <header><h2>Link-Check<small class="about"></small></h2><button class="links-close" aria-label="Schließen">${icon('close')}</button></header>
         <div class="summary"></div>
@@ -240,9 +258,13 @@ class Ha3dDashboard extends HTMLElement {
       if (b) this.setLevel(Number(b.dataset.level));
     });
     this.shadowRoot.querySelector('.compass').addEventListener('click', () => this.view?.faceNorth());
-    // Stift: Bearbeiten beginnen bzw. wie „Fertig“ beenden (speichert)
-    this.shadowRoot.querySelector('.edit-toggle').addEventListener('click', () => (this.hasAttribute('editing') ? this.finishEditing() : this.setEditing(true)));
-    this.shadowRoot.querySelector('.links-toggle').addEventListener('click', () => this._toggleLinks());
+    // Zahnrad: Einstellungsmenü (Ansicht, Bearbeiten, Link-Check, Info)
+    this.menu = new SettingsMenu(this.shadowRoot.querySelector('.settings'), {
+      onPrefs: (prefs) => this._applyPrefs(prefs),
+      onAction: (act) => (act === 'edit' ? this.setEditing(true) : this._toggleLinks(true)),
+    });
+    this.prefs = this.menu.prefs;
+    this.shadowRoot.querySelector('.settings-toggle').addEventListener('click', () => this._toggleMenu());
     this.shadowRoot.querySelector('.links-close').addEventListener('click', () => this._toggleLinks(false));
     this.shadowRoot.querySelector('.tools').addEventListener('click', (e) => {
       const act = e.target.closest('button')?.dataset.act;
@@ -470,8 +492,12 @@ class Ha3dDashboard extends HTMLElement {
     if (this.hasAttribute('editing')) this.editor.setEnabled(true);
     this.shadowRoot.querySelector('.title').textContent = data.house.name || '';
     this._renderLevel();
+    this.view.setQuality?.(this.prefs.quality);
     if (this._hass) this._applyHass();
-    else this._updateBadges();
+    else {
+      this._applySky();
+      this._updateBadges();
+    }
     this._resolveReady(this);
   }
 
@@ -656,10 +682,7 @@ class Ha3dDashboard extends HTMLElement {
   /** Zustände aus HA übernehmen: Sonne und alle verknüpften Leuchten. */
   _applyHass() {
     const states = this._hass?.states || {};
-    const sun = states['sun.sun'];
-    const a = sun?.attributes;
-    this.view.setSky(a && Number.isFinite(a.elevation) ? { azimuth: a.azimuth, elevation: a.elevation } : null);
-    this.toggleAttribute('day', this.view.daylight > 0.5);
+    this._applySky();
 
     // Im Demo-Modus folgen nur Leuchten, die mit einer echten Entity verknüpft wurden, HA; die übrigen schalten lokal
     for (const [id, s] of this.view.lamps) {
@@ -879,7 +902,36 @@ class Ha3dDashboard extends HTMLElement {
 
   // ------------------------------------------------------------------ Link-Check
 
+  /** Einstellungsmenü öffnen bzw. schließen (schließt den Link-Check) */
+  _toggleMenu(show = !this.menu.isOpen) {
+    this._toggleLinks(false);
+    if (!show) return this.menu.close();
+    const canEdit = !this.hasAttribute('readonly');
+    this.menu.open({ canEdit, version: VERSION, source: this._source || '', quality: this.view?.quality });
+  }
+
+  /** Ansichts-Einstellungen anwenden: Tageszeit (Sonne aus HA oder fest) und Qualität */
+  _applyPrefs(prefs) {
+    this.prefs = prefs;
+    if (!this.view) return;
+    this.view.setQuality?.(prefs.quality);
+    this._applySky();
+  }
+
+  /** Sonnenstand: aus sun.sun – oder fest Tag/Nacht (Einstellungsmenü, zum Testen und für Wand-Tablets) */
+  _applySky() {
+    const a = this._hass?.states?.['sun.sun']?.attributes;
+    const real = a && Number.isFinite(a.elevation) ? { azimuth: a.azimuth, elevation: a.elevation } : null;
+    const dt = this.prefs?.daytime;
+    // fest: Sonne im Süden (bzw. am wirklichen Azimut, wenn sie gerade scheint), Mond nachts
+    if (dt === 'day') this.view.setSky({ azimuth: real && real.elevation > 5 ? real.azimuth : 200, elevation: 38 });
+    else if (dt === 'night') this.view.setSky({ azimuth: real?.azimuth ?? 330, elevation: -25 });
+    else this.view.setSky(real);
+    this.toggleAttribute('day', this.view.daylight > 0.5);
+  }
+
   _toggleLinks(show = !this.shadowRoot.querySelector('.links').classList.contains('show')) {
+    if (show) this.menu?.close();
     this.shadowRoot.querySelector('.links').classList.toggle('show', show);
     if (show) this._renderLinks();
   }
