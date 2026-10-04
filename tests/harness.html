@@ -12,11 +12,13 @@
 <body>
   <script>
     // Vor dem Panel (es liest seine Ansichts-Einstellungen beim Anlegen): automatisierte Tests rechnen schnell
-    // (Qualität „Sparsam“, keine Ruhebild-Verfeinerung); Screenshots und Leistungstest schalten „Hoch“ selbst ein,
+    // (Qualität „Sparsam“, Animationen aus); Screenshots und Leistungstest schalten „Hoch“ selbst ein,
     // ?quality= überschreibt. Die Vorschau im Browser bleibt unberührt.
     try {
       const want = new URLSearchParams(location.search).get('quality') || (navigator.webdriver ? 'low' : null);
-      if (want && !localStorage.getItem('ha3d_view_prefs')) localStorage.setItem('ha3d_view_prefs', JSON.stringify({ quality: want }));
+      // Animationen in Tests aus (sonst läuft ein Bildtakt und „Kamera steht still“ tritt nie ein); Tests schalten
+      // sie gezielt ein
+      if (want && !localStorage.getItem('ha3d_view_prefs')) localStorage.setItem('ha3d_view_prefs', JSON.stringify({ quality: want, animations: navigator.webdriver ? 'off' : 'auto' }));
     } catch { /* ohne Speicher: Standard */ }
   </script>
   <span class="resolver"><div class="panel-custom"><ha-3d-dashboard></ha-3d-dashboard></div></span>

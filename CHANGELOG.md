@@ -1,5 +1,20 @@
 # Änderungen
 
+## 0.15.0
+
+- **Katalog im Editor:** Zahnrad → Bearbeiten → **Katalog** listet alle Modelle (Möbel, Leuchten, Geräte,
+  Pflanzen; Suche). Antippen setzt das Objekt in die Mitte der Ansicht – danach verschieben und verknüpfen.
+- **Einlagern statt Löschen:** **Entfernen** fragt: **Einlagern** nimmt das Objekt aus der Welt, behält aber Lage und
+  Verknüpfungen (z. B. Weihnachtsdekoration); im Katalog unter **Lager** lässt es sich wieder aufstellen. **Löschen**
+  entfernt es ganz. Beides lässt sich rückgängig machen und wird mit **Fertig** gespeichert.
+- **Animationen:** Modelle können sich bewegen, solange ihr Gerät an ist – neu: **Deckenventilator** und
+  **Standventilator** (Tempo aus der Lüfterstufe). Ohne Entity lässt sich im Editor ein fester Zustand einstellen
+  („Läuft immer“). Im Demo-Haus dreht sich ein Deckenventilator im Schlafzimmer.
+- **Einstellungen:** Animationen **Automatisch / An / Aus** (Automatisch: aus bei „Bewegung reduzieren“) und eine
+  **Leistungsanzeige** mit Bildern/s, Rechenzeit, Zeichenaufrufen und Dreiecken.
+- **Sparsam bei Animationen:** Nur solange sich etwas bewegt, wird laufend gerechnet – gedrosselt auf 30 Bilder/s
+  (Sparsam: 20), ohne die Schatten neu zu berechnen; in Ruhe wie bisher kein einziges Bild.
+
 ## 0.14.1
 
 - **Keine Nachverfeinerung mehr:** Das Bild wurde nach kurzem Stillstand noch einmal mit Raumschatten neu gerechnet

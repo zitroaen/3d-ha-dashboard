@@ -7,7 +7,10 @@ import { loadData, loadShared, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
 import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides, download } from './store.js';
-import { toScene, writeBack, gestureAction, roleEntities, showsBadge, GESTURES } from './model/model.js';
+import { toScene, writeBack, gestureAction, roleEntities, showsBadge, GESTURES, activityOf } from './model/model.js';
+import { CATALOG, hasCapability, DEFAULT_MOUNT, DEFAULT_LIGHT_HEIGHT, MODEL_LIGHT_HEIGHT } from './model/catalog.js';
+import { CatalogPanel } from './catalogpanel.js';
+import { pointInPoly } from './geometry.js';
 import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
 import { EntityPicker, areaForRoom } from './picker.js';
@@ -20,6 +23,8 @@ ICON.link = 'M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1
 ICON.plug = 'M16 7V3h-2v4h-4V3H8v4h-.01C6.9 7 6 7.9 6 8.99v5.49L9.5 18v3h5v-3l3.5-3.51v-5.5C18 7.89 17.1 7 16 7z';
 ICON.cog = 'M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97s-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1s.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z';
 ICON.close = 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z';
+ICON.trash = 'M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z';
+ICON.catalog = 'M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z';
 const icon = (name) => `<svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="${ICON[name]}"/></svg>`;
 
 const MODULE_BASE = new URL('./', import.meta.url);
@@ -78,6 +83,12 @@ button { touch-action: manipulation; }
 .levels button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); }
 .levels button.on + button, .levels button:has(+ button.on) { border-color: transparent; }
 /* Wetter oben: Symbol und Temperatur, antippen öffnet den HA-Wetterdialog */
+.fps { position: absolute; right: 12px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); padding: 6px 10px; border-radius: var(--r-item);
+  background: var(--g-bg); border: 1px solid var(--g-line); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur);
+  font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--g-fg); pointer-events: none; text-align: right; }
+.fps b { font-size: 15px; } .fps small { color: var(--g-fg-dim); }
+.picker.show ~ .fps, .objcfg.show ~ .fps { display: none; }
+:host([editing]) .fps { bottom: calc(var(--ha3d-editbar-h, 80px) + 30px + env(safe-area-inset-bottom, 0px)); }
 .weather { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; white-space: nowrap; flex-shrink: 0; margin-left: auto; margin-right: 140px; padding: 0 12px;
   border: 1px solid var(--g-line); border-radius: var(--r-btn); background: var(--g-bg); color: inherit; font: inherit; font-size: 14px; cursor: pointer;
   backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); }
@@ -120,10 +131,10 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .settings .body { overflow-y: auto; padding: 0 12px 12px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .settings h3 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
 .settings label { display: block; margin: 8px 0 4px; font-size: 14px; }
-.settings .seg { display: flex; gap: 4px; padding: 4px; border-radius: var(--r-btn); background: var(--g-well); }
-.settings .seg button { flex: 1; min-height: 48px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.settings .seg, .objcfg .seg, .catalog .seg { display: flex; gap: 4px; padding: 4px; border-radius: var(--r-btn); background: var(--g-well); }
+.settings .seg button, .objcfg .seg button, .catalog .seg button { flex: 1; min-height: 48px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .settings .seg.wrap { flex-wrap: wrap; } .settings .seg.wrap button { flex: 1 0 30%; }
-.settings .seg button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); font-weight: 600; }
+.settings .seg button.on, .objcfg .seg button.on, .catalog .seg button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); font-weight: 600; }
 .settings .hint { margin: 6px 2px 0; font-size: 12px; opacity: 0.6; }
 .settings .item { width: 100%; min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
   margin-bottom: 6px; padding: 8px 14px; border: 1px solid var(--g-line); border-radius: var(--r-item); background: var(--g-hover); color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -153,7 +164,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .picker.show { display: flex; }
 .picker header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
 .picker header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
-.picker header button, .picker .chip button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
+.picker header button, .picker .chip button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
 .picker .linked { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 8px; }
 .picker .search { margin: 0 12px 8px; height: 48px; padding: 0 14px; border-radius: var(--r-item); border: 1px solid var(--g-line); background: var(--g-well);
   color: inherit; font: inherit; font-size: 16px; user-select: text; -webkit-user-select: text; }
@@ -177,9 +188,14 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
   border-radius: var(--r-panel); background: var(--g-panel); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); border: 1px solid var(--g-line); overflow: hidden; }
 .objcfg.show { display: flex; }
 .picker.show ~ .objcfg { display: none; }
+.catalog .tabs { margin: 0 12px 8px; }
+.catalog .chip { min-height: 48px; }
+.catalog .tabs, .catalog .chips, .catalog .search, .catalog .hint { flex-shrink: 0; }
+.catalog .hint { margin: 0 16px 8px; }
+.catalog .list .mark { color: var(--g-fg-dim); }
 .objcfg header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
 .objcfg header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
-.objcfg header button, .objcfg .chip button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
+.objcfg header button, .objcfg .chip button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
 .objcfg .body { overflow-y: auto; padding: 0 12px 12px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .objcfg h3 { margin: 12px 0 2px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
 .objcfg .hint { margin: 0 0 6px; font-size: 12px; opacity: 0.6; }
@@ -206,7 +222,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .confirm.show { display: flex; }
 .confirm > div { max-width: min(360px, calc(100% - 32px)); padding: 18px; border-radius: var(--r-panel); background: var(--g-panel); border: 1px solid var(--g-line); }
 .confirm p { margin: 0 0 14px; font-size: 15px; }
-.confirm .row { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .confirm button { min-width: 96px; min-height: 48px; border-radius: var(--r-item); border: 1px solid var(--g-line); background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .confirm button.yes { background: var(--g-sel-bg); color: var(--g-sel-fg); border-color: var(--g-sel-bg); }
 /* volle Breite (mit left: 50% stünde nur die halbe Breite zur Verfügung und die Knöpfe brächen zu früh um);
@@ -283,12 +299,15 @@ class Ha3dDashboard extends HTMLElement {
       </div>
       <div class="picker"></div>
       <div class="objcfg"></div>
+      <div class="picker catalog"></div>
       <div class="editbar">
         <div class="editinfo"></div>
         <div class="tools">
+          <button data-act="catalog">${icon('catalog')}Katalog</button>
           <button data-act="move">${icon('move')}Verschieben</button>
           <button data-act="align">${icon('align')}Anlegen</button>
           <button data-act="link" hidden>${icon('plug')}Verknüpfen</button>
+          <button data-act="remove" hidden>${icon('trash')}Entfernen</button>
           <button data-act="undo">${icon('undo')}Rückgängig</button>
           <button data-act="export">${icon('export')}Export</button>
           <button data-act="cancel">${icon('close')}Abbrechen</button>
@@ -297,7 +316,8 @@ class Ha3dDashboard extends HTMLElement {
       </div>
       <button class="demo-note" hidden aria-label="Hinweis ausblenden"></button>
       <div class="toast"></div>
-      <div class="confirm"><div><p></p><div class="row"><button class="no">Abbrechen</button><button class="yes">OK</button></div></div></div>
+      <div class="confirm"><div><p></p><div class="row"><button class="no">Abbrechen</button><button class="alt" hidden></button><button class="yes">OK</button></div></div></div>
+      <div class="fps" hidden aria-live="off"></div>
       <div class="error"></div>`;
     this.shadowRoot.querySelector('button.menu').addEventListener('click', () => {
       this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
@@ -350,6 +370,7 @@ class Ha3dDashboard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    clearInterval(this._fpsTimer);
     document.removeEventListener('visibilitychange', this._onVisible);
     window.removeEventListener('resize', this._onResize);
     window.visualViewport?.removeEventListener('resize', this._onResize);
@@ -456,6 +477,7 @@ class Ha3dDashboard extends HTMLElement {
           this.view.setFurnishing({ devices: scene.devices, items: scene.items });
           this.areaMap = scene.areaMap;
           if (this._hass) this._applyHass(); // neue Leuchten-Objekte -> Zustand aus HA neu setzen
+          else this._applyActivity();
         }
       } catch (e) {
         console.error('ha-3d-dashboard:', e);
@@ -552,7 +574,17 @@ class Ha3dDashboard extends HTMLElement {
     });
     this.settings ??= new ObjectSettings(this.shadowRoot.querySelector('.objcfg'), {
       onChange: (ha) => this.editor?.setHa(ha),
+      onState: (state) => {
+        this.editor?.setState(state);
+        this._applyActivity();
+        this.settings.render();
+      },
       onPick: (role) => this._openPicker(role),
+      onClose: () => this.editor?._emit(),
+    });
+    this.catalog ??= new CatalogPanel(this.shadowRoot.querySelector('.catalog'), {
+      onAdd: (model) => this._addObject(model),
+      onRestore: (id) => this._restoreObject(id),
       onClose: () => this.editor?._emit(),
     });
     if (this.hasAttribute('editing')) this.editor.setEnabled(true);
@@ -560,11 +592,13 @@ class Ha3dDashboard extends HTMLElement {
     this._renderLevel();
     this.view.setQuality?.(this.prefs.quality);
     this.setAttribute('quality', this.view.quality);
+    this._applyMotion();
     if (this._hass) this._applyHass();
     else {
       this._applyWeather();
       this._applySky();
       this._updateBadges();
+      this._applyActivity();
     }
     this._resolveReady(this);
   }
@@ -606,6 +640,7 @@ class Ha3dDashboard extends HTMLElement {
   _leaveEditing() {
     this.picker?.close();
     this.settings?.close();
+    this.catalog?.close();
     this.toggleAttribute('editing', false);
     this.editor.setEnabled(false);
     if (this._reloadOnLeave) {
@@ -620,7 +655,12 @@ class Ha3dDashboard extends HTMLElement {
     try {
       // Änderungen ins Modell übernehmen und das Modell speichern
       for (const { type, id } of ed.changes.values()) writeBack(type, ed._entry({ type, id }));
-      await this.store.save(this.model, [...ed.changes.values()].map((c) => c.id), this._modelHeader);
+      const changes = [...ed.changes.values()];
+      const present = new Set(this.model.objects.map((o) => o.id));
+      await this.store.save(this.model, changes.map((c) => c.id), this._modelHeader, {
+        added: changes.filter((c) => c.added && present.has(c.id)).map((c) => c.id),
+        removed: changes.filter((c) => !present.has(c.id)).map((c) => c.id),
+      });
       this._keys = { ...this._keys, objects: JSON.stringify(this.model.objects) };
       ed.changes.clear();
       ed._emit();
@@ -640,6 +680,8 @@ class Ha3dDashboard extends HTMLElement {
     if (!ed) return;
     if (act === 'move' || act === 'align') ed.setTool(act);
     else if (act === 'link') this._toggleSettings();
+    else if (act === 'catalog') this._toggleCatalog();
+    else if (act === 'remove') await this._removeSelected();
     else if (act === 'undo') ed.undo();
     else if (act === 'done') await this.finishEditing();
     else if (act === 'cancel') this.cancelEditing();
@@ -656,12 +698,125 @@ class Ha3dDashboard extends HTMLElement {
     }
   }
 
+  // ------------------------------------------------------------------ Katalog: Hinzufügen, Einlagern, Löschen
+
+  _toggleCatalog(show = !this.catalog?.isOpen) {
+    this.picker.close();
+    this.settings.close();
+    if (show) this.catalog.open({ stored: this._storedObjects() });
+    else this.catalog.close();
+    this.editor._emit();
+  }
+
+  /** Eingelagerte Objekte für das Lager im Katalog */
+  _storedObjects() {
+    return (this.model?.objects || []).filter((o) => o.stored).map((o) => ({
+      id: o.id, model: o.model, name: o.name || CATALOG[o.model]?.label || o.id,
+      linked: Object.values(o.ha?.entities || {}).reduce((n, v) => n + [].concat(v).length, 0),
+    }));
+  }
+
+  /**
+   * Objektbestand ändern (Hinzufügen, Einlagern, Aufstellen, Löschen): ungespeicherte Lagen ins Modell, mutate(objects)
+   * ausführen, Einrichtung neu bauen. Rückgängig stellt den vorigen Bestand wieder her; gespeichert wird mit „Fertig“.
+   * @param mutate  (objects) => { id, added? } – das betroffene Objekt
+   * @param select  danach auswählen (nicht bei Löschen/Einlagern)
+   */
+  _changeObjects(mutate, select = true) {
+    const ed = this.editor;
+    for (const { type, id } of ed.changes.values()) writeBack(type, ed._entry({ type, id }));
+    const before = structuredClone(this.model.objects);
+    const { id, added } = mutate(this.model.objects);
+    ed.clearSelection();
+    this._rebuildObjects();
+    const o = this.model.objects.find((x) => x.id === id);
+    const type = o && hasCapability(o.model, 'light') ? 'lamp' : 'item';
+    ed.changes.set(`obj:${id}`, { type, id, added: added || ed.changes.get(`obj:${id}`)?.added, values: {} });
+    ed.undoStack.push({
+      restore: () => {
+        this.model.objects.splice(0, this.model.objects.length, ...before);
+        ed.clearSelection();
+        this._rebuildObjects();
+        ed._emit();
+      },
+    });
+    if (select && o && !o.stored) ed.select({ type, id });
+    else ed._emit();
+  }
+
+  _rebuildObjects() {
+    const scene = toScene(this.model);
+    this.view.setFurnishing({ devices: scene.devices, items: scene.items });
+    this.areaMap = scene.areaMap;
+    if (this._hass) this._applyHass();
+    else this._applyActivity();
+    this.catalog?.update(this._storedObjects());
+  }
+
+  /** Bereich (Raum, sonst Außenbereich) unter einem Plan-Punkt auf der gezeigten Ebene */
+  _spaceAt(pos) {
+    const floors = [...this.view.levelFloors].sort((a, b) => !!a.floor.outdoor - !!b.floor.outdoor);
+    if (!floors.some((f) => f.floor.outdoor)) floors.push(...this.view.floors.filter((f) => f.floor.outdoor));
+    for (const f of floors) for (const r of f.rooms.values()) if (pointInPoly(pos, r.room.polygon)) return r.room.id;
+    return null;
+  }
+
+  /** Neues Objekt aus dem Katalog in der Mitte der Ansicht anlegen und auswählen (danach verschieben) */
+  _addObject(model) {
+    const c = CATALOG[model];
+    if (!c) return;
+    const t = this.view.controls.target;
+    const pos = [Math.round(t.x * 100) / 100, Math.round(t.z * 100) / 100];
+    const space = this._spaceAt(pos);
+    this._changeObjects((objects) => {
+      const ids = new Set(objects.map((o) => o.id));
+      let n = 1;
+      while (ids.has(`${model}_${n}`)) n++;
+      const o = { id: `${model}_${n}`, name: c.label || model, model, ...(space ? { space } : {}), pos };
+      if (hasCapability(model, 'light')) {
+        const mount = DEFAULT_MOUNT[model] || 'ceiling';
+        o.light = { height: MODEL_LIGHT_HEIGHT[model] ?? DEFAULT_LIGHT_HEIGHT[mount] ?? 2, range: 3 };
+      }
+      objects.push(o);
+      return { id: o.id, added: true };
+    });
+    this.catalog.close();
+    this._toast(`${c.label || model} hinzugefügt – verschieben, verknüpfen, mit Fertig speichern`);
+  }
+
+  /** Eingelagertes Objekt wieder aufstellen (alter Platz, alte Verknüpfungen) */
+  _restoreObject(id) {
+    this._changeObjects((objects) => {
+      delete objects.find((o) => o.id === id).stored;
+      return { id };
+    });
+    this.catalog.close();
+  }
+
+  /** Gewähltes Objekt entfernen: einlagern (bleibt mit Verknüpfungen im Lager) oder endgültig löschen */
+  async _removeSelected() {
+    const s = this.editor?.sel;
+    if (!s) return;
+    const name = s.entry.name || s.entry.id;
+    const r = await this._confirm(`„${name}“ aus der Welt nehmen? Eingelagert bleibt es mit allen Verknüpfungen im Lager (Katalog) und lässt sich später wieder aufstellen.`,
+      { yes: 'Einlagern', alt: 'Löschen' });
+    if (!r) return;
+    this._changeObjects((objects) => {
+      const i = objects.findIndex((o) => o.id === s.id);
+      if (r === 'yes') objects[i].stored = true;
+      else objects.splice(i, 1);
+      return { id: s.id };
+    }, false);
+    this._toast(r === 'yes' ? `„${name}“ eingelagert` : `„${name}“ gelöscht`);
+  }
+
   /** Einstellungen des gewählten Objekts (Verknüpfungen, Gesten, Zustandsanzeige) öffnen bzw. schließen */
   _toggleSettings(show = !this.settings?.isOpen) {
     const s = this.editor?.sel;
     this.picker.close();
+    this.catalog?.close();
     if (!show || !s) return this.settings.close();
-    this.settings.open({ entry: s.entry, light: s.type === 'lamp', hass: this._hass });
+    this.settings.open({ entry: s.entry, light: s.type === 'lamp', hass: this._hass, anim: !!CATALOG[s.entry.kind || s.entry.model]?.anim });
     this.editor._emit();
   }
 
@@ -699,6 +854,8 @@ class Ha3dDashboard extends HTMLElement {
       if (act === 'undo') b.disabled = !info.canUndo;
       if (act === 'done') b.classList.toggle('dirty', info.dirty);
       if (act === 'export') b.hidden = this.demo || this.store.mode === 'files';
+      if (act === 'remove') b.hidden = !info.selection;
+      if (act === 'catalog') b.classList.toggle('active', !!this.catalog?.isOpen);
       if (act === 'link') {
         b.hidden = !info.selection;
         b.classList.toggle('active', !!(this.picker?.isOpen || this.settings?.isOpen));
@@ -773,6 +930,7 @@ class Ha3dDashboard extends HTMLElement {
       this.view.setLamp(id, l.on, { color: l.color ?? s.baseColor, brightness: l.on ? l.brightness : undefined });
     }
     this._updateBadges();
+    this._applyActivity();
     if (this.shadowRoot.querySelector('.links.show')) this._renderLinks();
   }
 
@@ -858,19 +1016,28 @@ class Ha3dDashboard extends HTMLElement {
   }
 
   /** Rückfrage im Panel (große Knöpfe); true = bestätigt */
-  _confirm(text) {
+  /**
+   * Rückfrage im Panel. Mit labels { yes, alt } drei Knöpfe (Ergebnis 'yes' | 'alt' | false), sonst OK/Abbrechen
+   * (true | false).
+   */
+  _confirm(text, labels = null) {
     const el = this.shadowRoot.querySelector('.confirm');
     el.querySelector('p').textContent = text;
+    const yes = el.querySelector('.yes'), no = el.querySelector('.no'), alt = el.querySelector('.alt');
+    yes.textContent = labels?.yes || 'OK';
+    alt.hidden = !labels?.alt;
+    alt.textContent = labels?.alt || '';
     el.classList.add('show');
     return new Promise((resolve) => {
-      const done = (ok) => (ev) => {
+      const done = (r) => (ev) => {
         ev.stopPropagation();
         el.classList.remove('show');
-        el.querySelector('.yes').onclick = el.querySelector('.no').onclick = null;
-        resolve(ok);
+        yes.onclick = no.onclick = alt.onclick = null;
+        resolve(r);
       };
-      el.querySelector('.yes').onclick = done(true);
-      el.querySelector('.no').onclick = done(false);
+      yes.onclick = done(labels ? 'yes' : true);
+      alt.onclick = done('alt');
+      no.onclick = done(false);
     });
   }
 
@@ -997,6 +1164,52 @@ class Ha3dDashboard extends HTMLElement {
     this.setAttribute('quality', this.view.quality);
     this._applyWeather();
     this._applySky();
+    this._applyMotion();
+  }
+
+  /** Animationen (global an/aus; Automatisch = aus bei „Bewegung reduzieren“) und Leistungsanzeige */
+  _applyMotion() {
+    const pref = this.prefs?.animations || 'auto';
+    const on = pref === 'auto' ? !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches : pref === 'on';
+    this.view?.setAnimations(on);
+    this._applyFps();
+  }
+
+  /**
+   * Aktivität animierter Objekte (Ventilator …): verknüpfte Entities (Demo-Modus: nur in HA vorhandene) oder der
+   * im Editor feste Zustand. Nur Objekte, deren Modell eine Animation hat.
+   */
+  _applyActivity() {
+    const d = this.view?.furnishingData;
+    if (!d) return;
+    const states = this._hass?.states || {};
+    for (const e of [...d.items, ...d.devices]) {
+      if (!CATALOG[e.kind || e.model]?.anim) continue;
+      const ents = this._live(roleEntities(e, 'power'));
+      this.view.setActivity(e.id, activityOf(ents.map((x) => states[x]), e.state));
+    }
+  }
+
+  /** Leistungsanzeige (Einstellungen): Bilder/s, Rechenzeit je Bild, Zeichenaufrufe, Dreiecke – alle 0,5 s */
+  _applyFps() {
+    const el = this.shadowRoot.querySelector('.fps');
+    const on = this.prefs?.fps === 'on';
+    el.hidden = !on;
+    clearInterval(this._fpsTimer);
+    if (!on) return;
+    let last = { t: performance.now(), frames: this.view?.frames || 0 };
+    this._fpsTimer = setInterval(() => {
+      const v = this.view;
+      if (!v) return;
+      const now = performance.now(), frames = v.frames || 0;
+      const fps = ((frames - last.frames) * 1000) / (now - last.t);
+      last = { t: now, frames };
+      const info = v.renderer.info.render;
+      el.innerHTML = `<b>${fps.toFixed(fps < 10 ? 1 : 0)}</b> Bilder/s${fps < 0.5 ? ' <small>(Ruhe)</small>' : ''}<br>`
+        + `${(v.frameMs || 0).toFixed(1)} ms je Bild · ${v.quality === 'low' ? 'Sparsam' : 'Hoch'}<br>`
+        + `${info.calls} Zeichenaufrufe · ${Math.round(info.triangles / 1000)}k Dreiecke<br>`
+        + `${v._runningAnims().length} Animationen`;
+    }, 500);
   }
 
   /**

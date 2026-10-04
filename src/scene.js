@@ -11,6 +11,8 @@ import { SkyEnvironment } from './environment.js';
 const NO_WEATHER = { cloud: 0, rain: 0, snow: 0, fog: 0 };
 
 /** Qualitätsstufen: Schattenauflösung und -weichheit, Bildauflösung */
+const _X = new THREE.Vector3(1, 0, 0), _Y = new THREE.Vector3(0, 1, 0), _Z = new THREE.Vector3(0, 0, 1), _q = new THREE.Quaternion();
+
 const QUALITY = {
   high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2 },
   low: { shadowMap: 1024, shadowRadius: 3, maxPixelRatio: 1.25 },
@@ -550,17 +552,59 @@ export class HouseScene {
   }
 
   requestRender() {
-    if (this._raf) return;
+    if (this._raf || this.paused) return;
     this._raf = requestAnimationFrame((t) => {
       this._raf = 0;
       const moving = this.controls.update() || this._dragging || !!this._anim;
+      // Laufende Animationen (Ventilator …): Bild nur im eigenen, gedrosselten Takt – nicht mit 60 Bildern/s
+      const anims = this._runningAnims();
+      if (anims.length) {
+        if (!moving && this._animT && t - this._animT < this._animInterval()) return this.requestRender();
+        this._stepAnims(anims, this._animT ? Math.min(0.1, (t - this._animT) / 1000) : 0);
+        this._animT = t;
+      } else this._animT = 0;
       this._draw();
-      this.frames = (this.frames || 0) + 1;
-      if (moving) {
-        this._measure(t);
-        this.requestRender();
-      } else this._lastT = 0;
+      if (moving) this._measure(t);
+      else this._lastT = 0;
+      if (moving || anims.length) this.requestRender();
     });
+  }
+
+  // ---------- Animationen ----------
+  // Bewegliche Teile (FurnishingLayer.animated) drehen sich, solange ihr Objekt aktiv ist (Entity an oder fester
+  // Zustand). Nur dann läuft ein Bildtakt, gedrosselt auf 30 Bilder/s (Sparsam: 20); sonst bleibt es beim
+  // Rendern bei Bedarf. Schatten werden dafür nicht neu berechnet.
+
+  /** Aktivität eines Objekts: { active, speed } (speed 0..1, Standard 1) */
+  setActivity(id, act) {
+    (this.activity ??= new Map()).set(id, act);
+    this.requestRender();
+  }
+
+  /** Animationen global an/aus (Einstellungen) */
+  setAnimations(on) {
+    this.animationsOn = on;
+    this.requestRender();
+  }
+
+  _runningAnims() {
+    if (this.animationsOn === false || !this.activity?.size) return [];
+    return this.activeLayers.flatMap((l) => l.animated || []).filter((a) => this.activity.get(a.id)?.active);
+  }
+
+  _animInterval() {
+    return this.quality === 'low' ? 1000 / 20 : 1000 / 30;
+  }
+
+  _stepAnims(anims, dt) {
+    for (const a of anims) {
+      const { node, spec } = a;
+      if (spec.type !== 'spin') continue;
+      const speed = this.activity.get(a.id)?.speed ?? 1;
+      a.angle = ((a.angle || 0) + dt * spec.speed * speed * Math.PI * 2) % (Math.PI * 2);
+      const axis = spec.axis === 'x' ? _X : spec.axis === 'z' ? _Z : _Y;
+      node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, a.angle));
+    }
   }
 
   /** Sofort rendern (für Tests). */
@@ -571,7 +615,11 @@ export class HouseScene {
 
   /** Ein Bild (immer dasselbe, ob in Bewegung oder im Stillstand – kein Nachschärfen nach dem Anhalten) */
   _draw() {
+    const t0 = performance.now();
     this.renderer.render(this.scene, this.camera);
+    // für die Leistungsanzeige: Bilder und Rechenzeit (CPU-Seite)
+    this.frames = (this.frames || 0) + 1;
+    this.frameMs = performance.now() - t0;
     this.onRender?.();
   }
 
@@ -818,6 +866,8 @@ export class HouseScene {
   }
 
   dispose() {
+    this.paused = true;
+    cancelAnimationFrame(this._raf);
     this.skyEnv.dispose();
     this._resizeObs.disconnect();
     this.controls.dispose();

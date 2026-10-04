@@ -182,9 +182,28 @@ legt sein Modell im [Katalog](#katalog) fest.
 | `params` | nein | `{}` | modellabhängige Parameter (Katalog) |
 | `light` | bei Fähigkeit `light` | | Lichtquelle, siehe unten |
 | `ha` | nein | | Verknüpfung mit Home Assistant, siehe unten |
+| `state` | nein | `off` | fester Zustand ohne Entity für Modelle mit Animation (`on` = bewegt sich immer, z. B. Ventilator) |
+| `stored` | nein | false | eingelagert: bleibt mit allen Verknüpfungen im Modell, steht aber nicht in der Welt (Editor → Katalog → Lager) |
 
 **Höhenbezug:** `elevation` und `light.height` zählen ab dem Boden des Bereichs: Raum → `elevation` der Etage;
 Außenbereich → dessen `elevation`; ohne `space` → 0.
+
+**Objekte anlegen, einlagern, löschen:** Ein Objekt ist ein Eintrag in `objects` – wer ein Modell automatisch
+erstellt (z. B. ein Agent), setzt Möbel, Leuchten und Geräte direkt mit `model`, `space`, `pos` (und `rot`, `size`,
+`light`, `ha`) in die Welt; der Benutzer passt danach im Editor an. Im Editor fügt **Katalog** ein Modell neu hinzu
+(in der Mitte der Ansicht, danach verschieben); **Entfernen → Einlagern** setzt `stored: true` (z. B.
+Weihnachtsdekoration, die nur ein paar Monate steht – Verknüpfungen bleiben), **Katalog → Lager → Aufstellen** holt
+es zurück, **Entfernen → Löschen** streicht den Eintrag.
+
+**Animationen:** Modelle mit Animation (Spalte Parameter im [Katalog](#katalog), z. B. `ceiling_fan`) bewegen sich,
+solange das Objekt aktiv ist: mit `ha.entities.power` sobald eine Entity aktiv ist (nicht `off`, `idle`, `paused`,
+`standby`, `closed`, `docked`, `unavailable`, `unknown`), das Tempo folgt dem Attribut `percentage` (Ventilatorstufe);
+ohne Entity gilt `state`. Die Einstellungen (Zahnrad) schalten Animationen für das Gerät ab.
+
+```yaml
+- { id: ventilator, name: Deckenventilator, model: ceiling_fan, space: schlafen, pos: [7, 4.7], state: on,
+    ha: { entities: { power: fan.schlafzimmer } } }
+```
 
 ### `light` – Lichtquelle (Modelle mit Fähigkeit `light`)
 
@@ -294,9 +313,11 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `bench` | Möbel | | 1.6 × 0.62 × 0.85 | `color` (Auflage; Gartenbank) |
 | `bookshelf` | Möbel | | 2.0 × 0.3 × 2.0 | |
 | `box` | Gerät | | 0.6 × 0.6 × 0.85 | `color` |
+| `ceiling_fan` | Gerät | | 1.2 | `color` (Flügel) – Animation: Flügel drehen sich, Tempo aus `percentage`; hängt an der Decke des Raums |
 | `chair` | Möbel | | | `guitar` |
 | `chest_table` | Möbel | | 0.8 × 0.6 × 0.48 | |
 | `curtain` | Möbel | | | `color` |
+| `floor_fan` | Gerät | | 0.42 × 0.42 × 1.15 | `color` (Rotor) – Animation: Rotor dreht sich, Tempo aus `percentage` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
 | `garden_chair` | Möbel | | | `color` (Bespannung; Gartenstuhl) |
 | `garden_table` | Möbel | | 1.6 × 0.9 × 0.74 | `color` (Platte; Gartentisch) |
@@ -508,6 +529,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.15.0, abwärtskompatibel):** Objekte mit `state` (fester Zustand für Animationen) und
+  `stored` (eingelagert); Katalog `ceiling_fan`, `floor_fan` mit Animation.
 - **Version 2, Ergänzung (0.14.0, abwärtskompatibel):** `outdoor[].edge`, `outdoor[].extend`; Kanten auch bei ebenen, erhöhten
   Außenbereichen; Oberflächen `slabs`, `stone`; Katalog `garden_table`, `garden_chair`, `bench`, `picnic_table`,
   `grill`, `barrel`, `grass`, `bollard`, `spike_spot`, `string_lights`; `tree` mit `stakes`.

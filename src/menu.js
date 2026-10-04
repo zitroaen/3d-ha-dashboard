@@ -1,8 +1,8 @@
-// Einstellungsmenü (Zahnrad oben rechts): Ansicht (Tageszeit, Qualität), Haus (Bearbeiten, Link-Check), Info.
+// Einstellungsmenü (Zahnrad oben rechts): Ansicht (Tageszeit, Qualität, Animationen, Leistungsanzeige), Haus (Bearbeiten, Link-Check), Info.
 // Ansichts-Einstellungen gelten pro Gerät (localStorage) – ein Wand-Tablet darf sparsam rechnen, der PC nicht.
 
 const PREFS_KEY = 'ha3d_view_prefs';
-export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto', weather: 'auto', theme: 'auto' };
+export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto', weather: 'auto', theme: 'auto', animations: 'auto', fps: 'off' };
 
 /** Ansichts-Einstellungen dieses Geräts (ohne Speicher, z. B. privates Fenster: Standardwerte) */
 export function loadPrefs() {
@@ -22,6 +22,8 @@ export function savePrefs(prefs) {
 const THEME = [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']];
 const DAYTIME = [['auto', 'Automatisch'], ['day', 'Tag'], ['night', 'Nacht']];
 const QUALITY = [['auto', 'Automatisch'], ['high', 'Hoch'], ['low', 'Sparsam']];
+const ANIMATIONS = [['auto', 'Automatisch'], ['on', 'An'], ['off', 'Aus']];
+const FPS = [['off', 'Aus'], ['on', 'An']];
 const WEATHER = [['auto', 'Automatisch'], ['clear', 'Klar'], ['cloudy', 'Bewölkt'], ['rain', 'Regen'], ['snow', 'Schnee'], ['fog', 'Nebel']];
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -94,6 +96,10 @@ export class SettingsMenu {
           <label>Qualität</label>${seg('quality', QUALITY)}
           ${autoQ}
           <p class="hint">Hoch: weiche Schatten und volle Auflösung. Sparsam: für ältere Tablets.</p>
+          <label>Animationen</label>${seg('animations', ANIMATIONS)}
+          <p class="hint">Bewegte Geräte (z. B. Ventilator). Automatisch: aus, wenn das System „Bewegung reduzieren“ wünscht.</p>
+          <label>Leistungsanzeige</label>${seg('fps', FPS)}
+          <p class="hint">Bilder pro Sekunde, Rechenzeit, Zeichenaufrufe und Dreiecke – zum Prüfen auf langsamen Geräten.</p>
         </section>
         <section><h3>Haus</h3>
           ${canEdit ? '<button class="item" data-act="edit"><b>Bearbeiten</b><small>Möbel und Leuchten verschieben, verknüpfen, Gesten einstellen</small></button>' : ''}

@@ -19,9 +19,10 @@ export class ObjectSettings {
    * @param onChange  (ha) => void – neue HA-Einstellungen des Objekts
    * @param onPick    (role) => void – Entity-Auswahl für eine Rolle öffnen
    */
-  constructor(root, { onChange, onPick, onClose } = {}) {
+  constructor(root, { onChange, onPick, onClose, onState } = {}) {
     this.root = root;
     this.onChange = onChange;
+    this.onState = onState;
     this.onPick = onPick;
     this.onClose = onClose;
     root.addEventListener('click', (e) => {
@@ -31,6 +32,7 @@ export class ObjectSettings {
       if (act === 'close') this.close();
       if (act === 'pick') this.onPick?.(role);
       if (act === 'remove') this._setRole(role, roleEntities(this.entry, role).filter((x) => x !== id));
+      if (act === 'state') this.onState?.(b.dataset.value === 'off' ? undefined : b.dataset.value);
     });
     root.addEventListener('change', (e) => {
       const g = e.target.closest('[data-g]')?.dataset.g;
@@ -42,10 +44,12 @@ export class ObjectSettings {
   /**
    * @param entry  Objekt (interne Kopie aus der Szene, mit `ha`)
    * @param light  Objekt kann leuchten (Standardaktionen wie bei Leuchten)
+   * @param anim   Modell hat eine Animation (fester Zustand ohne Entity einstellbar)
    */
-  open({ entry, light, hass }) {
+  open({ entry, light, hass, anim = false }) {
     this.entry = entry;
     this.light = light;
+    this.anim = anim;
     this.hass = hass;
     this.root.classList.add('show');
     this.render();
@@ -121,10 +125,19 @@ export class ObjectSettings {
       return `<div class="gesture" data-g="${g}"><label>${GESTURE_LABEL[g]}<select aria-label="${GESTURE_LABEL[g]}">${opts}</select></label>${extra.join('')}</div>`;
     }).join('');
     const badge = e.ha?.badge;
+    // Animation ohne Entity: fester Zustand (z. B. Ventilator dreht sich immer)
+    const linked = roleEntities(e, 'power').length > 0;
+    const stateSec = this.anim ? `<section><h3>Animation</h3>
+      <p class="hint">${linked ? 'Folgt der verknüpften Entity (an = bewegt sich). Ohne Entity gilt:' : 'Keine Entity verknüpft – fester Zustand:'}</p>
+      <div class="seg" role="group">${[['off', 'Steht still'], ['on', 'Läuft immer']].map(([v, l]) => {
+        const on = (e.state === 'on') === (v === 'on');
+        return `<button data-act="state" data-value="${v}" class="${on ? 'on' : ''}" aria-pressed="${on}">${l}</button>`;
+      }).join('')}</div></section>` : '';
     this.root.innerHTML = `
       <header><h2>${esc(e.name || e.id)}</h2><button data-act="close" aria-label="Schließen">✕</button></header>
       <div class="body">
         ${roles}
+        ${stateSec}
         <section><h3>Gesten</h3>${gestures}</section>
         <section><h3>Zustand über dem Objekt</h3>
           <select data-badge aria-label="Zustand anzeigen">

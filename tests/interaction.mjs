@@ -450,6 +450,113 @@ try {
   // Möbel ohne Verknüpfung reagieren nicht – Antippen geht an den Raum
   const sofaRef = await page.evaluate(() => [...window.panel._gesturesOf({ type: 'item', id: 'sofa' })].join());
   ok(sofaRef === '', 'Möbel ohne Verknüpfung: keine Geste (Antippen schaltet den Raum)', `Sofa: ${sofaRef}`);
+
+  // ---------------- Animationen: Ventilator dreht sich, solange die Entity an ist ----------------
+  const fanOff = await page.evaluate(() => {
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'on' });
+    return window.panel.view._runningAnims().length;
+  });
+  await page.evaluate(() => {
+    const mh = window.mockHass;
+    mh.states = { ...mh.states, 'fan.demo_ventilator': { entity_id: 'fan.demo_ventilator', state: 'on', attributes: { percentage: 50 } } };
+    window.panel.hass = mh;
+  });
+  const a0 = await page.evaluate(() => window.panel.view._runningAnims()[0]?.angle || 0);
+  // Software-Grafik: ein Bild dauert hier bis zu einer Sekunde – auf den nächsten Animationsschritt warten
+  await settle(page, (a) => (window.panel.view._runningAnims()[0]?.angle || 0) !== a, a0);
+  const fanOn = await page.evaluate(() => {
+    const v = window.panel.view, a = v._runningAnims();
+    return { n: a.length, id: a[0]?.id, angle: a[0]?.angle || 0, speed: v.activity.get('ventilator')?.speed };
+  });
+  const fanGlobalOff = await page.evaluate(() => {
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'off' });
+    return window.panel.view._runningAnims().length;
+  });
+  ok(fanOff === 0 && fanOn.n === 1 && fanOn.id === 'ventilator' && fanOn.angle !== a0 && fanOn.speed === 0.5 && fanGlobalOff === 0,
+    'Animation: Ventilator dreht sich nur, solange fan.* an ist (Stufe 50 % = halbes Tempo); Einstellung „Aus“ hält ihn an',
+    `Animation: aus=${fanOff} an=${JSON.stringify(fanOn)} (vorher ${a0}) global aus=${fanGlobalOff}`);
+  await page.evaluate(() => {
+    const mh = window.mockHass;
+    mh.states = { ...mh.states, 'fan.demo_ventilator': { entity_id: 'fan.demo_ventilator', state: 'off', attributes: {} } };
+    window.panel.hass = mh;
+  });
+
+  // ---------------- Leistungsanzeige ----------------
+  await page.evaluate(() => window.panel._applyPrefs({ ...window.panel.prefs, fps: 'on' }));
+  await page.evaluate(() => window.panel.view.requestRender());
+  await page.waitForTimeout(700);
+  const fps = await page.evaluate(() => {
+    const el = window.panel.shadowRoot.querySelector('.fps');
+    const r = { shown: !el.hidden, text: el.textContent };
+    window.panel._applyPrefs({ ...window.panel.prefs, fps: 'off' });
+    return { ...r, hiddenAfter: el.hidden };
+  });
+  ok(fps.shown && /Bilder\/s/.test(fps.text) && /Zeichenaufrufe/.test(fps.text) && fps.hiddenAfter,
+    'Leistungsanzeige: Bilder/s, Rechenzeit, Zeichenaufrufe – per Einstellung an und aus', `Leistungsanzeige: ${JSON.stringify(fps)}`);
+
+  // ---------------- Katalog: hinzufügen, fester Zustand, einlagern, aufstellen, löschen, rückgängig ----------------
+  if (!(await page.evaluate(() => window.panel.hasAttribute('editing')))) await menuAct('edit');
+  await clickShadow('.tools button[data-act=catalog]');
+  const cat = await page.evaluate(() => {
+    const r = window.panel.shadowRoot.querySelector('.catalog');
+    return { open: r.classList.contains('show'), items: r.querySelectorAll('button[data-add]').length };
+  });
+  await clickShadow('.catalog button[data-cat=device]');
+  await clickShadow('.catalog button[data-add=floor_fan]');
+  const added = await page.evaluate(() => {
+    const p = window.panel, o = p.model.objects.find((x) => x.id === 'floor_fan_1');
+    return { model: !!o, space: o?.space, inScene: p.view.furnishingData.items.some((i) => i.id === 'floor_fan_1'),
+      selected: p.editor.sel?.id, catalogClosed: !p.shadowRoot.querySelector('.catalog').classList.contains('show'), dirty: p.editor.changes.size > 0 };
+  });
+  ok(cat.open && cat.items > 40 && added.model && added.inScene && added.selected === 'floor_fan_1' && added.catalogClosed && added.dirty,
+    `Katalog: alle Modelle (${cat.items}), Antippen legt ein Objekt in der Mitte der Ansicht an (${added.space ?? 'freies Gelände'}) und wählt es aus`,
+    `Katalog: ${JSON.stringify({ cat, added })}`);
+  // fester Zustand ohne Entity: Läuft immer
+  await clickShadow('.tools button[data-act=link]');
+  await clickShadow('.objcfg button[data-act=state][data-value=on]');
+  const fixed = await page.evaluate(() => {
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'on' });
+    const r = { state: window.panel.editor.sel.entry.state, running: window.panel.view._runningAnims().map((a) => a.id) };
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'off' });
+    return r;
+  });
+  await clickShadow('.objcfg button[data-act=close]');
+  ok(fixed.state === 'on' && fixed.running.length === 0,
+    'Editor: fester Zustand „Läuft immer“ ohne Entity (der Editor zeigt das gewählte Objekt still)', `fester Zustand: ${JSON.stringify(fixed)}`);
+  // Entfernen -> Einlagern: bleibt im Modell (stored), nicht in der Welt, im Lager sichtbar
+  await clickShadow('.tools button[data-act=remove]');
+  await clickShadow('.confirm .yes');
+  const einlager = await page.evaluate(() => {
+    const p = window.panel, o = p.model.objects.find((x) => x.id === 'floor_fan_1');
+    return { stored: o?.stored, state: o?.state, inScene: p.view.furnishingData.items.some((i) => i.id === 'floor_fan_1'), sel: p.editor.sel?.id ?? null };
+  });
+  await clickShadow('.tools button[data-act=catalog]');
+  await clickShadow('.catalog button[data-tab=stored]');
+  const lager = await page.evaluate(() => [...window.panel.shadowRoot.querySelectorAll('.catalog button[data-restore]')].map((b) => b.dataset.restore));
+  await clickShadow('.catalog button[data-restore=floor_fan_1]');
+  const restored = await page.evaluate(() => {
+    const p = window.panel, o = p.model.objects.find((x) => x.id === 'floor_fan_1');
+    return { stored: o?.stored, inScene: p.view.furnishingData.items.some((i) => i.id === 'floor_fan_1'), sel: p.editor.sel?.id };
+  });
+  ok(einlager.stored === true && einlager.state === 'on' && !einlager.inScene && einlager.sel === null && lager.join() === 'floor_fan_1'
+    && restored.stored === undefined && restored.inScene && restored.sel === 'floor_fan_1',
+    'Entfernen → Einlagern: Objekt bleibt mit Zustand im Modell (stored), steht im Lager und lässt sich wieder aufstellen',
+    `Einlagern: ${JSON.stringify({ einlager, lager, restored })}`);
+  // Entfernen -> Löschen, Rückgängig holt es zurück
+  await clickShadow('.tools button[data-act=remove]');
+  await clickShadow('.confirm .alt');
+  const deleted = await page.evaluate(() => !window.panel.model.objects.some((x) => x.id === 'floor_fan_1'));
+  await clickShadow('.tools button[data-act=undo]');
+  const undone = await page.evaluate(() => window.panel.view.furnishingData.items.some((i) => i.id === 'floor_fan_1'));
+  ok(deleted && undone, 'Entfernen → Löschen streicht das Objekt, Rückgängig holt es zurück', `Löschen: weg=${deleted} zurück=${undone}`);
+  // Abbrechen verwirft alles (nichts gespeichert)
+  let savedCatalog = false;
+  await page.route('**/__save/**', async (route) => { savedCatalog = true; await route.fulfill({ status: 204 }); });
+  await clickShadow('.tools button[data-act=cancel]');
+  await settle(page, () => !window.panel.model.objects.some((x) => x.id === 'floor_fan_1'));
+  const gone = await page.evaluate(() => !window.panel.model.objects.some((x) => x.id === 'floor_fan_1'));
+  await page.unroute('**/__save/**');
+  ok(gone && !savedCatalog, 'Abbrechen verwirft auch hinzugefügte Objekte', `Abbrechen: weg=${gone} gespeichert=${savedCatalog}`);
   await page.close();
 } finally {
   await browser.close();

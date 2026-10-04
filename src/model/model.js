@@ -168,6 +168,7 @@ export function toScene(model) {
 
   const items = [], devices = [];
   for (const o of model.objects || []) {
+    if (o.stored) continue; // eingelagert: im Modell (mit Verknüpfungen), aber nicht in der Welt
     const sp = o.space ? spaces.get(o.space) : null;
     // Ohne Bereich (oder unbekannter Bereich): freies Gelände auf Ebene 0
     const floor = sp ? sp.floorKey : OUTDOOR_FLOOR;
@@ -175,7 +176,7 @@ export function toScene(model) {
     // Außenbereiche liegen auf der Außen-Etage (Höhe 0): ihre eigene Höhe kommt zu den Objekthöhen dazu
     const base = sp?.kind === 'outdoor' ? outdoorHeightAt(sp.room, o.pos) : 0;
     // ha: Kopie, die der Editor bearbeitet (writeBack schreibt sie zurück)
-    const common = { id: o.id, name: o.name, floor, room, pos: o.pos, rot: o.rot, ...(o.params || {}), src: o, base, ha: o.ha ? structuredClone(o.ha) : undefined };
+    const common = { id: o.id, name: o.name, floor, room, pos: o.pos, rot: o.rot, ...(o.params || {}), src: o, base, ha: o.ha ? structuredClone(o.ha) : undefined, state: o.state };
     if (hasCapability(o.model, 'light')) {
       const l = o.light || {};
       devices.push({
@@ -207,8 +208,11 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
  * @param type 'item' | 'lamp'
  */
 export function writeBack(type, e) {
-  const o = e.src;
+  const o = e?.src;
   if (!o) return;
+  // fester Zustand ohne Entity (Animation, z. B. Ventilator dreht sich immer)
+  if (e.state) o.state = e.state;
+  else delete o.state;
   o.pos = e.pos.map(r3);
   if (e.rot != null && (e.rot !== 0 || o.rot != null)) o.rot = e.rot;
   if (type === 'lamp') o.light = { ...(o.light || {}), height: r3(e.height) };
@@ -239,3 +243,19 @@ export function setRole(o, role, entities) {
 
 /** Modell für den Katalog-Abgleich: alle Modellnamen */
 export const catalogModels = () => Object.keys(CATALOG);
+
+// Zustände, in denen ein Gerät ruht (alles andere gilt als aktiv: on, playing, cleaning, heating …)
+const IDLE_STATES = new Set(['off', 'unavailable', 'unknown', 'idle', 'paused', 'standby', 'closed', 'docked', 'none', '']);
+
+/**
+ * Aktivität eines animierten Objekts: aus den Zuständen seiner power-Entities (aktiv, sobald eine aktiv ist; Tempo
+ * aus `percentage`, z. B. Ventilatorstufe) oder – ohne Entity – aus dem festen Zustand `state` ('on' | 'off').
+ * @param stateObjs  HA-Zustände der verknüpften Entities (leer = keine Entity)
+ */
+export function activityOf(stateObjs, fixed) {
+  if (!stateObjs.length) return { active: fixed === 'on', speed: 1 };
+  const on = stateObjs.find((st) => st && !IDLE_STATES.has(String(st.state)));
+  if (!on) return { active: false, speed: 1 };
+  const pct = Number(on.attributes?.percentage);
+  return { active: true, speed: Number.isFinite(pct) && pct > 0 ? Math.max(0.25, Math.min(1, pct / 100)) : 1 };
+}

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import * as yaml from 'js-yaml';
 import { ENGINE_ROOT } from './lib/config.mjs';
 import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.js';
-import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
+import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, activityOf, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 
@@ -111,6 +111,30 @@ check('ha aufräumen: leere Rollen weg, nichts übrig -> undefined', cleanHa({ e
   && JSON.stringify(cleanHa({ entities: { power: ['a'] }, badge: false })) === '{"entities":{"power":"a"},"badge":false}');
 check('Aktionen: ohne Entities nichts, Doppeltippen standardmäßig nichts', act(undefined, 'tap') === 'none' && act({ entities: { power: 'light.a' } }, 'double_tap') === 'none');
 check('Aktionen: Kurzform und ausführliche Form', act({ tap: 'more-info' }, 'tap') === 'more-info' && gestureAction({ ha: { tap: { action: 'service', service: 'script.x' } } }, 'tap').service === 'script.x');
+
+// Animationen: Aktivität aus Entities (Tempo aus percentage) oder festem Zustand
+check('Animation: Entity an -> aktiv, Stufe als Tempo; ruhende Zustände -> inaktiv',
+  activityOf([{ state: 'on', attributes: { percentage: 50 } }]).speed === 0.5 && activityOf([{ state: 'on' }]).active
+  && !activityOf([{ state: 'off' }, { state: 'unavailable' }]).active && activityOf([{ state: 'off' }, { state: 'playing' }]).active
+  && activityOf([{ state: 'on', attributes: { percentage: 5 } }]).speed === 0.25);
+check('Animation: ohne Entity gilt der feste Zustand (Standard aus)', activityOf([], 'on').active && !activityOf([], undefined).active && !activityOf([], 'off').active);
+
+// Einlagern, fester Zustand, angelegte/gelöschte Objekte in den Benutzerdaten
+{
+  const m = parseModel(readFileSync(join(ENGINE_ROOT, 'examples/demo/model.yaml'), 'utf8'));
+  const n = toScene(m).items.length;
+  m.objects.find((o) => o.id === 'sofa').stored = true;
+  const sc = toScene(m);
+  check('Eingelagerte Objekte (stored) stehen nicht in der Welt', sc.items.length === n - 1 && !sc.items.some((i) => i.id === 'sofa'));
+  const fan = sc.items.find((i) => i.id === 'ventilator');
+  fan.state = undefined;
+  writeBack('item', fan);
+  check('Zurückschreiben: fester Zustand wird entfernt bzw. gesetzt', !('state' in fan.src) && (fan.state = 'on', writeBack('item', fan), fan.src.state === 'on'));
+  const m2 = parseModel(readFileSync(join(ENGINE_ROOT, 'examples/demo/model.yaml'), 'utf8'));
+  applyOverrides(m2, { removed: ['sofa'], added: { neu_1: { id: 'neu_1', model: 'box', pos: [1, 1] } }, objects: { tv: { stored: true } } });
+  check('Overrides: gelöschte Objekte fehlen, neue sind da, stored wirkt', !m2.objects.some((o) => o.id === 'sofa')
+    && m2.objects.some((o) => o.id === 'neu_1') && m2.objects.find((o) => o.id === 'tv').stored === true);
+}
 
 if (failed) {
   console.error(`\n✖ ${failed} Test(s) fehlgeschlagen`);

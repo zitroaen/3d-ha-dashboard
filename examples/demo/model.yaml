@@ -551,3 +551,11 @@ objects:
     pos: [0.4, -6.6]
     light: { height: 0.55, range: 2.5, color: "#ffcf8a" }
     ha: { entities: { power: light.demo_pollerleuchte } }
+  - id: ventilator
+    name: Deckenventilator
+    model: ceiling_fan
+    space: schlafen
+    pos: [7, 4.7]
+    size: [1.1]
+    state: "on"
+    ha: { entities: { power: fan.demo_ventilator } }
