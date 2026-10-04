@@ -13,6 +13,24 @@ const NO_WEATHER = { cloud: 0, rain: 0, snow: 0, fog: 0 };
 /** Qualitätsstufen: Schattenauflösung und -weichheit, Bildauflösung */
 const _X = new THREE.Vector3(1, 0, 0), _Y = new THREE.Vector3(0, 1, 0), _Z = new THREE.Vector3(0, 0, 1), _q = new THREE.Quaternion();
 
+/** Polylinie mit Länge und Punkt nach Weglänge (Energiefluss) */
+function pathOf(pts) {
+  const seg = [];
+  let length = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = new THREE.Vector3(...pts[i - 1]), b = new THREE.Vector3(...pts[i]);
+    seg.push({ a, b, from: length, len: a.distanceTo(b) });
+    length += seg.at(-1).len;
+  }
+  return {
+    length,
+    at(d, out) {
+      const s = seg.find((x) => d <= x.from + x.len) || seg.at(-1);
+      return out.copy(s.a).lerp(s.b, s.len ? (d - s.from) / s.len : 0);
+    },
+  };
+}
+
 const QUALITY = {
   high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2 },
   low: { shadowMap: 1024, shadowRadius: 3, maxPixelRatio: 1.25 },
@@ -108,7 +126,8 @@ export class HouseScene {
       this.scene.add(fm.group);
       this.floors.push(fm);
     }
-    this.levels = [...new Set(this.floors.map((f) => f.floor.level ?? 0))].sort((a, b) => a - b);
+    // Dächer liegen eine Ebene über ihrem Gebäude, bekommen aber keinen eigenen Ebenen-Knopf
+    this.levels = [...new Set(this.floors.filter((f) => !f.floor.roof).map((f) => f.floor.level ?? 0))].sort((a, b) => a - b);
     this.setLevel(this.levels.includes(0) ? 0 : this.levels[0], { silent: true });
   }
 
@@ -125,8 +144,9 @@ export class HouseScene {
     this.activeFloors = this.floors.filter((f) => (f.floor.level ?? 0) <= level);
     // Etagen genau dieser Ebene; "Haupt"-Etage (Titel, Editor-Standard): die erste echte Gebäude-Etage
     this.levelFloors = this.floors.filter((f) => (f.floor.level ?? 0) === level);
-    this.activeFloor = this.levelFloors.find((f) => !f.floor.outdoor) || this.levelFloors[0];
+    this.activeFloor = this.levelFloors.find((f) => !f.floor.outdoor && !f.floor.roof) || this.levelFloors[0];
     for (const f of this.floors) f.group.visible = this.activeFloors.includes(f);
+    if (this.furnishing?.length) this._syncAnims();
     for (const slab of this.slabs || []) slab.visible = slab.userData.level <= level;
     makeFloorAO(this.activeFloors.flatMap((f) => f.floor.walls));
     if (!silent) {
@@ -138,7 +158,7 @@ export class HouseScene {
 
   /** Name einer Ebene: Namen der Gebäude-Etagen (ohne Doppelungen) */
   levelName(level = this.level) {
-    const names = this.floors.filter((f) => (f.floor.level ?? 0) === level && !f.floor.outdoor).map((f) => f.floor.name);
+    const names = this.floors.filter((f) => (f.floor.level ?? 0) === level && !f.floor.outdoor && !f.floor.roof).map((f) => f.floor.name);
     return [...new Set(names)].join(' · ') || 'Außen';
   }
 
@@ -267,6 +287,7 @@ export class HouseScene {
       return layer;
     });
     this._updateLights();
+    this._syncAnims();
     this.renderer.shadowMap.needsUpdate = true;
     this.requestRender();
   }
@@ -560,7 +581,7 @@ export class HouseScene {
       const anims = this._runningAnims();
       if (anims.length) {
         if (!moving && this._animT && t - this._animT < this._animInterval()) return this.requestRender();
-        this._stepAnims(anims, this._animT ? Math.min(0.1, (t - this._animT) / 1000) : 0);
+        this._stepAnims(anims, this._animT ? Math.min(0.25, (t - this._animT) / 1000) : 0); // langsame Geräte: größere Schritte
         this._animT = t;
       } else this._animT = 0;
       this._draw();
@@ -578,18 +599,46 @@ export class HouseScene {
   /** Aktivität eines Objekts: { active, speed } (speed 0..1, Standard 1) */
   setActivity(id, act) {
     (this.activity ??= new Map()).set(id, act);
+    this._syncAnims();
     this.requestRender();
   }
 
   /** Animationen global an/aus (Einstellungen) */
   setAnimations(on) {
     this.animationsOn = on;
+    this._syncAnims();
     this.requestRender();
   }
 
+  /** Alle beweglichen Teile der gezeigten Ebenen */
+  get _anims() {
+    return this.activeLayers.flatMap((l) => l.animated || []);
+  }
+
+  /**
+   * Zustände ohne Bildtakt nachführen: Tore stehen nach dem Laden sofort richtig (ohne Aufschwenken), ohne
+   * Animationen springen sie in die Endlage; Energiefluss nur sichtbar, solange er läuft.
+   */
+  _syncAnims() {
+    const on = this.animationsOn !== false;
+    for (const a of this._anims) {
+      const act = this.activity?.get(a.id)?.active ?? false;
+      if (a.spec.type === 'swing' && (a.progress == null || !on)) {
+        a.progress = act ? 1 : 0;
+        this._pose(a);
+      }
+      if (a.spec.type === 'flow') a.node.visible = on && act;
+    }
+  }
+
+  /** Läuft die Animation gerade (braucht sie Bilder)? */
   _runningAnims() {
     if (this.animationsOn === false || !this.activity?.size) return [];
-    return this.activeLayers.flatMap((l) => l.animated || []).filter((a) => this.activity.get(a.id)?.active);
+    return this._anims.filter((a) => {
+      const act = this.activity.get(a.id)?.active;
+      if (a.spec.type === 'swing') return a.progress != null && (act ? a.progress < 1 : a.progress > 0);
+      return act;
+    });
   }
 
   _animInterval() {
@@ -599,12 +648,35 @@ export class HouseScene {
   _stepAnims(anims, dt) {
     for (const a of anims) {
       const { node, spec } = a;
-      if (spec.type !== 'spin') continue;
-      const speed = this.activity.get(a.id)?.speed ?? 1;
-      a.angle = ((a.angle || 0) + dt * spec.speed * speed * Math.PI * 2) % (Math.PI * 2);
-      const axis = spec.axis === 'x' ? _X : spec.axis === 'z' ? _Z : _Y;
-      node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, a.angle));
+      const act = this.activity.get(a.id);
+      const speed = act?.speed ?? 1;
+      if (spec.type === 'spin') {
+        a.angle = ((a.angle || 0) + dt * spec.speed * speed * Math.PI * 2) % (Math.PI * 2);
+        const axis = spec.axis === 'x' ? _X : spec.axis === 'z' ? _Z : _Y;
+        node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, a.angle));
+      } else if (spec.type === 'swing') {
+        const step = dt / (spec.duration || 5);
+        a.progress = act?.active ? Math.min(1, a.progress + step) : Math.max(0, a.progress - step);
+        this._pose(a);
+      } else if (spec.type === 'flow') {
+        // Lichtpunkte gleichmäßig verteilt den Pfad entlang, Tempo aus der Leistung
+        a.phase = ((a.phase || 0) + dt * spec.speed * speed) % 1;
+        const path = (a.path ??= pathOf(spec.path));
+        node.children.forEach((m, i) => {
+          if (!m.isMesh || m.geometry.type !== 'SphereGeometry') return;
+          path.at(((a.phase + i / spec.count) % 1) * path.length, m.position);
+        });
+      }
     }
+  }
+
+  /** Torblatt: Drehung um die Achse nach Fortschritt (sanft beschleunigen/bremsen) */
+  _pose(a) {
+    const { node, spec } = a;
+    if (spec.type !== 'swing') return;
+    const e = a.progress * a.progress * (3 - 2 * a.progress);
+    const axis = spec.axis === 'y' ? _Y : spec.axis === 'z' ? _Z : _X;
+    node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, spec.angle * e));
   }
 
   /** Sofort rendern (für Tests). */

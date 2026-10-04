@@ -71,6 +71,19 @@ Wohnhaus, Garage, Gartenhaus, Carport … jeweils mit Etagen.
 | `name` | ja | | Anzeigename |
 | `kind` | nein | `house` | `house`, `garage`, `garden_house`, `carport`, `other` (nur Information) |
 | `floors` | ja | | Etagen, mindestens eine |
+| `roof` | nein | Flachdach | Dach über der obersten Etage, siehe unten; `false` = keins |
+
+**Dach:** Jedes Gebäude bekommt ein Flachdach über seiner obersten Etage. Es erscheint, sobald eine höhere Ebene
+gezeigt wird (z. B. die Garage, wenn das 1. OG des Hauses gewählt ist), und ist ein eigener Bereich: Objekte darauf
+(Balkonkraftwerk, Satellitenschüssel …) haben `space: <Dach-ID>`, ihre Höhen zählen ab der Dachfläche.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `id` | nein | `<Gebäude-ID>_dach` | Bereichs-ID des Dachs |
+| `name` | nein | `Dach` | Anzeigename |
+| `surface` | nein | `roof` | Oberfläche (Dachbahn) |
+| `polygon` | nein | Hülle der obersten Etage | Umriss |
+| `thickness` | nein | 0.2 | Dachaufbau über den Wänden (Meter) |
 
 ### Etage (`buildings[].floors[]`)
 
@@ -196,9 +209,10 @@ Weihnachtsdekoration, die nur ein paar Monate steht – Verknüpfungen bleiben),
 es zurück, **Entfernen → Löschen** streicht den Eintrag.
 
 **Animationen:** Modelle mit Animation (Spalte Parameter im [Katalog](#katalog), z. B. `ceiling_fan`) bewegen sich,
-solange das Objekt aktiv ist: mit `ha.entities.power` sobald eine Entity aktiv ist (nicht `off`, `idle`, `paused`,
-`standby`, `closed`, `docked`, `unavailable`, `unknown`), das Tempo folgt dem Attribut `percentage` (Ventilatorstufe);
-ohne Entity gilt `state`. Die Einstellungen (Zahnrad) schalten Animationen für das Gerät ab.
+solange das Objekt aktiv ist: mit `ha.entities.power` (ohne power: `info`) sobald eine Entity aktiv ist (nicht `off`,
+`idle`, `paused`, `standby`, `closed`, `closing`, `docked`, `unavailable`, `unknown`; Messwerte ab 1), das Tempo folgt
+dem Attribut `percentage` (Ventilatorstufe) bzw. dem Messwert (Leistung/`peak`); ohne Entity gilt `state`. Tore
+(`garage_door`) schwenken in rund 6 s auf bzw. zu. Die Einstellungen (Zahnrad) schalten Animationen für das Gerät ab.
 
 ```yaml
 - { id: ventilator, name: Deckenventilator, model: ceiling_fan, space: schlafen, pos: [7, 4.7], state: on,
@@ -291,6 +305,7 @@ die keine Leuchte sind (Leuchten zeigen ihren Zustand durch ihr Licht). Keine An
 | `water` | Wasser |
 | `slabs` | Großformatplatten (60 × 30 cm, hellgrau) |
 | `stone` | Naturstein (Trockenmauer, Blockstufen) |
+| `roof` | Flachdach (dunkle Dachbahn) |
 
 ## Katalog
 
@@ -319,6 +334,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `curtain` | Möbel | | | `color` |
 | `floor_fan` | Gerät | | 0.42 × 0.42 × 1.15 | `color` (Rotor) – Animation: Rotor dreht sich, Tempo aus `percentage` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
+| `garage_door` | Gerät | | 3.0 × 0.2 × 2.1 | `color` – Schwingtor in einer Wandöffnung, Ursprung an der Innenkante; Animation: schwenkt auf, solange offen (`cover`: open/opening); Sturz bis zur Decke |
 | `garden_chair` | Möbel | | | `color` (Bespannung; Gartenstuhl) |
 | `garden_table` | Möbel | | 1.6 × 0.9 × 0.74 | `color` (Platte; Gartentisch) |
 | `grand_piano` | Möbel | | 1.48 × 1.6 | |
@@ -333,6 +349,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `shrub` | Pflanze | | 1.2 × 1.0 × 1.0 | `color` |
 | `sideboard` | Möbel | | 1.2 × 0.45 × 0.6 | |
 | `sofa_u` | Möbel | | 3.5 × 2.4 × 0.82 | `seat_depth`, `left`, `right`, `color` |
+| `solar_panels` | Gerät | | 2.29 × 1.72 × 0.1 | `panels` (2), `cable_to` (`[x, z]` Kabel bis zum Dachrand), `drop` (Kabel hinunter, m), `peak` (800 W) – Balkonkraftwerk flach; Animation: Energiefluss im Kabel, solange Leistung ≥ 1 W (Tempo aus Leistung/`peak`) |
 | `speaker` | Möbel | | 0.22 × 0.3 × 1.0 | |
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
@@ -529,6 +546,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.16.0, abwärtskompatibel):** `buildings[].roof` (Flachdach als eigener Bereich, sichtbar
+  ab der Ebene darüber); Oberfläche `roof`; Katalog `garage_door`, `solar_panels`.
 - **Version 2, Ergänzung (0.15.0, abwärtskompatibel):** Objekte mit `state` (fester Zustand für Animationen) und
   `stored` (eingelagert); Katalog `ceiling_fan`, `floor_fan` mit Animation.
 - **Version 2, Ergänzung (0.14.0, abwärtskompatibel):** `outdoor[].edge`, `outdoor[].extend`; Kanten auch bei ebenen, erhöhten

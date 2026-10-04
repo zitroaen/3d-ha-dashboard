@@ -58,7 +58,14 @@ export const PALETTE = {
   table_top: { color: 0x2b2d30, roughness: 0.35 },
   pine: { color: 0xa67a4c, roughness: 0.75 },
   barrel_green: { color: 0x1f8a6a, roughness: 0.5 },
+  // Garage, Solar
+  door_grey: { color: 0x8c9095, roughness: 0.45, metalness: 0.2 },
+  pv_cell: { color: 0x1b2a44, roughness: 0.18, metalness: 0.35 },
+  alu: { color: 0xc4c7ca, roughness: 0.35, metalness: 0.7 },
 };
+
+// Geteilte Geometrie/Materialien der Energiefluss-Lichtpunkte
+const PULSE = {};
 
 /** Fester Pseudozufall (gleiche Daten -> gleiches Bild) */
 const jitter = (i, k) => {
@@ -185,6 +192,13 @@ export class PartCollector {
       a.node.decompose(node.position, node.quaternion, node.scale);
       node.userData.baseQuaternion = node.quaternion.clone();
       for (const m of this._meshes(a.groups.values(), materialFor)) node.add(m);
+      if (a.spec.type === 'flow') {
+        // Lichtpunkte entlang des Pfads (Energiefluss); unsichtbar, solange nichts fließt
+        PULSE.geo ??= new THREE.SphereGeometry(0.035, 8, 6);
+        const mat = (PULSE[a.spec.color] ??= new THREE.MeshBasicMaterial({ color: a.spec.color ?? 0xffd34d, toneMapped: false }));
+        for (let i = 0; i < a.spec.count; i++) node.add(new THREE.Mesh(PULSE.geo, mat));
+        node.visible = false;
+      }
       return { node, spec: a.spec, id: a.id };
     });
   }
@@ -677,6 +691,52 @@ export const FURNITURE = {
         new THREE.Matrix4().makeRotationZ(a).multiply(new THREE.Matrix4().makeRotationX(0.35)).setPosition(Math.cos(a) * 0.1, y + Math.sin(a) * 0.1, 0.03));
     }
     P.cyl('white', 0.03, 0.03, 0.04, 0, y, 0.03, { seg: 10, rot: new THREE.Euler(Math.PI / 2, 0, 0) });
+    P.endAnim();
+  },
+
+  /**
+   * Garagentor (Schwingtor) für eine Toröffnung in der Wand: size = [Breite, Wanddicke, Höhe]; Sturz bis zur Decke.
+   * Ursprung an der Innenkante der Wand (Mitte der Öffnung), +z = nach außen. Animation: Das Torblatt schwenkt nach
+   * innen unter die Decke, solange das Tor offen ist (cover: open/opening).
+   */
+  garage_door(P, it, { ceiling = 2.4 } = {}) {
+    const [W, D, H] = it.size || [3.0, 0.2, 2.1];
+    const c = it.color || 'door_grey', z = D / 2; // Ursprung an der Innenkante der Wand, Tor in Wandmitte
+    if (ceiling - H > 0.02) P.box('plaster', W, ceiling - H, D, 0, H, z); // Sturz
+    P.beginAnim({ type: 'swing', axis: 'x', angle: Math.PI / 2 * 0.98, duration: 6 }, [0, H, z]);
+    P.box(c, W - 0.04, H - 0.03, 0.04, 0, 0.02, z);
+    // waagrechte Sicken und Griff
+    for (let i = 1; i < 6; i++) P.box('alu', W - 0.12, 0.012, 0.01, 0, (H - 0.03) * (i / 6), z + 0.025);
+    P.box('steel_dark', 0.3, 0.04, 0.03, 0, H * 0.42, z + 0.035);
+    P.endAnim();
+  },
+
+  /**
+   * Balkonkraftwerk: zwei (params.panels) Solarmodule flach auf niedrigen Füßen, Wechselrichter und Kabel zum
+   * Dachrand (params.cable_to = [x, z] in Objektkoordinaten) und daran hinunter (params.drop Meter).
+   * Animation: Energiefluss im Kabel (Lichtpunkte), solange Strom erzeugt wird – Tempo aus der Leistung
+   * (params.peak Watt = volles Tempo).
+   */
+  solar_panels(P, it) {
+    const n = it.panels ?? 2, pw = 1.134, pd = 1.722, gap = 0.02;
+    const W = n * pw + (n - 1) * gap;
+    for (let i = 0; i < n; i++) {
+      const x = -W / 2 + pw / 2 + i * (pw + gap);
+      P.box('alu', pw, 0.035, pd, x, 0.06, 0);
+      P.box('pv_cell', pw - 0.03, 0.006, pd - 0.03, x, 0.095, 0);
+      // Zellraster: ein paar feine Linien genügen aus der Entfernung
+      for (let k = 1; k < 6; k++) P.box('alu', 0.004, 0.002, pd - 0.04, x - pw / 2 + (pw * k) / 6, 0.1, 0);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.box('alu', 0.04, 0.06, 0.04, x + sx * (pw / 2 - 0.08), 0, sz * (pd / 2 - 0.1));
+    }
+    // Wechselrichter am Rand, Kabel zum Dachrand und hinunter
+    const ix = W / 2 + 0.15;
+    P.box('black_matte', 0.18, 0.05, 0.25, ix, 0.02, 0);
+    const [tx, tz] = it.cable_to || [ix + 0.6, 0];
+    const drop = it.drop ?? 0;
+    const path = [[ix, 0.04, 0], [ix, 0.04, tz], [tx, 0.04, tz]];
+    if (drop > 0) path.push([tx, 0.04 - drop, tz]);
+    for (let i = 1; i < path.length; i++) P.rod('black_matte', path[i - 1], path[i], 0.012, { seg: 4 });
+    P.beginAnim({ type: 'flow', path, count: Math.max(4, Math.round(path.length * 3)), speed: 0.6, color: 0xffd34d, peak: it.peak ?? 800 });
     P.endAnim();
   },
 

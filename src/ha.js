@@ -7,7 +7,7 @@ import * as THREE from 'three';
 export const entitiesOf = (d) => (d.entity == null ? [] : [].concat(d.entity)).filter(Boolean);
 
 // Domains mit eigenem turn_on/turn_off; alle anderen schaltet homeassistant.turn_on/turn_off
-const SWITCHABLE = new Set(['light', 'switch', 'fan', 'input_boolean', 'media_player', 'climate', 'humidifier', 'siren', 'automation', 'script']);
+const SWITCHABLE = new Set(['light', 'switch', 'fan', 'cover', 'input_boolean', 'media_player', 'climate', 'humidifier', 'siren', 'automation', 'script']);
 // Zustände, die als „an“ gelten (Waschmaschine läuft, Fernseher spielt, Heizung heizt …)
 const OFF_STATES = new Set(['off', 'unavailable', 'unknown', 'idle', 'standby', 'closed', 'locked', 'docked', 'not_home', 'none', '']);
 
@@ -23,7 +23,7 @@ export function stateText(state) {
     const v = Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10;
     return `${v.toLocaleString('de-DE')}${a.unit_of_measurement ? ` ${a.unit_of_measurement}` : ''}`;
   }
-  const DE = { on: 'An', off: 'Aus', open: 'Offen', closed: 'Zu', playing: 'Spielt', paused: 'Pause', idle: 'Bereit',
+  const DE = { on: 'An', off: 'Aus', open: 'Offen', closed: 'Zu', opening: 'Öffnet', closing: 'Schließt', playing: 'Spielt', paused: 'Pause', idle: 'Bereit',
     standby: 'Standby', cleaning: 'Saugt', docked: 'Station', returning: 'Zurück', heating: 'Heizt', home: 'Zuhause', not_home: 'Weg' };
   return DE[state.state] ?? state.state;
 }
@@ -85,5 +85,7 @@ export async function callForEntities(hass, service, entityIds) {
     if (!byDomain.has(d)) byDomain.set(d, []);
     byDomain.get(d).push(e);
   }
-  await Promise.all([...byDomain].map(([domain, ids]) => hass.callService(domain, service, { entity_id: ids })));
+  // Tore, Rollläden: öffnen/schließen statt an/aus
+  const svc = (domain) => (domain === 'cover' ? { turn_on: 'open_cover', turn_off: 'close_cover' }[service] || service : service);
+  await Promise.all([...byDomain].map(([domain, ids]) => hass.callService(domain, svc(domain), { entity_id: ids })));
 }

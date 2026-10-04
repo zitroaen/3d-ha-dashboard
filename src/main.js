@@ -992,7 +992,8 @@ class Ha3dDashboard extends HTMLElement {
     const ents = this._live(roleEntities(e, 'power'));
     if (!ents.length) return this._toast(`${e.name || e.id}: nichts zum Schalten verknüpft – im Editor (Stift) verknüpfen`);
     const on = !ents.some((id) => isOn(this._hass.states[id]));
-    this._toast(`${e.name || e.id}: ${on ? 'an' : 'aus'}`);
+    const cover = ents.every((id) => id.startsWith('cover.'));
+    this._toast(`${e.name || e.id}: ${cover ? (on ? 'öffnet' : 'schließt') : on ? 'an' : 'aus'}`);
     await this._call(on ? 'turn_on' : 'turn_off', ents);
   }
 
@@ -1056,7 +1057,10 @@ class Ha3dDashboard extends HTMLElement {
         if (!showsBadge(e, light)) continue;
         const info = this._live(roleEntities(e, 'info')), power = this._live(roleEntities(e, 'power'));
         const on = power.some((id) => isOn(states[id]));
-        const text = info.length ? info.map((id) => stateText(states[id])).join(' · ') : power.length ? (on ? 'An' : 'Aus') : null;
+        // Tore/Rollläden: Zustandstext (Offen, Zu, Öffnet …) statt An/Aus
+        const covers = power.length && power.every((id) => id.startsWith('cover.'));
+        const text = info.length ? info.map((id) => stateText(states[id])).join(' · ')
+          : covers ? stateText(states[power[0]]) : power.length ? (on ? 'An' : 'Aus') : null;
         if (text != null) want.set(`${type}:${e.id}`, { ref: { type, id: e.id }, text, on, name: e.name || e.id });
       }
     }
@@ -1185,8 +1189,10 @@ class Ha3dDashboard extends HTMLElement {
     const states = this._hass?.states || {};
     for (const e of [...d.items, ...d.devices]) {
       if (!CATALOG[e.kind || e.model]?.anim) continue;
-      const ents = this._live(roleEntities(e, 'power'));
-      this.view.setActivity(e.id, activityOf(ents.map((x) => states[x]), e.state));
+      // Schalt-Entities, sonst Anzeige-Werte (Leistung eines Balkonkraftwerks)
+      const power = this._live(roleEntities(e, 'power'));
+      const ents = power.length ? power : this._live(roleEntities(e, 'info'));
+      this.view.setActivity(e.id, activityOf(ents.map((x) => states[x]), e.state, { peak: e.peak }));
     }
   }
 

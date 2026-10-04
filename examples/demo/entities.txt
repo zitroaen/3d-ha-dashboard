@@ -33,3 +33,5 @@ light.demo_studio | Deckenlicht Studio
 light.demo_garage | Deckenlicht Garage
 switch.demo_waschmaschine | Waschmaschine
 sensor.demo_waschmaschine_restzeit | Waschmaschine Restzeit
+cover.demo_garagentor | Garagentor
+sensor.demo_balkonkraftwerk_leistung | Balkonkraftwerk Leistung
