@@ -6,6 +6,7 @@ import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
 import { pointInPoly, heightAt, terrainHeightNear } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
+import { SkyEnvironment } from './environment.js';
 
 // Warmweiß ~2700 K
 const DEFAULT_LIGHT = new THREE.Color().setRGB(1.0, 0.8, 0.6, THREE.SRGBColorSpace);
@@ -49,6 +50,7 @@ export class HouseScene {
     container.appendChild(r.domElement);
 
     this.scene = new THREE.Scene();
+    this.skyEnv = new SkyEnvironment(r); // Spiegelungen und Himmelslicht (scene.environment)
     this.scene.background = new THREE.Color(0x0a0d13);
     this.scene.fog = new THREE.Fog(0x0a0d13, 45, 95);
 
@@ -320,10 +322,11 @@ export class HouseScene {
     const L = (a, b) => a + (b - a) * day;
     const mix = (a, b) => new THREE.Color(a).lerp(new THREE.Color(b), day);
 
-    // Halbkugel: Nacht kühl und gedämpft, Tag hell mit warmem Bodenreflex
+    // Halbkugel: Nacht kühl und gedämpft, Tag hell mit warmem Bodenreflex. Einen Teil des Himmelslichts liefert die
+    // Umgebung (scene.environment, unten) – sie bringt dazu die Spiegelungen auf Glas, Böden und Lack.
     this.hemi.color.copy(mix(0x525a6c, 0xc9d8ec));
     this.hemi.groundColor.copy(mix(0x1e1d1c, 0x6e6250));
-    this.hemi.intensity = L(1.2, 1.6);
+    this.hemi.intensity = L(0.95, 1.05);
     this.scene.background.copy(mix(0x0a0d13, 0x8d9aa8));
     this.scene.fog.color.copy(this.scene.background);
 
@@ -344,6 +347,9 @@ export class HouseScene {
     const d = 35;
     // Plan: "oben" = -z, im Uhrzeigersinn = +x
     light.position.set(this.center.x + Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d, this.center.z - Math.cos(a) * Math.cos(e) * d);
+    const dir = light.position.clone().sub(this.center).normalize();
+    this.scene.environment = this.skyEnv.update(day, dir, isSun, sunWarm);
+    this.scene.environmentIntensity = L(0.35, 0.75);
     this.renderer.shadowMap.needsUpdate = true;
     this.onSkyChange?.(day);
     this.requestRender();
@@ -707,6 +713,7 @@ export class HouseScene {
   }
 
   dispose() {
+    this.skyEnv.dispose();
     this._resizeObs.disconnect();
     this.controls.dispose();
     this.renderer.dispose();
