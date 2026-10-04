@@ -84,7 +84,8 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/environment.js` Himmel als Umgebung (PMREM, Spiegelungen)
 - `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (ganzes Modell
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
-  · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige) · `src/ha.js` Zustand/Dienste
+  · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige, fester Zustand)
+  · `src/catalogpanel.js` Katalog und Lager im Editor · `src/ha.js` Zustand/Dienste
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
   (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `performance.mjs` (Leistungsbudget), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
@@ -201,3 +202,14 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Im Konstruktor des Elements keine Attribute setzen (auch nicht indirekt): HA legt das Panel mit
   `document.createElement` an, das wirft dann NotSupportedError (0.13.0: weiße Seite). `tests/harness.html?ha=1`
   legt das Panel wie HA an (createElement, Properties, einhängen); `tests/demo.mjs` und `tests/webkit.mjs` nutzen das.
+- Katalog/Lager (0.15.0): Hinzufügen, Einlagern (`stored: true`), Aufstellen und Löschen ändern das Modell direkt
+  (`_changeObjects` in main.js: erst ungespeicherte Lagen per writeBack ins Modell, dann ändern, Einrichtung aus
+  `toScene()` neu bauen; Rückgängig = Bestand vorher). Gespeichert wird mit Fertig wie sonst; die
+  Benutzerdaten-Overrides (ohne Integration) kennen dafür `added` (ganze Objekte) und `removed` (IDs). Neue Objekte
+  landen in der Mitte der Ansicht im Raum darunter (sonst Außenbereich/freies Gelände).
+- Animationen (0.15.0): Ein Modell markiert bewegliche Teile mit `P.beginAnim(spec, pivot)`/`endAnim()`; sie werden
+  als eigene kleine Gruppe gebaut (`FurnishingLayer.animated`), der Rest bleibt zusammengefasst. Die Szene dreht sie
+  nur, solange `setActivity(id)` aktiv ist (Entity nicht ruhend, Tempo aus `percentage`, sonst `state`), in einem
+  gedrosselten Takt (30, Sparsam 20 Bilder/s) ohne Schatten-Neuberechnung; in Ruhe bleibt es bei null Bildern
+  (`tests/performance.mjs` prüft das). Im Editor ist das gewählte Objekt statisch. Tests schalten Animationen im
+  Harness aus (sonst steht die Kamera nie „still“) und gezielt wieder ein.

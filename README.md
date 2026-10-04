@@ -34,6 +34,10 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Link-Check, Version.
 - **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten. Gerechnet wird nur,
   wenn sich etwas ändert.
+- **Katalog und Lager:** im Editor Modelle aus dem Katalog hinzufügen; Objekte einlagern (z. B.
+  Weihnachtsdekoration) und später mit allen Verknüpfungen wieder aufstellen.
+- **Animationen:** Ventilatoren drehen sich, solange sie an sind (Tempo aus der Stufe); abschaltbar, mit
+  Leistungsanzeige (Bilder/s) in den Einstellungen.
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,
   mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), Gesten und Zustandsanzeige je
   Objekt einstellen, speichern.

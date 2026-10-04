@@ -79,7 +79,9 @@ Prüfen: `npm run validate`, dann `npm run serve` und http://127.0.0.1:8123/test
 ## 4. Möbel
 
 Fotos pro Raum nach `reference/photos/<raum>/` (gitignored). Daraus die Möbel als Objekte in `data/model.yaml`
-anlegen – Katalog und Parameter in `docs/DATA_MODEL.md`. Feinjustieren geht im Panel: Zahnrad → Bearbeiten → Möbel antippen → verschieben,
+anlegen – Katalog und Parameter in `docs/DATA_MODEL.md`. Ein Agent setzt Objekte direkt in die Welt (`model`,
+`space`, `pos`); der Besitzer ergänzt oder entfernt später im Panel: Zahnrad → Bearbeiten → **Katalog** (hinzufügen,
+Lager) bzw. Objekt antippen → **Entfernen** (einlagern oder löschen). Feinjustieren geht im Panel: Zahnrad → Bearbeiten → Möbel antippen → verschieben,
 drehen, **Anlegen** an Wand oder Boden → **Fertig**. Bilder an der Wand können eine Textur bekommen
 (`data/textures/`, Feld `texture`). Fehlt ein Modell, ein generisches Modell in der Engine vorschlagen (Issue/PR),
 nicht in `engine/` der Instanz ändern.

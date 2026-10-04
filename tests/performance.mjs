@@ -49,6 +49,20 @@ try {
       `Ebene ${level}: ${m.calls} Zeichenaufrufe, ${Math.round(m.triangles / 1000)}k Dreiecke (Budget ${BUDGET.calls} / ${BUDGET.triangles / 1000}k); Bildzeit sparsam ${m.fast} ms, hoch ${m.high} ms (Software-Grafik)`,
       `Ebene ${level} über dem Budget: ${JSON.stringify(m)}`);
   }
+  // Rendern bei Bedarf: in Ruhe kein Bild; laufende Animation höchstens im gedrosselten Takt (30 Bilder/s)
+  const idle = await page.evaluate(async () => {
+    const v = window.panel.view;
+    window.panel.setLevel(0);
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'on' });
+    await new Promise((r) => setTimeout(r, 1500));
+    const f0 = v.frames;
+    await new Promise((r) => setTimeout(r, 1000));
+    const idleFrames = v.frames - f0;
+    v.setActivity('ventilator', { active: true, speed: 1 });
+    return { idleFrames, interval: v._animInterval(), running: v._runningAnims().length };
+  });
+  ok(idle.idleFrames === 0 && idle.running === 1 && idle.interval >= 1000 / 30,
+    `Ruhe: kein Bild ohne Anlass; Animation gedrosselt auf ${Math.round(1000 / idle.interval)} Bilder/s`, `Ruhe/Animation: ${JSON.stringify(idle)}`);
 } finally {
   await browser.close();
   server.close();
