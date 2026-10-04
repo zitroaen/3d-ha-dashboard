@@ -39,14 +39,14 @@ try {
       v.setQuality('high');
       const t1 = performance.now();
       for (let i = 0; i < 3; i++) { v.renderNow(); sync(); }
-      const refined = (performance.now() - t1) / 3;
-      out[level] = { calls: Math.round(calls), triangles, fast: Math.round(fast), refined: Math.round(refined) };
+      const high = (performance.now() - t1) / 3;
+      out[level] = { calls: Math.round(calls), triangles, fast: Math.round(fast), high: Math.round(high) };
     }
     return out;
   });
   for (const [level, m] of Object.entries(res)) {
     ok(m.calls <= BUDGET.calls && m.triangles <= BUDGET.triangles,
-      `Ebene ${level}: ${m.calls} Zeichenaufrufe, ${Math.round(m.triangles / 1000)}k Dreiecke (Budget ${BUDGET.calls} / ${BUDGET.triangles / 1000}k); Bildzeit schnell ${m.fast} ms, verfeinert ${m.refined} ms (Software-Grafik)`,
+      `Ebene ${level}: ${m.calls} Zeichenaufrufe, ${Math.round(m.triangles / 1000)}k Dreiecke (Budget ${BUDGET.calls} / ${BUDGET.triangles / 1000}k); Bildzeit sparsam ${m.fast} ms, hoch ${m.high} ms (Software-Grafik)`,
       `Ebene ${level} über dem Budget: ${JSON.stringify(m)}`);
   }
 } finally {

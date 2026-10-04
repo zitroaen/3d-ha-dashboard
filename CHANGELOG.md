@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.14.1
+
+- **Keine Nachverfeinerung mehr:** Das Bild wurde nach kurzem Stillstand noch einmal mit Raumschatten neu gerechnet
+  und sprang dabei sichtbar um. Das ist entfernt – jedes Bild sieht gleich aus, ob in Bewegung oder nicht. Die
+  Qualitätsstufen Hoch/Sparsam regeln weiter Schattenauflösung und Bildschärfe.
+
 ## 0.14.0
 
 - **Logo:** Die Integration hat ein eigenes Symbol und Logo; Home Assistant zeigt es ab 2026.3 unter Geräte & Dienste.

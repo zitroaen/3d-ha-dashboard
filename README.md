@@ -32,8 +32,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 - **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
 - **Einstellungen (Zahnrad):** Darstellung Hell/Dunkel (Glas-Design, folgt HA), Tageszeit Automatisch/Tag/Nacht, Qualität Automatisch/Hoch/Sparsam, Bearbeiten,
   Link-Check, Version.
-- **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten; im Stillstand ein
-  verfeinertes Bild mit Raumschatten. Gerechnet wird nur, wenn sich etwas ändert.
+- **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten. Gerechnet wird nur,
+  wenn sich etwas ändert.
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,
   mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), Gesten und Zustandsanzeige je
   Objekt einstellen, speichern.

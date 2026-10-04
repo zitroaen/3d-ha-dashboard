@@ -93,7 +93,7 @@ export class SettingsMenu {
           <p class="hint">${weather ? `Automatisch: ${esc(weather)}` : 'Automatisch: keine Wetter-Entity in Home Assistant gefunden'}</p>
           <label>Qualität</label>${seg('quality', QUALITY)}
           ${autoQ}
-          <p class="hint">Hoch: Raumschatten und volle Auflösung, sobald die Ansicht stillsteht. Sparsam: für ältere Tablets.</p>
+          <p class="hint">Hoch: weiche Schatten und volle Auflösung. Sparsam: für ältere Tablets.</p>
         </section>
         <section><h3>Haus</h3>
           ${canEdit ? '<button class="item" data-act="edit"><b>Bearbeiten</b><small>Möbel und Leuchten verschieben, verknüpfen, Gesten einstellen</small></button>' : ''}
