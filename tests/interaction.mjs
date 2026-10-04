@@ -122,6 +122,13 @@ try {
   ok(menu.open && /daytime:day/.test(menu.items) && /quality:low/.test(menu.items) && /edit/.test(menu.items) && /links/.test(menu.items),
     'Einstellungsmenü: Tageszeit, Qualität, Bearbeiten, Link-Check', `Menü: ${JSON.stringify(menu)}`);
   await page.screenshot({ path: join(OUT, 'demo_einstellungen.png') });
+  // Darstellung Hell (Glas hell), Bild für die Sichtprüfung, dann zurück auf Automatisch (= HA dunkel)
+  await clickShadow('.settings button[data-pref="theme"][data-value="light"]');
+  const light = await page.evaluate(() => window.panel.getAttribute('theme'));
+  await page.screenshot({ path: join(OUT, 'demo_einstellungen_hell.png') });
+  await clickShadow('.settings button[data-pref="theme"][data-value="auto"]');
+  const autoTheme = await page.evaluate(() => window.panel.getAttribute('theme'));
+  ok(light === 'light' && autoTheme === 'dark', 'Darstellung Hell/Dunkel, Automatisch folgt HA (dunkel)', `Darstellung: ${light} / ${autoTheme}`);
   await clickShadow('.settings button[data-pref="daytime"][data-value="day"]');
   const dayL = await page.evaluate(() => window.panel.view.daylight);
   await clickShadow('.settings button[data-pref="daytime"][data-value="night"]');

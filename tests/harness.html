@@ -64,7 +64,8 @@
       // Wetter wie die Wetter-Integration von HA (Standard-Entity weather.home)
       'weather.home': { state: 'clear-night', attributes: { temperature: 14.2, temperature_unit: '°C', friendly_name: 'Zuhause' } },
     }, (h) => { el.hass = h; });
-    Object.assign(hass, { entities, areas, devices: {} });
+    // Darstellung wie in HA (hass.themes.darkMode); ?light=1 = helles HA-Design
+    Object.assign(hass, { entities, areas, devices: {}, themes: { darkMode: !q.has('light') } });
     if (q.has('user')) hass.user = { name: 'Gast', is_admin: false };
     el.hass = hass;
     el.narrow = matchMedia('(max-width: 870px)').matches;
