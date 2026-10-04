@@ -47,6 +47,10 @@ export function spacesOf(model) {
       }
     }
   }
+  for (const b of model.buildings || []) {
+    const roof = roofOf(b);
+    if (roof && !out.has(roof.id)) out.set(roof.id, { kind: 'roof', building: b, floorKey: `${b.id}/${ROOF_FLOOR}`, room: roof, base: roof.elevation, height: 3 });
+  }
   for (const z of model.outdoor || []) {
     out.set(z.id, { kind: 'outdoor', floorKey: OUTDOOR_FLOOR, room: z, base: z.elevation || 0, height: 3 });
   }
@@ -54,6 +58,47 @@ export function spacesOf(model) {
 }
 
 export const floorKey = (b, f) => `${b.id}/${f.id}`;
+
+/** Oberste Etage eines Gebäudes (höchste Ebene, bei Gleichstand die höher liegende) */
+function topFloor(b) {
+  return [...b.floors].sort((x, y) => (x.level ?? 0) - (y.level ?? 0) || (x.elevation || 0) - (y.elevation || 0)).at(-1);
+}
+
+/** Konvexe Hülle (Plan-Punkte), gegen den Uhrzeigersinn */
+function convexHull(pts) {
+  const p = [...new Map(pts.map((q) => [`${q[0]},${q[1]}`, [q[0], q[1]]])).values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list) => {
+    const h = [];
+    for (const q of list) {
+      while (h.length >= 2 && cross(h.at(-2), h.at(-1), q) <= 0) h.pop();
+      h.push(q);
+    }
+    h.pop();
+    return h;
+  };
+  return [...half(p), ...half([...p].reverse())];
+}
+
+/**
+ * Dach eines Gebäudes (Flachdach über der obersten Etage): sichtbar, sobald eine höhere Ebene gezeigt wird (z. B.
+ * die Garage, wenn das 1. OG des Hauses gewählt ist). Ein eigener Bereich – Objekte darauf (Balkonkraftwerk …) haben
+ * `space: <Dach-ID>`. `roof: false` = kein Dach. Standard-ID `<Gebäude-ID>_dach`, Umriss = Hülle der obersten Etage.
+ */
+export function roofOf(b) {
+  if (b.roof === false || !b.floors?.length) return null;
+  const r = b.roof || {};
+  const top = topFloor(b);
+  const polygon = r.polygon || convexHull([...top.walls.flatMap((w) => w.polygon), ...top.rooms.flatMap((x) => x.polygon)]);
+  return {
+    id: r.id || `${b.id}_dach`, name: r.name || 'Dach', surface: r.surface || 'roof', polygon,
+    level: (top.level ?? 0) + 1, thickness: r.thickness ?? 0.2,
+    elevation: (top.elevation || 0) + (top.height ?? 2.5) + (r.thickness ?? 0.2),
+  };
+}
+
+export const ROOF_FLOOR = '__dach';
 
 /** Gelände eines Außenbereichs: Höhe je Eckpunkt (dritte Koordinate, sonst elevation) – oder null, wenn eben */
 export function terrainHeights(z) {
@@ -146,6 +191,16 @@ export function toScene(model) {
         doors: f.doors || [],
       });
     }
+    // Dach als eigene Etage eine Ebene über der obersten (ohne Wände); die Ebene selbst bekommt keinen Knopf
+    const roof = roofOf(b);
+    if (roof && roof.polygon.length >= 3) {
+      floors.push({
+        id: `${b.id}/${ROOF_FLOOR}`, building: b.id, name: roof.name, buildingName: b.name, roof: true, roofThickness: roof.thickness,
+        level: roof.level, elevation: roof.elevation, ceiling: 2.5,
+        rooms: [{ id: roof.id, name: `${roof.name} ${b.name || ''}`.trim(), polygon: roof.polygon, floor: roof.surface }],
+        walls: [], windows: [], doors: [],
+      });
+    }
   }
   if (model.outdoor?.length) {
     floors.push({
@@ -188,7 +243,7 @@ export function toScene(model) {
         range: l.range ?? 3,
         color: l.color,
         facing: l.facing,
-        outdoor: !sp || sp.kind === 'outdoor',
+        outdoor: !sp || sp.kind === 'outdoor' || sp.kind === 'roof',
         entity: roleEntities(o, 'power'),
       });
     } else {
@@ -248,13 +303,21 @@ export const catalogModels = () => Object.keys(CATALOG);
 const IDLE_STATES = new Set(['off', 'unavailable', 'unknown', 'idle', 'paused', 'standby', 'closed', 'docked', 'none', '']);
 
 /**
- * Aktivität eines animierten Objekts: aus den Zuständen seiner power-Entities (aktiv, sobald eine aktiv ist; Tempo
- * aus `percentage`, z. B. Ventilatorstufe) oder – ohne Entity – aus dem festen Zustand `state` ('on' | 'off').
+ * Aktivität eines animierten Objekts: aus den Zuständen seiner Entities (aktiv, sobald eine aktiv ist; Tempo aus
+ * `percentage`, z. B. Ventilatorstufe, bzw. aus einem Messwert im Verhältnis zu `peak`) oder – ohne Entity – aus dem
+ * festen Zustand `state` ('on' | 'off').
  * @param stateObjs  HA-Zustände der verknüpften Entities (leer = keine Entity)
  */
-export function activityOf(stateObjs, fixed) {
+export function activityOf(stateObjs, fixed, { peak = 800 } = {}) {
   if (!stateObjs.length) return { active: fixed === 'on', speed: 1 };
-  const on = stateObjs.find((st) => st && !IDLE_STATES.has(String(st.state)));
+  // Messwerte (z. B. Leistung eines Balkonkraftwerks in W): aktiv ab 1, Tempo im Verhältnis zur Spitzenleistung
+  const nums = stateObjs.map((st) => (st && st.state !== '' && Number.isFinite(Number(st.state)) ? Number(st.state) : null));
+  if (nums.some((n) => n != null)) {
+    const n = Math.max(...nums.filter((x) => x != null));
+    return { active: n >= 1, speed: Math.max(0.25, Math.min(1, n / peak)) };
+  }
+  // closing: Tor geht zu (Ziel geschlossen)
+  const on = stateObjs.find((st) => st && !IDLE_STATES.has(String(st.state)) && st.state !== 'closing');
   if (!on) return { active: false, speed: 1 };
   const pct = Number(on.attributes?.percentage);
   return { active: true, speed: Number.isFinite(pct) && pct > 0 ? Math.max(0.25, Math.min(1, pct / 100)) : 1 };

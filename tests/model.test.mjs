@@ -136,6 +136,24 @@ check('Animation: ohne Entity gilt der feste Zustand (Standard aus)', activityOf
     && m2.objects.some((o) => o.id === 'neu_1') && m2.objects.find((o) => o.id === 'tv').stored === true);
 }
 
+// Messwerte und Tore
+check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitze; Tor beim Schließen inaktiv',
+  activityOf([{ state: '400' }], undefined, { peak: 800 }).speed === 0.5 && !activityOf([{ state: '0' }]).active
+  && activityOf([{ state: 'opening' }]).active && !activityOf([{ state: 'closing' }]).active && activityOf([{ state: 'open' }]).active);
+
+// Dach: eigene Etage eine Ebene über der obersten, eigener Bereich
+{
+  const m = parseModel(readFileSync(join(ENGINE_ROOT, 'examples/demo/model.yaml'), 'utf8'));
+  const sc = toScene(m);
+  const roof = sc.house.floors.find((f) => f.id === 'garage/__dach');
+  const pv = sc.items.find((i) => i.id === 'balkonkraftwerk');
+  check('Dach der Garage: Etage auf Ebene 1 über den Wänden, Bereich garage_dach mit Hülle der Garage',
+    roof?.roof && roof.level === 1 && Math.abs(roof.elevation - 2.6) < 1e-6 && roof.rooms[0].id === 'garage_dach'
+    && roof.rooms[0].polygon.length === 4 && pv?.floor === 'garage/__dach' && pv.room === 'garage_dach', JSON.stringify(roof?.rooms[0]));
+  m.buildings.find((b) => b.id === 'garage').roof = false;
+  check('Dach abschaltbar (roof: false)', !toScene({ ...m, objects: [] }).house.floors.some((f) => f.id === 'garage/__dach'));
+}
+
 if (failed) {
   console.error(`\n✖ ${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

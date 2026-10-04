@@ -10,8 +10,10 @@ if (!IS_DEMO) {
   console.log('ℹ Leistungsbudget gilt für das Demo-Haus (ohne DATA_DIR) – übersprungen');
   process.exit(0);
 }
-// Budget für das Demo-Haus (Haus, Garage, Garten), ganze Ebene 0 bzw. 1 im Bild
-const BUDGET = { calls: 130, triangles: 120000 };
+// Budget für das Demo-Haus (Haus, Garage, Garten), ganze Ebene 0 bzw. 1 im Bild. Ebene 1 zeigt alles auf einmal
+// (beide Hausetagen, Garage samt Dach mit Balkonkraftwerk, Garten): 145 Zeichenaufrufe sind für Tablets unkritisch
+// (sie schaffen mehrere hundert je Bild); das Budget soll schleichendes Wachstum sichtbar machen.
+const BUDGET = { calls: 145, triangles: 120000 };
 
 const { server, base } = await startServer({ dataDir: DATA_DIR, entities: ENTITIES });
 const browser = await launchBrowser();

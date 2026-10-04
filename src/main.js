@@ -10,6 +10,7 @@ import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides,
 import { toScene, writeBack, gestureAction, roleEntities, showsBadge, GESTURES, activityOf } from './model/model.js';
 import { CATALOG, hasCapability, DEFAULT_MOUNT, DEFAULT_LIGHT_HEIGHT, MODEL_LIGHT_HEIGHT } from './model/catalog.js';
 import { CatalogPanel } from './catalogpanel.js';
+import { modelPreview } from './preview.js';
 import { pointInPoly } from './geometry.js';
 import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
@@ -193,6 +194,12 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .catalog .tabs, .catalog .chips, .catalog .search, .catalog .hint { flex-shrink: 0; }
 .catalog .hint { margin: 0 16px 8px; }
 .catalog .list .mark { color: var(--g-fg-dim); }
+.catalog .list button { grid-template-columns: 64px 1fr 32px; column-gap: 6px; min-height: 68px; }
+.catalog .list b, .catalog .list small { grid-column: 2; }
+.catalog .list .mark { grid-column: 3; }
+.catalog .list .thumb { grid-column: 1; grid-row: 1 / span 2; align-self: center; width: 56px; height: 56px; border-radius: var(--r-item);
+  background: radial-gradient(circle at 50% 40%, #f4f5f7, #c3c8cf); object-fit: contain; }
+.catalog .list .thumb:not([src]) { visibility: visible; }
 .objcfg header { display: flex; align-items: center; padding: 8px 8px 4px 16px; }
 .objcfg header h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
 .objcfg header button, .objcfg .chip button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
@@ -586,6 +593,7 @@ class Ha3dDashboard extends HTMLElement {
       onAdd: (model) => this._addObject(model),
       onRestore: (id) => this._restoreObject(id),
       onClose: () => this.editor?._emit(),
+      preview: (model) => (this.view ? modelPreview(this.view.renderer, model) : null),
     });
     if (this.hasAttribute('editing')) this.editor.setEnabled(true);
     this.shadowRoot.querySelector('.title').textContent = data.house.name || '';
@@ -992,7 +1000,8 @@ class Ha3dDashboard extends HTMLElement {
     const ents = this._live(roleEntities(e, 'power'));
     if (!ents.length) return this._toast(`${e.name || e.id}: nichts zum Schalten verknüpft – im Editor (Stift) verknüpfen`);
     const on = !ents.some((id) => isOn(this._hass.states[id]));
-    this._toast(`${e.name || e.id}: ${on ? 'an' : 'aus'}`);
+    const cover = ents.every((id) => id.startsWith('cover.'));
+    this._toast(`${e.name || e.id}: ${cover ? (on ? 'öffnet' : 'schließt') : on ? 'an' : 'aus'}`);
     await this._call(on ? 'turn_on' : 'turn_off', ents);
   }
 
@@ -1056,7 +1065,10 @@ class Ha3dDashboard extends HTMLElement {
         if (!showsBadge(e, light)) continue;
         const info = this._live(roleEntities(e, 'info')), power = this._live(roleEntities(e, 'power'));
         const on = power.some((id) => isOn(states[id]));
-        const text = info.length ? info.map((id) => stateText(states[id])).join(' · ') : power.length ? (on ? 'An' : 'Aus') : null;
+        // Tore/Rollläden: Zustandstext (Offen, Zu, Öffnet …) statt An/Aus
+        const covers = power.length && power.every((id) => id.startsWith('cover.'));
+        const text = info.length ? info.map((id) => stateText(states[id])).join(' · ')
+          : covers ? stateText(states[power[0]]) : power.length ? (on ? 'An' : 'Aus') : null;
         if (text != null) want.set(`${type}:${e.id}`, { ref: { type, id: e.id }, text, on, name: e.name || e.id });
       }
     }
@@ -1185,8 +1197,10 @@ class Ha3dDashboard extends HTMLElement {
     const states = this._hass?.states || {};
     for (const e of [...d.items, ...d.devices]) {
       if (!CATALOG[e.kind || e.model]?.anim) continue;
-      const ents = this._live(roleEntities(e, 'power'));
-      this.view.setActivity(e.id, activityOf(ents.map((x) => states[x]), e.state));
+      // Schalt-Entities, sonst Anzeige-Werte (Leistung eines Balkonkraftwerks)
+      const power = this._live(roleEntities(e, 'power'));
+      const ents = power.length ? power : this._live(roleEntities(e, 'info'));
+      this.view.setActivity(e.id, activityOf(ents.map((x) => states[x]), e.state, { peak: e.peak }));
     }
   }
 

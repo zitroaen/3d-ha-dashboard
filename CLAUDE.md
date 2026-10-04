@@ -85,7 +85,7 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (ganzes Modell
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
   · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige, fester Zustand)
-  · `src/catalogpanel.js` Katalog und Lager im Editor · `src/ha.js` Zustand/Dienste
+  · `src/catalogpanel.js` Katalog und Lager im Editor · `src/preview.js` Vorschaubilder · `src/ha.js` Zustand/Dienste
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
   (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `performance.mjs` (Leistungsbudget), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
@@ -213,3 +213,14 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   gedrosselten Takt (30, Sparsam 20 Bilder/s) ohne Schatten-Neuberechnung; in Ruhe bleibt es bei null Bildern
   (`tests/performance.mjs` prüft das). Im Editor ist das gewählte Objekt statisch. Tests schalten Animationen im
   Harness aus (sonst steht die Kamera nie „still“) und gezielt wieder ein.
+- Dächer (0.16.0): `toScene()` legt für jedes Gebäude eine Dach-Etage (`<gebäude>/__dach`, `roof: true`) eine Ebene
+  über der obersten an; sie bekommt keinen Ebenen-Knopf (`scene.levels` ohne Dächer), erscheint also nur, wenn eine
+  höhere Ebene eines anderen Gebäudes gewählt ist. Der Dachraum ist ein Bereich (`spacesOf`, Standard-ID
+  `<gebäude>_dach`), Umriss = konvexe Hülle der obersten Etage (sonst `roof.polygon`). Dachrand als Blende bis auf die
+  Wände plus niedrige Attika.
+- Weitere Animationsarten (0.16.0): `swing` (Tor; Fortschritt 0..1 läuft auch beim Schließen, nach dem Laden ohne
+  Aufschwenken in der richtigen Lage) und `flow` (Lichtpunkte entlang eines Pfads, nur sichtbar, solange aktiv).
+  Aktivität aus Messwerten (≥ 1, Tempo = Wert/`peak`), ohne power-Entity aus den info-Entities.
+- Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
+  Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
+  Panel füllt die Bilder nach und nach (eins pro Durchgang).

@@ -229,8 +229,8 @@ try {
       label: window.panel.shadowRoot.querySelector('.floor').textContent,
     };
   });
-  ok(og.level === 1 && og.shown.join() === '__aussen,garage/eg,haus/eg,haus/og' && og.label === 'Obergeschoss',
-    `Ebene 1. OG steht auf dem Erdgeschoss, Garten bleibt sichtbar (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
+  ok(og.level === 1 && og.shown.join() === '__aussen,garage/__dach,garage/eg,haus/eg,haus/og' && og.label === 'Obergeschoss',
+    `Ebene 1. OG steht auf dem Erdgeschoss, Garten bleibt sichtbar, die Garage zeigt ihr Dach (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
   await page.evaluate(() => (window.mockHass.calls.length = 0));
   await steady(page);
   pt = await toScreen(page, [1.5, 2.85, 2.0]);
@@ -481,6 +481,38 @@ try {
     window.panel.hass = mh;
   });
 
+  // ---------------- Garagentor und Balkonkraftwerk ----------------
+  const door = await page.evaluate(async () => {
+    const p = window.panel, mh = window.mockHass;
+    mh.calls.length = 0;
+    await p._onGesture({ type: 'item', id: 'garagentor' }, 'tap');
+    return mh.calls.at(-1);
+  });
+  await page.evaluate(() => {
+    const mh = window.mockHass;
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'on' });
+    mh.states = { ...mh.states, 'cover.demo_garagentor': { entity_id: 'cover.demo_garagentor', state: 'open', attributes: {} },
+      'sensor.demo_balkonkraftwerk_leistung': { entity_id: 'sensor.demo_balkonkraftwerk_leistung', state: '400', attributes: { unit_of_measurement: 'W' } } };
+    window.panel.hass = mh;
+    window.panel.setLevel(1);
+  });
+  await settle(page, () => (window.panel.view._anims.find((a) => a.id === 'garagentor')?.progress || 0) > 0.05);
+  const garage = await page.evaluate(() => {
+    const v = window.panel.view, a = (id) => v._anims.find((x) => x.id === id);
+    const r = { level: v.level, roof: v.activeFloors.some((f) => f.floor.id === 'garage/__dach'), buttons: window.panel.shadowRoot.querySelectorAll('.levels button').length,
+      door: a('garagentor')?.progress, pv: a('balkonkraftwerk')?.node.visible, pvSpeed: v.activity.get('balkonkraftwerk')?.speed,
+      badge: [...window.panel.shadowRoot.querySelectorAll('.badge')].find((b) => b.ref.id === 'garagentor')?.textContent };
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'off' });
+    r.doorOff = a('garagentor')?.progress;
+    window.panel.setLevel(0);
+    r.roofAt0 = v.activeFloors.some((f) => f.floor.id === 'garage/__dach');
+    return r;
+  });
+  ok(door?.domain === 'cover' && door.service === 'open_cover' && garage.level === 1 && garage.roof && garage.buttons === 2 && garage.door > 0
+    && garage.pv === true && garage.pvSpeed === 0.5 && garage.badge === 'Offen' && garage.doorOff === 1 && !garage.roofAt0,
+    'Garagentor: Antippen öffnet (cover.open_cover), Tor schwenkt auf; 1. OG zeigt das Garagendach mit Energiefluss (400 W = halbes Tempo)',
+    `Garage: Antippen=${JSON.stringify(door)} ${JSON.stringify(garage)}`);
+
   // ---------------- Leistungsanzeige ----------------
   await page.evaluate(() => window.panel._applyPrefs({ ...window.panel.prefs, fps: 'on' }));
   await page.evaluate(() => window.panel.view.requestRender());
@@ -501,6 +533,9 @@ try {
     const r = window.panel.shadowRoot.querySelector('.catalog');
     return { open: r.classList.contains('show'), items: r.querySelectorAll('button[data-add]').length };
   });
+  await settle(page, () => window.panel.shadowRoot.querySelectorAll('.catalog img.thumb[src]').length >= 3);
+  const thumbs = await page.evaluate(() => window.panel.shadowRoot.querySelectorAll('.catalog img.thumb[src^="data:image/png"]').length);
+  ok(thumbs >= 3, `Katalog: Vorschaubilder der Modelle (${thumbs} gerechnet)`, `Vorschau: ${thumbs}`);
   await clickShadow('.catalog button[data-cat=device]');
   await clickShadow('.catalog button[data-add=floor_fan]');
   const added = await page.evaluate(() => {

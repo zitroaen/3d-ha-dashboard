@@ -1,5 +1,16 @@
 # Änderungen
 
+## 0.16.0
+
+- **Vorschaubilder im Katalog:** Jedes Modell erscheint mit einem kleinen Bild (einmal gerechnet, dann
+  zwischengespeichert).
+- **Dächer:** Gebäude ohne Obergeschoss zeigen ihr Flachdach, sobald eine höhere Ebene gewählt ist – z. B. die
+  Garage, wenn das 1. OG des Hauses gezeigt wird. Das Dach ist ein eigener Bereich, auf dem Objekte stehen können.
+- **Garagentor** mit Funktion: Antippen öffnet bzw. schließt (`cover`), das Tor schwenkt sichtbar auf und zu; die
+  Anzeige zeigt Offen / Zu / Öffnet / Schließt.
+- **Balkonkraftwerk:** zwei Solarmodule flach auf dem Dach; solange es Strom erzeugt, fließen Lichtpunkte durchs
+  Kabel – je mehr Leistung, desto schneller. Im Demo-Haus auf dem Garagendach.
+
 ## 0.15.0
 
 - **Katalog im Editor:** Zahnrad → Bearbeiten → **Katalog** listet alle Modelle (Möbel, Leuchten, Geräte,

@@ -162,8 +162,21 @@ export class FloorModel {
       buildDoor(this, d, B);
     }
 
+    // --- Dach: Dachrand (Blende bis auf die Wände darunter) und niedrige Attika rundum
+    if (floor.roof) {
+      const edge = (floors.roof_edge ??= new Builder());
+      const t = floor.roofThickness ?? 0.2;
+      for (const r of this.rooms.values()) {
+        const poly = r.room.polygon;
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i], b = poly[(i + 1) % poly.length];
+          edge.skirt(a, -t - 0.01, 0.12, b, -t - 0.01, 0.12, r.idx);
+        }
+      }
+    }
+
     // --- Sockelleisten: entlang der Raumkanten, ausgespart an Türen und bodentiefen Fenstern
-    if (!floor.outdoor) this._baseboards(B.door);
+    if (!floor.outdoor && !floor.roof) this._baseboards(B.door);
 
     const S = this.shared;
     const add = (b, mat, opts = {}) => {
@@ -308,6 +321,8 @@ export function createSharedMaterials() {
   gravel.repeat.set(1 / 0.6, 1 / 0.6);
   const soil = speckleTexture([74, 54, 38], 0.8, 9, 0.35);
   soil.repeat.set(1 / 0.8, 1 / 0.8);
+  const roofTex = speckleTexture([78, 80, 84], 0.7, 13, 0.25);
+  roofTex.repeat.set(1 / 0.7, 1 / 0.7);
   const slabs = slabTexture();
   slabs.repeat.set(1 / 1.2, 1 / 1.2);
   const stone = stoneTexture();
@@ -325,6 +340,9 @@ export function createSharedMaterials() {
     paving: lit({ map: paving, normalMap: relief(paving, 6), normalScale: N(0.8), roughness: 0.85 }, { weather: true }),
     gravel: lit({ map: gravel, normalMap: relief(gravel, 8), normalScale: N(1), roughness: 1 }, { weather: true }),
     soil: lit({ map: soil, normalMap: relief(soil, 5), normalScale: N(0.8), roughness: 1 }, { weather: true }),
+    // Flachdach: dunkle Dachbahn; Dachrand/Attika in hellem Metall
+    roof: lit({ map: roofTex, normalMap: relief(roofTex, 4), normalScale: N(0.6), roughness: 0.95 }, { weather: true }),
+    roof_edge: lit({ color: 0xa9adb1, roughness: 0.5, metalness: 0.3 }, { weather: true }),
     slabs: lit({ map: slabs, normalMap: relief(slabs, 8), normalScale: N(0.7), roughness: 0.75 }, { weather: true }),
     stone: lit({ map: stone, normalMap: relief(stone, 10), normalScale: N(1.2), roughness: 0.95 }, { weather: true }),
     wood: lit({ color: 0x8a6440, roughness: 0.7 }, { weather: true }),

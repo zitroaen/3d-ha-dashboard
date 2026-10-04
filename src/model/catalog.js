@@ -7,7 +7,8 @@
 //   size          Standardmaß [B, T, H] bzw. [B, T] (nur Doku)
 //   params        erlaubte Schlüssel in objects[].params
 //   label         Name im Katalog des Editors
-//   anim          Animation, solange das Objekt aktiv ist (Entity an bzw. `state: on`): spin = dreht sich
+//   anim          Animation, solange das Objekt aktiv ist (Entity an bzw. `state: on`): spin = dreht sich,
+//                 swing = schwenkt auf (Tor), flow = Energiefluss im Kabel
 
 export const CATALOG = {
   // --- Möbel
@@ -44,6 +45,8 @@ export const CATALOG = {
   marker: { label: 'Markierung', category: 'device', size: [0.12], params: ['color'] },
   ceiling_fan: { label: 'Deckenventilator', category: 'device', size: [1.2], params: ['color'], anim: 'spin' },
   floor_fan: { label: 'Standventilator', category: 'device', size: [0.42, 0.42, 1.15], params: ['color'], anim: 'spin' },
+  garage_door: { label: 'Garagentor', category: 'device', size: [3.0, 0.2, 2.1], params: ['color'], anim: 'swing' },
+  solar_panels: { label: 'Balkonkraftwerk', category: 'device', size: [2.29, 1.72, 0.1], params: ['panels', 'cable_to', 'drop', 'peak'], anim: 'flow' },
   tv: { label: 'Fernseher', category: 'device', size: [1.45, 0.06, 0.84], params: [] },
   // --- Leuchten
   ball: { label: 'Leuchtkugel', category: 'lamp', capabilities: ['light'], params: ['radius'] },
@@ -70,7 +73,7 @@ export const DEFAULT_LIGHT_HEIGHT = { ceiling: 2.35, pendant: 2.0, floor: 0.15, 
 export const MODEL_LIGHT_HEIGHT = { floor_spots: 1.5, string_lights: 2.4, bollard: 0.55, ball: 0.15, spike_spot: 0.15 };
 
 /** Bodenbeläge und Oberflächen (`surface`) */
-export const SURFACES = ['parquet', 'parquet_cube', 'tiles', 'concrete', 'lawn', 'paving', 'gravel', 'soil', 'wood', 'water', 'slabs', 'stone'];
+export const SURFACES = ['parquet', 'parquet_cube', 'tiles', 'concrete', 'lawn', 'paving', 'gravel', 'soil', 'wood', 'water', 'slabs', 'stone', 'roof'];
 
 /** Montagearten von Leuchten (`light.mount`) */
 export const LIGHT_MOUNTS = ['ceiling', 'pendant', 'floor', 'table', 'wall', 'spot'];
