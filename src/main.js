@@ -314,7 +314,8 @@ class Ha3dDashboard extends HTMLElement {
       onAction: (act) => (act === 'edit' ? this.setEditing(true) : this._toggleLinks(true)),
     });
     this.prefs = this.menu.prefs;
-    this._applyTheme();
+    // Darstellung erst in connectedCallback setzen: Attribute im Konstruktor sind verboten, HA legt das Panel mit
+    // document.createElement an (sonst NotSupportedError -> weiße Seite)
     window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => this._applyTheme());
     this.shadowRoot.querySelector('.settings-toggle').addEventListener('click', () => this._toggleMenu());
     // Wetter antippen: HA-Wetterdialog (Vorhersage)
@@ -335,6 +336,7 @@ class Ha3dDashboard extends HTMLElement {
   }
 
   connectedCallback() {
+    this._applyTheme();
     // beim Wiederanzeigen neu laden – aber nicht mitten in einer Bearbeitung
     this._onVisible ??= () => document.visibilityState === 'visible' && !this.editor?.changes.size && this.reloadData();
     document.addEventListener('visibilitychange', this._onVisible);

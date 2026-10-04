@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.13.1
+
+- **Weiße Seite in Home Assistant behoben** (seit 0.13.0): Das Panel setzte die Darstellung (hell/dunkel) schon beim
+  Anlegen; Home Assistant legt Panels mit `document.createElement` an, und dort sind Attribute im Konstruktor
+  verboten. Die Test-Seite legt das Panel mit `?ha=1` jetzt genauso an wie HA.
+
 ## 0.13.0
 
 - **Glas-Design:** Alle Bedienelemente sind durchscheinend mit Weichzeichner und feiner Lichtkante, die Formen sind
