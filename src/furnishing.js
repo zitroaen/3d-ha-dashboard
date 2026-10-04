@@ -14,7 +14,7 @@ const FABRIC = /^(fabric|cushion|rug|curtain)/;
 const GLOW_OFF = { shade: 0x8f897d, bulb: 0x7d786f, disc: 0x1f1e1c };
 
 // Kein Kontaktschatten: liegt flach am Boden oder hängt an der Wand
-const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers']);
+const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door']);
 
 /** Weicher Kontaktschatten (Alpha-Verlauf, Rechteck mit runden Ecken), einmal pro Szene */
 function contactTexture() {

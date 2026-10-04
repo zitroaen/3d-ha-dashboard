@@ -19,9 +19,11 @@ export class CatalogPanel {
    * @param root       Container im Shadow-DOM
    * @param onAdd      (model) => void – neues Objekt dieses Modells in die Welt setzen
    * @param onRestore  (id) => void – eingelagertes Objekt wieder aufstellen
+   * @param preview    (model) => Bild-URL – Vorschaubild (wird nach und nach gerechnet)
    */
-  constructor(root, { onAdd, onRestore, onClose } = {}) {
+  constructor(root, { onAdd, onRestore, onClose, preview } = {}) {
     this.root = root;
+    this.preview = preview; // (model) => Bild-URL oder null (preview.js)
     this.onAdd = onAdd;
     this.onRestore = onRestore;
     this.onClose = onClose;
@@ -96,16 +98,40 @@ export class CatalogPanel {
     const q = this.query.trim().toLowerCase();
     if (this.tab === 'stored') {
       ul.innerHTML = (this.stored || []).map((o) => `<li><button data-restore="${esc(o.id)}"><b>${esc(o.name)}</b>
-        <small>${esc(CATALOG[o.model]?.label || o.model)}${o.linked ? ` · ${o.linked} verknüpft` : ''}</small><span class="mark">↺</span></button></li>`).join('')
+        <small>${esc(CATALOG[o.model]?.label || o.model)}${o.linked ? ` · ${o.linked} verknüpft` : ''}</small><span class="mark">↺</span>${this._thumb(o.model)}</button></li>`).join('')
         || '<li class="more">Das Lager ist leer. Im Editor ein Objekt wählen → Entfernen → Einlagern.</li>';
-      return;
+      return this._fillThumbs();
     }
     const items = Object.entries(CATALOG)
       .filter(([, c]) => this.cat === 'all' || c.category === this.cat)
       .filter(([m, c]) => !q || `${c.label} ${m} ${CATEGORY_LABEL[c.category]}`.toLowerCase().includes(q))
       .sort(([, a], [, b]) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category) || (a.label || '').localeCompare(b.label || '', 'de'));
     ul.innerHTML = items.map(([m, c]) => `<li><button data-add="${m}"><b>${esc(c.label || m)}</b>
-      <small>${esc(catalogInfo(m))}</small><span class="mark">+</span></button></li>`).join('')
+      <small>${esc(catalogInfo(m))}</small><span class="mark">+</span>${this._thumb(m)}</button></li>`).join('')
       || '<li class="more">Nichts gefunden.</li>';
+    this._fillThumbs();
+  }
+
+  /** Platz für das Vorschaubild (gerechnete Bilder sofort, sonst später) */
+  _thumb(model) {
+    return `<img class="thumb" data-model="${esc(model)}" alt="" width="56" height="56">`;
+  }
+
+  /** Vorschaubilder nach und nach rechnen – eins pro Durchgang, damit die Liste sofort bedienbar bleibt */
+  _fillThumbs() {
+    clearTimeout(this._thumbTimer);
+    if (!this.preview) return;
+    const next = () => {
+      const img = this.root.querySelector('img.thumb:not([src]):not([data-none])');
+      if (!img || !this.isOpen) return;
+      const url = this.preview(img.dataset.model);
+      // gleiches Modell mehrfach in der Liste (Lager): alle versorgen
+      for (const i of this.root.querySelectorAll(`img.thumb[data-model="${img.dataset.model}"]`)) {
+        if (url) i.src = url;
+        else i.dataset.none = '';
+      }
+      this._thumbTimer = setTimeout(next, 0);
+    };
+    next();
   }
 }

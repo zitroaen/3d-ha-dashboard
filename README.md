@@ -23,6 +23,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Waschmaschine, Kamin, PV, Staubsauger. Antippen, Doppeltippen und langes Drücken lösen wählbare Aktionen aus
   (Umschalten, HA-Dialog, Dienst, Seite, optional mit Rückfrage); ein Schild über dem Objekt zeigt den Zustand
   (z. B. „42 min“).
+- **Dächer:** Gebäude ohne Obergeschoss (Garage, Gartenhaus) zeigen ab der Ebene darüber ihr Flachdach – samt
+  Objekten darauf wie einem Balkonkraftwerk.
 - **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände mit Höhen (z. B. Südhang); Trockenmauern,
   Hochbeete und Stufen; Bäume, Sträucher, Gräser, Blumen, Gartenmöbel und Gartenleuchten (Poller, Strahler,
   Lichterkette) aus dem Katalog.
@@ -34,9 +36,10 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Link-Check, Version.
 - **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten. Gerechnet wird nur,
   wenn sich etwas ändert.
-- **Katalog und Lager:** im Editor Modelle aus dem Katalog hinzufügen; Objekte einlagern (z. B.
+- **Katalog und Lager:** im Editor Modelle aus dem Katalog (mit Vorschaubildern) hinzufügen; Objekte einlagern (z. B.
   Weihnachtsdekoration) und später mit allen Verknüpfungen wieder aufstellen.
-- **Animationen:** Ventilatoren drehen sich, solange sie an sind (Tempo aus der Stufe); abschaltbar, mit
+- **Animationen:** Ventilatoren drehen sich, solange sie an sind (Tempo aus der Stufe), Garagentore schwenken auf,
+  im Kabel des Balkonkraftwerks fließt Energie, solange es Strom erzeugt; abschaltbar, mit
   Leistungsanzeige (Bilder/s) in den Einstellungen.
 - **Editor:** Möbel/Leuchten antippen, mit Koordinatensystem verschieben und drehen, an Wände anlegen,
   mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), Gesten und Zustandsanzeige je

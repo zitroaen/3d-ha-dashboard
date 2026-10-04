@@ -704,10 +704,10 @@ export const FURNITURE = {
     const c = it.color || 'door_grey', z = D / 2; // Ursprung an der Innenkante der Wand, Tor in Wandmitte
     if (ceiling - H > 0.02) P.box('plaster', W, ceiling - H, D, 0, H, z); // Sturz
     P.beginAnim({ type: 'swing', axis: 'x', angle: Math.PI / 2 * 0.98, duration: 6 }, [0, H, z]);
+    // Torblatt mit waagrechten Sicken und Griff – ein Material (ein Zeichenaufruf für das bewegliche Teil)
     P.box(c, W - 0.04, H - 0.03, 0.04, 0, 0.02, z);
-    // waagrechte Sicken und Griff
-    for (let i = 1; i < 6; i++) P.box('alu', W - 0.12, 0.012, 0.01, 0, (H - 0.03) * (i / 6), z + 0.025);
-    P.box('steel_dark', 0.3, 0.04, 0.03, 0, H * 0.42, z + 0.035);
+    for (let i = 1; i < 6; i++) P.box(c, W - 0.12, 0.012, 0.01, 0, (H - 0.03) * (i / 6), z + 0.025);
+    P.box(c, 0.3, 0.04, 0.03, 0, H * 0.42, z + 0.035);
     P.endAnim();
   },
 
