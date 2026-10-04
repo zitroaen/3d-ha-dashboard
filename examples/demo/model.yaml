@@ -173,6 +173,84 @@ outdoor:
     surface: soil
     elevation: -0.04
   - { id: weg, name: Gartenweg, polygon: [[2.7, 10.5], [3.8, 10.5], [3.8, 11.3], [2.7, 11.3]], surface: paving }
+  - { id: terrasse_nord, name: Terrasse Nord, polygon: [[0, -4.4], [10, -4.4], [10, 0], [0, 0]], surface: slabs }
+  - id: mauer_nord
+    name: Trockenmauer
+    polygon: [[1.4, -4.8], [10.4, -4.8], [10.4, -4.4], [1.4, -4.4]]
+    surface: stone
+    edge: stone
+    elevation: 0.9
+  - id: hochbeet
+    name: Hochbeet
+    polygon: [[1.4, -6], [10.4, -6], [10.4, -4.8], [1.4, -4.8]]
+    surface: soil
+    edge: stone
+    elevation: 0.8
+  - id: stufe_1
+    name: Stufe
+    polygon: [[0, -4.8], [1.4, -4.8], [1.4, -4.4], [0, -4.4]]
+    surface: stone
+    edge: stone
+    elevation: 0.17
+  - id: stufe_2
+    name: Stufe
+    polygon: [[0, -5.2], [1.4, -5.2], [1.4, -4.8], [0, -4.8]]
+    surface: stone
+    edge: stone
+    elevation: 0.34
+  - id: stufe_3
+    name: Stufe
+    polygon: [[0, -5.6], [1.4, -5.6], [1.4, -5.2], [0, -5.2]]
+    surface: stone
+    edge: stone
+    elevation: 0.51
+  - id: stufe_4
+    name: Stufe
+    polygon: [[0, -6], [1.4, -6], [1.4, -5.6], [0, -5.6]]
+    surface: stone
+    edge: stone
+    elevation: 0.68
+  - id: mauer_west_1
+    name: Trockenmauer
+    polygon: [[-0.4, -6], [0, -6], [0, -3.6], [-0.4, -3.6]]
+    surface: stone
+    edge: stone
+    elevation: 0.95
+  - id: mauer_west_2
+    name: Trockenmauer
+    polygon: [[-0.4, -3.6], [0, -3.6], [0, -1.8], [-0.4, -1.8]]
+    surface: stone
+    edge: stone
+    elevation: 0.62
+  - id: mauer_west_3
+    name: Trockenmauer
+    polygon: [[-0.4, -1.8], [0, -1.8], [0, 0], [-0.4, 0]]
+    surface: stone
+    edge: stone
+    elevation: 0.36
+  - id: mauer_ost_1
+    name: Trockenmauer
+    polygon: [[10, -4.4], [10.4, -4.4], [10.4, -2.9], [10, -2.9]]
+    surface: stone
+    edge: stone
+    elevation: 0.9
+  - id: mauer_ost_2
+    name: Trockenmauer
+    polygon: [[10, -2.9], [10.4, -2.9], [10.4, -1.4], [10, -1.4]]
+    surface: stone
+    edge: stone
+    elevation: 0.62
+  - id: mauer_ost_3
+    name: Trockenmauer
+    polygon: [[10, -1.4], [10.4, -1.4], [10.4, 0], [10, 0]]
+    surface: stone
+    edge: stone
+    elevation: 0.36
+  - id: garten_nord
+    name: Garten Nord
+    surface: lawn
+    extend: true
+    polygon: [[-4, 0, 0], [-0.4, 0, 0], [-0.4, -6, 0.84], [10.4, -6, 0.84], [10.4, 0, 0], [15.5, 0, 0], [15.5, -11, 1.54], [-4, -11, 1.54]]
   - id: garten
     name: Garten
     surface: lawn
@@ -306,7 +384,6 @@ objects:
     params: { radius: 0.12 }
     light: { height: 0.12, range: 2.5, color: "#9fd0ff" }
     ha: { entities: { power: light.demo_garten } }
-  # Garten: Bäume und Sträucher am Südhang, Blumen in den Beeten um die Terrasse
   - { id: apfelbaum, name: Apfelbaum, model: tree, space: garten, pos: [1.2, 14.4], size: [3.2, 3.2, 4.5] }
   - id: kirschbaum
     name: Kirschbaum
@@ -326,7 +403,12 @@ objects:
   - { id: strauch_2, name: Strauch, model: shrub, space: garten, pos: [-2.9, 12.5], size: [1.4, 1.1, 1.2] }
   - { id: strauch_3, name: Strauch, model: shrub, space: garten, pos: [5.4, 17], size: [1.6, 1.2, 1.1] }
   - { id: blumen_west, name: Blumen, model: flowers, space: beet_west, pos: [-0.5, 9.65], size: [0.8, 3.1, 0.35] }
-  - { id: blumen_sued_1, name: Blumen, model: flowers, space: beet_sued_1, pos: [1.35, 10.9], size: [2.5, 0.65, 0.35] }
+  - id: blumen_sued_1
+    name: Blumen
+    model: flowers
+    space: beet_sued_1
+    pos: [1.35, 10.9]
+    size: [2.5, 0.65, 0.35]
   - id: blumen_sued_2
     name: Lavendel
     model: flowers
@@ -355,3 +437,117 @@ objects:
     pos: [-3.2, 13.6]
     size: [1.2, 1.2, 4.5]
     params: { shape: column }
+  - { id: gartentisch, name: Gartentisch, model: garden_table, space: terrasse_nord, pos: [8.5, -2.4], rot: 90 }
+  - { id: gartenbank, name: Gartenbank, model: bench, space: terrasse_nord, pos: [9.62, -2.4], rot: 90 }
+  - { id: gartenstuhl_1, name: Gartenstuhl, model: garden_chair, space: terrasse_nord, pos: [7.62, -2.85], rot: 270 }
+  - { id: gartenstuhl_2, name: Gartenstuhl, model: garden_chair, space: terrasse_nord, pos: [7.62, -1.95], rot: 270 }
+  - { id: gartenstuhl_3, name: Gartenstuhl, model: garden_chair, space: terrasse_nord, pos: [8.5, -1.12], rot: 180 }
+  - id: kindertisch
+    name: Kinder-Picknicktisch
+    model: picnic_table
+    space: terrasse_nord
+    pos: [4.6, -2.2]
+    rot: 15
+  - { id: grill, name: Grill, model: grill, space: terrasse_nord, pos: [2.3, -0.45], rot: 180 }
+  - { id: regentonne, name: Regentonne, model: barrel, space: terrasse_nord, pos: [0.45, -0.45] }
+  - id: lichterkette_terrasse
+    name: Lichterkette
+    model: string_lights
+    space: terrasse_nord
+    pos: [5, -4.05]
+    params: { length: 9.4, sag: 0.45, bulbs: 14 }
+    light: { height: 2.5, range: 6, color: "#ffc27a" }
+    ha: { entities: { power: light.demo_lichterkette_garten } }
+  - { id: gras_1, name: Ziergras, model: grass, space: hochbeet, pos: [2.2, -5.3], size: [0.7, 0.7, 0.9] }
+  - { id: gras_2, name: Ziergras, model: grass, space: hochbeet, pos: [6.4, -5.2], size: [0.8, 0.8, 1] }
+  - id: gras_3
+    name: Lampenputzergras
+    model: grass
+    space: hochbeet
+    pos: [9.4, -5.5]
+    size: [0.6, 0.6, 0.6]
+    params: { color: grass_green }
+  - id: lavendel_nord
+    name: Lavendel
+    model: flowers
+    space: hochbeet
+    pos: [3.6, -5.5]
+    size: [1.6, 0.7, 0.45]
+    params: { color: flower_violet }
+  - id: schafgarbe
+    name: Schafgarbe
+    model: flowers
+    space: hochbeet
+    pos: [5, -5.1]
+    size: [1, 0.5, 0.4]
+    params: { color: flower_yellow }
+  - id: prachtkerze
+    name: Prachtkerze
+    model: flowers
+    space: hochbeet
+    pos: [8, -5.4]
+    size: [1.3, 0.8, 0.55]
+    params: { color: flower_white }
+  - id: silberlaub_1
+    name: Heiligenkraut
+    model: shrub
+    space: hochbeet
+    pos: [4.4, -5.6]
+    size: [0.45, 0.4, 0.3]
+    params: { color: leaf_silver }
+  - id: silberlaub_2
+    name: Heiligenkraut
+    model: shrub
+    space: hochbeet
+    pos: [7.2, -5]
+    size: [0.4, 0.4, 0.28]
+    params: { color: leaf_silver }
+  - { id: buchs_nord, name: Buchskugel, model: shrub, space: hochbeet, pos: [5.6, -5.65], size: [0.5, 0.5, 0.45] }
+  - id: hochbeet_kugel_1
+    name: Leuchtkugel Hochbeet
+    model: ball
+    space: hochbeet
+    pos: [2.9, -5.15]
+    params: { radius: 0.15 }
+    light: { height: 0.15, range: 2.2, color: "#ffd59a" }
+    ha: { entities: { power: light.demo_hochbeet } }
+  - id: hochbeet_kugel_2
+    name: Leuchtkugel Hochbeet
+    model: ball
+    space: hochbeet
+    pos: [7.6, -5.55]
+    params: { radius: 0.18 }
+    light: { height: 0.18, range: 2.2, color: "#ffd59a" }
+    ha: { entities: { power: light.demo_hochbeet } }
+  - id: gras_strahler_1
+    name: Strahler Ziergras
+    model: spike_spot
+    space: hochbeet
+    pos: [2.2, -5]
+    rot: 180
+    light: { height: 0.15, range: 1.8, color: "#ffc070" }
+    ha: { entities: { power: light.demo_hochbeet } }
+  - id: gras_strahler_2
+    name: Strahler Ziergras
+    model: spike_spot
+    space: hochbeet
+    pos: [6.4, -4.92]
+    rot: 180
+    light: { height: 0.15, range: 1.8, color: "#ffc070" }
+    ha: { entities: { power: light.demo_hochbeet } }
+  - id: jungbaum
+    name: Junger Baum
+    model: tree
+    space: garten_nord
+    pos: [6.8, -7.6]
+    size: [2.2, 2.2, 4.2]
+    params: { stakes: true }
+  - { id: hecke_nord_1, name: Hecke, model: shrub, space: garten_nord, pos: [-2.6, -8.6], size: [2.2, 1.4, 1.6] }
+  - { id: hecke_nord_2, name: Hecke, model: shrub, space: garten_nord, pos: [13.4, -8.4], size: [2.6, 1.5, 1.7] }
+  - id: pollerleuchte
+    name: Pollerleuchte
+    model: bollard
+    space: garten_nord
+    pos: [0.4, -6.6]
+    light: { height: 0.55, range: 2.5, color: "#ffcf8a" }
+    ha: { entities: { power: light.demo_pollerleuchte } }

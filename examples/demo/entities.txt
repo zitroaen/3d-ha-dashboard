@@ -21,6 +21,9 @@ light.demo_bad | Deckenlicht Bad
 ## Außen
 light.demo_terrasse | Terrassenleuchte
 light.demo_garten | Gartenstrahler
+light.demo_lichterkette_garten | Lichterkette Terrasse
+light.demo_hochbeet | Hochbeet
+light.demo_pollerleuchte | Pollerleuchte
 ## Ohne Bereich
 light.demo_ohne_bereich | Lampe ohne Bereich
 ## Studio

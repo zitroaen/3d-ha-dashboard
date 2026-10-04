@@ -1,6 +1,6 @@
 // Erzeugt das Bauwerk des erfundenen Demo-Hauses in examples/demo/model.yaml (Datenmodell v2, docs/DATA_MODEL.md):
 // Wohnhaus 10 × 8 m (Erdgeschoss: Wohnzimmer, Küche, Schlafzimmer, Bad; Obergeschoss: Studio), Garage daneben und
-// Außenbereiche (Terrasse, Einfahrt, Beet). Die Objekte (objects) in model.yaml bleiben unverändert.
+// Außenbereiche (Terrasse, Einfahrt, Beete, Südhang; im Norden eine in den Hang gegrabene Terrasse mit Trockenmauern). Die Objekte (objects) in model.yaml bleiben unverändert.
 //   node examples/demo/build-house.mjs
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -132,12 +132,49 @@ const outdoor = [
   { id: 'beet_sued_1', name: 'Beet Süd links', polygon: rect(0, 10.5, 2.7, 11.3), surface: 'soil', elevation: -0.04 },
   { id: 'beet_sued_2', name: 'Beet Süd rechts', polygon: rect(3.8, 10.5, 6.5, 11.3), surface: 'soil', elevation: -0.04 },
   { id: 'weg', name: 'Gartenweg', polygon: rect(2.7, 10.5, 3.8, 11.3), surface: 'paving' },
+  ...northTerrace(),
   // Garten als Südhang (Süden = +y): oben auf Terrassenhöhe, unten 1,5 m tiefer (Höhe je Eckpunkt)
   {
     id: 'garten', name: 'Garten', surface: 'lawn',
     polygon: [[-4, 11.3, -0.05], [11.2, 11.3, -0.05], [11.2, 18, -1.5], [-4, 18, -1.5]],
   },
 ];
+
+/**
+ * Terrasse nördlich des Hauses, in den Hang gegraben: Großformatplatten auf Fußbodenhöhe, dahinter steigt der Rasen
+ * nach Norden an (14 cm pro Meter). Trockenmauern aus Naturstein halten den Hang – im Norden mit Hochbeet dahinter,
+ * an den Seiten in Stufen dem Gelände folgend; im Nordwesten führen Blockstufen hinauf.
+ */
+function northTerrace() {
+  const slope = (y) => r3(-y * 0.14); // Höhe des Rasens bei y (Norden = -y)
+  const T = 0.4; // Mauerstärke
+  const N = -4.4, BED = -6.0; // Terrasse bis y = N, Hochbeet bis y = BED
+  const STEPS = 1.4; // Treppe x 0 … 1.4
+  const wallSegs = (x0, x1, segs) => segs.map(([y0, y1, z], i) => ({
+    id: `${x0 < 1 ? 'mauer_west' : 'mauer_ost'}_${i + 1}`, name: 'Trockenmauer', polygon: rect(x0, y0, x1, y1),
+    surface: 'stone', edge: 'stone', elevation: z,
+  }));
+  const rise = 0.17;
+  return [
+    { id: 'terrasse_nord', name: 'Terrasse Nord', polygon: rect(0, N, 10, 0), surface: 'slabs' },
+    { id: 'mauer_nord', name: 'Trockenmauer', polygon: rect(STEPS, N - T, 10 + T, N), surface: 'stone', edge: 'stone', elevation: 0.9 },
+    { id: 'hochbeet', name: 'Hochbeet', polygon: rect(STEPS, BED, 10 + T, N - T), surface: 'soil', edge: 'stone', elevation: 0.8 },
+    // Blockstufen von der Terrasse hinauf zum Rasen
+    ...[1, 2, 3, 4].map((k) => ({
+      id: `stufe_${k}`, name: 'Stufe', polygon: rect(0, N - k * 0.4, STEPS, N - (k - 1) * 0.4),
+      surface: 'stone', edge: 'stone', elevation: r3(k * rise),
+    })),
+    // Seitenmauern, abgetreppt (oben im Norden am höchsten)
+    ...wallSegs(-T, 0, [[BED, -3.6, 0.95], [-3.6, -1.8, 0.62], [-1.8, 0, 0.36]]),
+    ...wallSegs(10, 10 + T, [[N, -2.9, 0.9], [-2.9, -1.4, 0.62], [-1.4, 0, 0.36]]),
+    // Rasen am Nordhang rund um die Terrasse (U-Form), steigt nach Norden an; der Boden setzt ihn nach außen fort
+    {
+      id: 'garten_nord', name: 'Garten Nord', surface: 'lawn', extend: true, // der Hang läuft über den Rand hinaus weiter
+      polygon: [[-4, 0], [-T, 0], [-T, BED], [10 + T, BED], [10 + T, 0], [15.5, 0], [15.5, -11], [-4, -11]]
+        .map(([x, y]) => [x, y, slope(y)]),
+    },
+  ];
+}
 
 const file = fileURLToPath(new URL('./model.yaml', import.meta.url));
 const prevText = existsSync(file) ? readFileSync(file, 'utf8') : '';

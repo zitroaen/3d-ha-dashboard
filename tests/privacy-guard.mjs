@@ -14,11 +14,13 @@ const files = execSync('git ls-files --cached --others --exclude-standard', { cw
   .split('\n').filter(Boolean).filter((f) => existsSync(join(ENGINE_ROOT, f)));
 
 const IMAGES = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.gif', '.tif', '.tiff', '.bmp']);
+// Erlaubte Bilder: Doku-Screenshots (Demo-Haus) und die Markenbilder der Integration (erzeugt von scripts/logo.mjs)
+const BRAND = /^custom_components\/ha_3d_dashboard\/brand\/(dark_)?(icon|logo)(@2x)?\.png$/;
 const errors = [];
 for (const f of files) {
   const ext = extname(f).toLowerCase();
   if (ext === '.pdf') errors.push(`${f}: PDF (Grundriss-Reports gehören in die private Instanz)`);
-  if (IMAGES.has(ext) && !f.startsWith('docs/')) errors.push(`${f}: Bild außerhalb von docs/ (Fotos/Texturen gehören in die private Instanz)`);
+  if (IMAGES.has(ext) && !f.startsWith('docs/') && !BRAND.test(f)) errors.push(`${f}: Bild außerhalb von docs/ (Fotos/Texturen gehören in die private Instanz)`);
   if (/^(data|reference|Fotos|photos)\//i.test(f)) errors.push(`${f}: Ordner für private Daten`);
   if (/entities\.txt$/.test(f) && f !== 'examples/demo/entities.txt') errors.push(`${f}: HA-Export außerhalb des Demo-Hauses`);
   if (/(^|\/)(model\.yaml|house\.json|furniture\.yaml|devices\.yaml)$/.test(f) && !f.startsWith('examples/demo/') && !f.startsWith('templates/'))

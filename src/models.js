@@ -49,6 +49,15 @@ export const PALETTE = {
   flower_violet: { color: 0x7d55b8, roughness: 0.7 },
   flower_white: { color: 0xeeeae0, roughness: 0.7 },
   flower_pink: { color: 0xe07aa6, roughness: 0.7 },
+  leaf_silver: { color: 0x9aa79a, roughness: 0.9 },
+  grass_straw: { color: 0xb8a467, roughness: 0.9 },
+  grass_green: { color: 0x6f8a4a, roughness: 0.9 },
+  // Gartenmöbel und -geräte
+  alu_dark: { color: 0x3a3c3f, roughness: 0.45, metalness: 0.5 },
+  sling_grey: { color: 0x6c6a66, roughness: 0.95 },
+  table_top: { color: 0x2b2d30, roughness: 0.35 },
+  pine: { color: 0xa67a4c, roughness: 0.75 },
+  barrel_green: { color: 0x1f8a6a, roughness: 0.5 },
 };
 
 /** Fester Pseudozufall (gleiche Daten -> gleiches Bild) */
@@ -453,6 +462,15 @@ export const FURNITURE = {
     }
     const c = it.color || 'leaf_green';
     const trunk = Math.max(0.6, H - Dm * 0.9);
+    if (it.stakes) {
+      // Dreibock aus Pfählen mit Querlatten (junger Baum)
+      const ps = [0, 2.094, 4.189].map((a) => [Math.cos(a) * 0.32, Math.sin(a) * 0.32]);
+      for (const [x, z] of ps) P.cyl('oak_light', 0.035, 0.035, 1.9, x, 0, z, { seg: 6 });
+      for (let i = 0; i < 3; i++) {
+        const [a, b] = [ps[i], ps[(i + 1) % 3]];
+        P.rod('oak_light', [a[0], 1.75, a[1]], [b[0], 1.75, b[1]], 0.025, { seg: 4 });
+      }
+    }
     P.cyl('bark', 0.1, 0.16, trunk + r * 0.3, 0, 0, 0, { seg: 8 });
     const cy = H - r * 0.95;
     P.blob(c, r * 0.85, r * 0.8, r * 0.85, 0, cy, 0);
@@ -491,6 +509,91 @@ export const FURNITURE = {
         P.sphere(c, 0.045, x, H * (0.45 + 0.5 * e), z, { seg: 8 });
       }
     }
+  },
+
+  /**
+   * Ziergras (Horst): size = [Durchmesser, –, Höhe]; params.color = Halmfarbe (grass_straw, grass_green …).
+   * Halme als schmale Prismen, außen flacher – wenige Dreiecke.
+   */
+  grass(P, it) {
+    const [Dm, , H] = [it.size?.[0] ?? 0.6, 0, it.size?.[2] ?? 0.7];
+    const c = it.color || 'grass_straw';
+    P.blob('grass_green', Dm * 0.3, H * 0.18, Dm * 0.3, 0, H * 0.08, 0, { seg: 8 });
+    const n = 22;
+    for (let i = 0; i < n; i++) {
+      const a = i * 2.399, t = jitter(i, 3); // goldener Winkel: gleichmäßig verteilt
+      const lean = 0.15 + t * 0.6; // innen steil, außen flach
+      const len = H * (1.05 - lean * 0.45);
+      const tip = [Math.cos(a) * Dm * 0.55 * lean, len * Math.cos(lean * 0.9), Math.sin(a) * Dm * 0.55 * lean];
+      P.rod(i % 3 ? c : 'grass_green', [0, 0.05, 0], tip, 0.012, { seg: 3 });
+    }
+  },
+
+  /** Gartentisch: size = [Länge, Breite, Höhe]; dunkle Platte auf Aluminiumgestell */
+  garden_table(P, it) {
+    const [W, D, H] = it.size || [1.6, 0.9, 0.74];
+    P.box(it.color || 'table_top', W, 0.03, D, 0, H - 0.03, 0);
+    P.box('alu_dark', W - 0.04, 0.06, D - 0.04, 0, H - 0.09, 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.box('alu_dark', 0.05, H - 0.09, 0.05, sx * (W / 2 - 0.06), 0, sz * (D / 2 - 0.06));
+  },
+
+  /** Gartenstuhl (Stapelsessel mit Armlehnen und Bespannung, optional Auflage); +z = Sitzseite */
+  garden_chair(P, it) {
+    const f = 'alu_dark', c = it.color || 'sling_grey';
+    for (const sx of [-1, 1]) {
+      P.rod(f, [sx * 0.27, 0, 0.26], [sx * 0.27, 0.66, 0.24], 0.014);
+      P.rod(f, [sx * 0.27, 0, -0.24], [sx * 0.27, 1.02, -0.34], 0.014);
+      P.rod(f, [sx * 0.27, 0.66, 0.24], [sx * 0.27, 0.66, -0.3], 0.014); // Armlehne
+    }
+    P.rbox(c, 0.5, 0.05, 0.48, 0.02, 0, 0.42, 0.01, { rotX: 0.06 });
+    P.rbox(c, 0.5, 0.56, 0.05, 0.02, 0, 0.46, -0.29, { rotX: -0.18 });
+  },
+
+  /** Gartenbank mit Auflage: size = [Breite, Tiefe, Höhe Lehne]; +z = Sitzseite */
+  bench(P, it) {
+    const [W, D, H] = it.size || [1.6, 0.62, 0.85];
+    const f = 'alu_dark', c = it.color || 'sling_grey';
+    for (const sx of [-1, 1]) {
+      P.box(f, 0.05, 0.62, D, sx * (W / 2 - 0.03), 0, 0);
+      P.box(f, 0.05, H - 0.62, 0.05, sx * (W / 2 - 0.03), 0.62, -D / 2 + 0.03);
+    }
+    P.box(f, W - 0.1, 0.04, D - 0.06, 0, 0.36, 0);
+    P.rbox(c, W - 0.12, 0.08, D - 0.1, 0.03, 0, 0.4, 0.02);
+    P.rbox(c, W - 0.12, H - 0.5, 0.08, 0.03, 0, 0.47, -D / 2 + 0.08, { rotX: -0.12 });
+  },
+
+  /** Kinder-Picknicktisch (Holz, Tisch mit zwei Bänken): size = [Länge, Tiefe, Höhe] */
+  picnic_table(P, it) {
+    const [W, D, H] = it.size || [0.9, 0.9, 0.5];
+    const w = it.color || 'pine';
+    P.box(w, W, 0.03, D * 0.5, 0, H - 0.03, 0);
+    for (const sz of [-1, 1]) P.box(w, W, 0.03, D * 0.2, 0, H * 0.52, sz * D * 0.4);
+    for (const sx of [-1, 1]) {
+      // gekreuzte Beine (A-Form) und Querträger
+      P.rod(w, [sx * (W / 2 - 0.1), 0, -D * 0.45], [sx * (W / 2 - 0.1), H - 0.03, D * 0.12], 0.018, { seg: 4 });
+      P.rod(w, [sx * (W / 2 - 0.1), 0, D * 0.45], [sx * (W / 2 - 0.1), H - 0.03, -D * 0.12], 0.018, { seg: 4 });
+      P.box(w, 0.04, 0.03, D * 0.95, sx * (W / 2 - 0.1), H * 0.48, 0);
+    }
+  },
+
+  /** Gasgrill mit Deckel und Seitenablagen: size = [Breite, Tiefe, Höhe]; +z = Vorderseite */
+  grill(P, it) {
+    const [W, D, H] = it.size || [1.3, 0.55, 1.15];
+    const body = W * 0.55;
+    P.box('black_matte', body, H * 0.7, D, 0, 0.05, 0);
+    P.rbox('black_matte', body, H * 0.25, D * 0.9, 0.08, 0, H * 0.75, -0.02);
+    P.box('steel_dark', body * 0.8, 0.03, 0.03, 0, H * 0.9, D / 2 + 0.03); // Griff
+    for (const sx of [-1, 1]) P.box('steel_dark', (W - body) / 2, 0.03, D * 0.8, sx * (body / 2 + (W - body) / 4), H * 0.72, 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.cyl('black_matte', 0.04, 0.04, 0.05, sx * (body / 2 - 0.05), 0, sz * (D / 2 - 0.05), { seg: 8 });
+  },
+
+  /** Regentonne: size = [Durchmesser, –, Höhe]; params.color */
+  barrel(P, it) {
+    const [Dm, , H] = [it.size?.[0] ?? 0.6, 0, it.size?.[2] ?? 0.9];
+    const c = it.color || 'barrel_green';
+    P.cyl(c, Dm * 0.46, Dm * 0.44, H * 0.5, 0, 0, 0, { seg: 16 });
+    P.cyl(c, Dm * 0.44, Dm * 0.5, H * 0.5, 0, H * 0.5, 0, { seg: 16 });
+    P.cyl('black_matte', Dm * 0.48, Dm * 0.48, 0.03, 0, H, 0, { seg: 16 });
   },
 
   /** Plattenheizkörper (Rippen). Später ein Gerät, das beim Heizen glüht. */
@@ -582,6 +685,48 @@ export const LAMPS = {
   wall_box(P, l, { lampIdx }) {
     P.idx = lampIdx;
     P.box('disc', 0.14, 0.24, 0.14, 0, l.height - 0.12, 0, { kind: 'glow' });
+  },
+
+  /** Erdspießstrahler (Beet): kleiner Strahler, nach oben geneigt; h = Höhe der Linse */
+  spike_spot(P, l, { roomIdx, lampIdx }) {
+    const h = l.height ?? 0.15;
+    P.idx = roomIdx;
+    P.rod('black_matte', [0, 0, 0], [0, h - 0.04, 0], 0.01);
+    P.cyl('black_matte', 0.04, 0.035, 0.1, 0, h - 0.05, -0.02, { seg: 10, rot: new THREE.Euler(-0.5, 0, 0) });
+    P.idx = lampIdx;
+    P.sphere('bulb', 0.032, 0, h + 0.03, 0.02, { kind: 'glow', seg: 8 });
+  },
+
+  /** Pollerleuchte (Weg, Rasen): Mast mit Schirm, Licht strahlt darunter; h = Höhe des Leuchtkörpers */
+  bollard(P, l, { roomIdx, lampIdx }) {
+    const h = l.height ?? 0.55;
+    P.idx = roomIdx;
+    P.cyl('steel_dark', 0.05, 0.05, h - 0.02, 0, 0, 0, { seg: 10 });
+    P.cyl('steel_dark', 0.14, 0.12, 0.03, 0, h + 0.03, 0, { seg: 16 });
+    P.idx = lampIdx;
+    P.cyl('shade', 0.07, 0.07, 0.05, 0, h - 0.02, 0, { kind: 'glow', seg: 12 });
+  },
+
+  /**
+   * Lichterkette (Partylichter) zwischen zwei Punkten: entlang der lokalen x-Achse, params.length (Spannweite, 8 m),
+   * params.sag (Durchhang, 0,4 m), params.bulbs (Anzahl, 12), params.poles (Masten an beiden Enden, true).
+   * h = Aufhängehöhe der Enden; die Lichtquelle sitzt in der Mitte.
+   */
+  string_lights(P, l, { roomIdx, lampIdx }) {
+    const L = l.length ?? 8, sag = l.sag ?? 0.4, n = l.bulbs ?? 12, h = l.height;
+    const y = (x) => h - sag * (1 - (2 * x / L) ** 2); // Parabel als Kettenlinie
+    P.idx = roomIdx;
+    if (l.poles !== false) for (const sx of [-1, 1]) P.cyl('wood_dark', 0.04, 0.05, h + 0.1, sx * L / 2, 0, 0, { seg: 8 });
+    const seg = 12;
+    for (let i = 0; i < seg; i++) {
+      const x0 = -L / 2 + (i / seg) * L, x1 = -L / 2 + ((i + 1) / seg) * L;
+      P.rod('black_matte', [x0, y(x0), 0], [x1, y(x1), 0], 0.006, { seg: 3 });
+    }
+    P.idx = lampIdx;
+    for (let i = 0; i < n; i++) {
+      const x = -L / 2 + ((i + 0.5) / n) * L;
+      P.sphere('bulb', 0.045, x, y(x) - 0.08, 0, { kind: 'glow', seg: 8 });
+    }
   },
 
   /** Leuchtkugel auf dem Boden. */

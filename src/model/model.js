@@ -156,7 +156,7 @@ export function toScene(model) {
       elevation: 0,
       ceiling: 3,
       rooms: model.outdoor.map((z) => ({
-        id: z.id, name: z.name, polygon: z.polygon, floor: z.surface || 'lawn', elevation: z.elevation || 0, area: z.ha_area,
+        id: z.id, name: z.name, polygon: z.polygon, floor: z.surface || 'lawn', edge: z.edge, extend: !!z.extend, elevation: z.elevation || 0, area: z.ha_area,
         heights: terrainHeights(z),
       })),
       walls: [],

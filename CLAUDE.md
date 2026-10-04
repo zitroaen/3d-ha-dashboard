@@ -60,6 +60,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `bash tests/ha/install.sh && python -m pytest tests/ha` | Tests der HA-Integration (Python ≥ 3.13) |
 | `npm run demo` | Demo-Haus aus `examples/demo/build-house.mjs` neu erzeugen |
 | `npm run test:perf` | Leistungsbudget: Zeichenaufrufe und Dreiecke pro Bild (Teil von `npm test`) |
+| `node scripts/logo.mjs` | Logo: `docs/logo.svg` und Markenbilder `custom_components/ha_3d_dashboard/brand/*.png` |
 | `npm run test:unit` | Modell: Migration, YAML, Szenen-Adapter, Zurückschreiben (Teil von `npm test`) |
 | `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude) |
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
@@ -187,6 +188,14 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   `:host([theme="light"])`. Darstellung Automatisch folgt `hass.themes.darkMode` (ohne HA: prefers-color-scheme).
   Ausgewählt = invertiert (`--g-sel-*`), Bernstein (`--g-accent`) nur für Zustände. Neue Elemente nutzen die
   Variablen statt fester Farben.
+- Logo (0.14.0): isometrischer Grundriss mit erleuchtetem Raum auf einer Glas-Kachel, erzeugt von `scripts/logo.mjs`
+  (SVG, PNG über den Test-Browser). HA zeigt ab 2026.3 die Bilder aus `custom_components/ha_3d_dashboard/brand/`
+  (icon/logo, @2x, dark_logo) ohne Eintrag in home-assistant/brands; der Datenschutz-Check erlaubt genau diese PNGs.
+  Die HACS-Liste zeigt eigene Markenbilder noch nicht (hacs/integration#5171).
+- Mauern, Hochbeete, Stufen (0.14.0): keine eigene Objektart, sondern schmale Außenbereiche mit `elevation` und
+  `edge` (Material der Kante; ebene erhöhte Bereiche bekommen jetzt auch Kanten). `extend` lässt den Boden
+  ansteigendes Gelände fortsetzen (Nordhang des Demo-Hauses); unter Gebäuden und ebenen Bereichen bleibt der Boden
+  unten, Kanten von `extend`-Bereichen nur zu Nachbarbereichen. Kanten-UV = Länge × Höhe (Mauerwerk liegt waagrecht).
 - Im Konstruktor des Elements keine Attribute setzen (auch nicht indirekt): HA legt das Panel mit
   `document.createElement` an, das wirft dann NotSupportedError (0.13.0: weiße Seite). `tests/harness.html?ha=1`
   legt das Panel wie HA an (createElement, Properties, einhängen); `tests/demo.mjs` und `tests/webkit.mjs` nutzen das.

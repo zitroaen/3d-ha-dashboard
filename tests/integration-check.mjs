@@ -1,6 +1,6 @@
-// Prüft die HA-Integration ohne Python: Versionen, HACS-Angaben, Übersetzungen.
+// Prüft die HA-Integration ohne Python: Versionen, HACS-Angaben, Markenbilder, Übersetzungen.
 //   node tests/integration-check.mjs   (Teil von npm test; die eigentlichen Integrationstests: tests/ha, pytest)
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ENGINE_ROOT } from './lib/config.mjs';
 
@@ -15,6 +15,10 @@ if (manifest.domain !== 'ha_3d_dashboard') errors.push(`manifest.json: domain ${
 for (const k of ['name', 'documentation', 'issue_tracker', 'codeowners', 'version']) if (!manifest[k]) errors.push(`manifest.json: ${k} fehlt`);
 if (!hacs.zip_release || hacs.filename !== `${manifest.domain}.zip`) errors.push('hacs.json: zip_release/filename passen nicht zum Release-Paket');
 
+// Markenbilder (ab HA 2026.3 aus dem Ordner brand/ der Integration)
+for (const img of ['icon.png', 'icon@2x.png', 'logo.png', 'logo@2x.png'])
+  if (!existsSync(join(ENGINE_ROOT, 'custom_components/ha_3d_dashboard/brand', img))) errors.push(`brand/${img} fehlt (node scripts/logo.mjs)`);
+
 // alle Übersetzungen mit denselben Schlüsseln
 const keys = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (typeof v === 'object' ? keys(v, `${p}${k}.`) : [`${p}${k}`])).sort();
 const de = keys(read('custom_components/ha_3d_dashboard/translations/de.json'));
@@ -25,4 +29,4 @@ if (errors.length) {
   console.error('✖ Integration:\n  ' + errors.join('\n  '));
   process.exit(1);
 }
-console.log(`✔ Integration ${manifest.domain} ${manifest.version}: Versionen, HACS-Angaben und Übersetzungen stimmen`);
+console.log(`✔ Integration ${manifest.domain} ${manifest.version}: Versionen, HACS-Angaben, Markenbilder und Übersetzungen stimmen`);
