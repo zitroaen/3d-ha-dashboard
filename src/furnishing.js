@@ -90,7 +90,34 @@ export class FurnishingLayer {
       this.group.add(hit);
     }
 
+    // Nachts fällt Licht aus erleuchteten Räumen durch die Fenster nach draußen (nur im Erdgeschoss, Schein in der
+    // Lichtfarbe der ersten Leuchte des Raums)
+    const wpools = new Builder();
+    const fl = floorModel.floor;
+    if (!fl.outdoor && Math.abs(fl.elevation || 0) < 0.5) {
+      for (const w of fl.windows || []) {
+        const lamp = lamps.find((l) => l.room === w.room);
+        if (!lamp) continue;
+        const [x0, y0, x1, y1] = w.rect;
+        const alongX = x1 - x0 >= y1 - y0;
+        const cx = (x0 + x1) / 2, cz = (y0 + y1) / 2;
+        const half = alongX ? (y1 - y0) / 2 : (x1 - x0) / 2;
+        // Außenseite: dort liegt kein Raum
+        const out = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dz]) => (alongX ? dx === 0 : dz === 0)
+          && !floorModel.roomAt([cx + dx * (half + 0.3), cz + dz * (half + 0.3)]));
+        if (!out) continue;
+        const L = alongX ? x1 - x0 : y1 - y0, depth = 1.0;
+        const pcx = cx + out[0] * (half + depth), pcz = cz + out[1] * (half + depth);
+        quad(wpools, pcx, pcz, alongX ? L / 2 + 0.5 : depth, alongX ? depth : L / 2 + 0.5, lamp.idx, 0.006);
+      }
+    }
+
     for (const m of P.build((key, kind) => this._material(key, kind))) this.group.add(m);
+    if (!wpools.empty) {
+      const m = new THREE.Mesh(wpools.geometry('lampIdx'), shared.mat.windowPool);
+      m.renderOrder = 3;
+      this.group.add(m);
+    }
     if (!contact.empty) {
       shared.contactMat ??= new THREE.MeshBasicMaterial({ map: contactTexture(), transparent: true, depthWrite: false, opacity: 0.55, color: 0x000000 });
       const m = new THREE.Mesh(contact.geometry(), shared.contactMat);

@@ -341,3 +341,17 @@ objects:
     pos: [7.9, 9.75]
     size: [1.4, 1.1, 0.35]
     params: { color: flower_yellow }
+  - id: birke
+    name: Birke
+    model: tree
+    space: garten
+    pos: [4.9, 13.4]
+    size: [2.2, 2.2, 6]
+    params: { shape: birch }
+  - id: saeulenbaum
+    name: Säulenbaum
+    model: tree
+    space: garten
+    pos: [-3.2, 13.6]
+    size: [1.2, 1.2, 4.5]
+    params: { shape: column }

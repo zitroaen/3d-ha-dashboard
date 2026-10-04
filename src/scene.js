@@ -338,8 +338,8 @@ export class HouseScene {
     this.hemi.color.copy(mix(0x525a6c, 0xc9d8ec));
     this.hemi.groundColor.copy(mix(0x1e1d1c, 0x6e6250));
     this.hemi.intensity = L(0.95, 1.05);
+    // Hintergrund und Nebel: Richtung Horizont geht der Boden in die Himmelsfarbe über (Farbe aus der Umgebung unten)
     this.scene.background.copy(mix(0x0a0d13, 0x8d9aa8));
-    this.scene.fog.color.copy(this.scene.background);
 
     // Gestirn: über dem Horizont die Sonne (bei tiefem Stand wärmer), sonst der Mond gegenüber
     const isSun = elev > -2;
@@ -360,6 +360,8 @@ export class HouseScene {
     light.position.set(this.center.x + Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d, this.center.z - Math.cos(a) * Math.cos(e) * d);
     const dir = light.position.clone().sub(this.center).normalize();
     this.scene.environment = this.skyEnv.update(day, dir, isSun, sunWarm);
+    this.scene.background.lerp(this.skyEnv.horizon, 0.35 * day);
+    this.scene.fog.color.copy(this.scene.background);
     this.scene.environmentIntensity = L(0.35, 0.75);
     this.renderer.shadowMap.needsUpdate = true;
     this.onSkyChange?.(day);

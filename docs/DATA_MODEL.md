@@ -296,7 +296,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
 | `toy_storage` | Möbel | | | `columns` |
-| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`), `color` |
+| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`, `column`, `birch`), `color` |
 | `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
 | `ball` | Leuchte | `light` | | `radius` |
 | `chandelier_candles` | Leuchte | `light` | | `arms` |
