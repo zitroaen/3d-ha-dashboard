@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FloorModel, createSharedMaterials } from './house.js';
 import { FurnishingLayer } from './furnishing.js';
-import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
+import { LightTable, lightUniforms, withRoomLight, LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from './roomlight.js';
 import { pointInPoly, heightAt } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
 import { makeGround, terrainGroundGeometry, setupTerrainShading, loadAerial, aerialSpec } from './ground.js';
@@ -234,6 +234,10 @@ export class HouseScene {
       this.scene.add(fm.group);
       this.floors.push(fm);
     }
+    // Pseudo-Raum der Außenbeleuchtung hinter allen Bereichen; die Lichttabelle wächst mit
+    this.outdoorIdx = base + 1;
+    if (this.outdoorIdx > LIGHT_TABLE_MAX) console.warn(`ha-3d-dashboard: ${base} Bereiche – höchstens ${LIGHT_TABLE_MAX - 1} bekommen Raumlicht`);
+    this._growLightTable(this.outdoorIdx);
     this._mergeLevels();
     // Dächer liegen eine Ebene über ihrem Gebäude, bekommen aber keinen eigenen Ebenen-Knopf – außer über der
     // obersten Ebene: dort zeigt ein Knopf „Dach“ alle Gebäude mit ihren Dächern
@@ -381,7 +385,7 @@ export class HouseScene {
 
   /** Globaler Raum-Index (1-basiert) für Lampen-Zuordnung; "aussen" ist ein Pseudo-Raum. */
   _roomIdx(floorId, roomId) {
-    if (roomId === 'aussen') return OUTDOOR_IDX;
+    if (roomId === 'aussen') return this.outdoorIdx;
     const fm = this.floors.find((f) => f.floor.id === floorId);
     return fm?.rooms.get(roomId)?.idx || 0;
   }
@@ -407,8 +411,9 @@ export class HouseScene {
         return d.roomIdx;
       })
       .sort((a, b) => a.roomIdx - b.roomIdx);
-    if (lamps.length > MAX_LAMPS) console.warn(`ha-3d-dashboard: nur ${MAX_LAMPS} Lampen werden dargestellt`);
-    lamps.length = Math.min(lamps.length, MAX_LAMPS);
+    if (lamps.length > LIGHT_TABLE_MAX) console.warn(`ha-3d-dashboard: nur ${LIGHT_TABLE_MAX} Lampen werden dargestellt`);
+    lamps.length = Math.min(lamps.length, LIGHT_TABLE_MAX);
+    this._growLightTable(lamps.length);
     const ranges = new Map();
     lamps.forEach((l, i) => {
       l.idx = i + 1;
@@ -1076,6 +1081,11 @@ export class HouseScene {
     this._updateLights();
     this.requestRender();
     return ids.length > 0;
+  }
+
+  /** Lichttabelle auf n Einträge vergrößern (neue Textur an die Shader geben) */
+  _growLightTable(n) {
+    if (this.lightTable.ensure(n)) lightUniforms.uLights.value = this.lightTable.texture;
   }
 
   _updateLights() {

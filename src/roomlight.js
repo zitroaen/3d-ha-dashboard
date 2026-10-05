@@ -4,29 +4,42 @@
 //
 // Lampen und Räume stehen in einer kleinen Float-Textur (statt Uniform-Arrays, die auf
 // Mobil-GPUs schnell an ihr Limit kommen):
+// Die Breite wächst mit dem Haus (ensure): Spalten = Bereiche bzw. Lampen.
 //   Zeile 0: Lampe i  -> Position (Welt) xyz, Reichweite
 //   Zeile 1: Lampe i  -> Farbe × Helligkeit (linear), 0 wenn aus
 //   Zeile 2: Raum r   -> erste Lampe, Anzahl Lampen
 //   Zeile 3: Raum r   -> Summe der Lampenfarben (für indirektes Licht / Glas)
 import * as THREE from 'three';
 
-export const MAX_ROOMS = 64;
-export const MAX_LAMPS = 128;
+// Breite der Lichttabelle: wächst mit der Zahl der Bereiche (Räume, Dächer, Außenbereiche) bzw. Lampen, in Schritten
+// von 64; höchstens LIGHT_TABLE_MAX (übliche Grenze für Texturbreiten, auch auf Tablets)
+export const LIGHT_TABLE_MAX = 4096;
 export const MAX_LAMPS_PER_ROOM = 12;
-export const OUTDOOR_IDX = MAX_ROOMS; // Pseudo-Raum für die Außenbeleuchtung
-
-const TEX_W = Math.max(MAX_ROOMS, MAX_LAMPS);
 
 export class LightTable {
-  constructor() {
-    this.data = new Float32Array(TEX_W * 4 * 4);
-    this.texture = new THREE.DataTexture(this.data, TEX_W, 4, THREE.RGBAFormat, THREE.FloatType);
+  constructor(width = 64) {
+    this._alloc(width);
+  }
+
+  _alloc(width) {
+    this.width = width;
+    this.data = new Float32Array(width * 4 * 4);
+    this.texture?.dispose();
+    this.texture = new THREE.DataTexture(this.data, width, 4, THREE.RGBAFormat, THREE.FloatType);
     this.texture.minFilter = this.texture.magFilter = THREE.NearestFilter;
     this.texture.needsUpdate = true;
   }
 
+  /** Platz für n Einträge (Bereiche oder Lampen) schaffen; true, wenn die Textur neu angelegt wurde (Inhalt leer) */
+  ensure(n) {
+    if (n <= this.width) return false;
+    this._alloc(Math.min(LIGHT_TABLE_MAX, Math.ceil(n / 64) * 64));
+    return true;
+  }
+
   _set(row, col, x, y, z, w) {
-    const o = (row * TEX_W + col) * 4;
+    if (col < 0 || col >= this.width) return;
+    const o = (row * this.width + col) * 4;
     this.data[o] = x; this.data[o + 1] = y; this.data[o + 2] = z; this.data[o + 3] = w;
   }
 
