@@ -6,6 +6,7 @@ site:
   name: Demohaus
   north_deg: 20
   ground: { surface: lawn }
+  attribution: "Luftbild und Gelände: erfunden (Demo-Haus, keine echten Geodaten)"
   terrain:
     origin: [-10, -14]
     cell: 1
@@ -514,7 +515,13 @@ objects:
     params: { radius: 0.12 }
     light: { height: 0.12, range: 2.5, color: "#9fd0ff" }
     ha: { entities: { power: light.demo_garten } }
-  - { id: apfelbaum, name: Apfelbaum, model: tree, space: garten, pos: [1.2, 14.4], size: [3.6, 3.6, 3.6], params: { shape: fruit } }
+  - id: apfelbaum
+    name: Apfelbaum
+    model: tree
+    space: garten
+    pos: [1.2, 14.4]
+    size: [3.6, 3.6, 3.6]
+    params: { shape: fruit }
   - id: kirschbaum
     name: Kirschbaum
     model: tree

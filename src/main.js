@@ -1216,7 +1216,9 @@ class Ha3dDashboard extends HTMLElement {
     const canEdit = !this.hasAttribute('readonly');
     const we = this._weatherEntity(), ws = we && this._hass?.states?.[we];
     const weather = we ? `${we}${ws ? ` (${[weatherLabel(weatherKind(ws)), temperatureText(ws)].filter(Boolean).join(', ')})` : ''}` : '';
-    this.menu.open({ canEdit, version: VERSION, source: this._source || '', quality: this.view?.quality, weather });
+    const attr = this.model?.site?.attribution;
+    const attribution = (Array.isArray(attr) ? attr : attr ? [attr] : []).map(String);
+    this.menu.open({ canEdit, version: VERSION, source: this._source || '', quality: this.view?.quality, weather, attribution });
   }
 
   /** Ansichts-Einstellungen anwenden: Tageszeit (Sonne aus HA oder fest) und Qualität */
