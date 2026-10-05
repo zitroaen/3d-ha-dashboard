@@ -464,6 +464,51 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
     objs.length === 1 && t.model === 'tree' && t.pos.join() === '5,5' && Math.abs(t.size[0] - 5) < 1 && Math.abs(t.size[2] - 8) < 0.1, JSON.stringify(objs));
 }
 
+// Einpassung an LoD2 (fit-footprint) und Dach aus LoD2 (roof-from-lod2), mit erfundenem CityGML
+{
+  const { mkdtempSync, writeFileSync: wf, readFileSync: rf, mkdirSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { execFileSync } = await import('node:child_process');
+  const dir = mkdtempSync(join(tmpdir(), 'ha3d-lod2-'));
+  mkdirSync(join(dir, 'data'));
+  // Modell: L-förmiges Haus (asymmetrisch), oberste Etage auf 0 m
+  const L = [[0, 0], [10, 0], [10, 6], [4, 6], [4, 9], [0, 9]];
+  wf(join(dir, 'data', 'model.yaml'), [
+    'schema: ha3d', 'version: 2', 'site: { name: Test, north_deg: 24 }', 'buildings:',
+    '  - id: haus', '    name: Haus', '    floors:',
+    `      - { id: eg, name: EG, level: 0, height: 2.6, walls: [], rooms: [{ id: raum, name: Raum, polygon: ${JSON.stringify(L)} }] }`,
+    'objects: []', '',
+  ].join('\n'));
+  // „Wahre“ Lage: Nord 25,4°, Ursprung bei (500100, 5400200); daraus die LoD2-Flächen
+  const truth = georef({ origin: [500100, 5400200], north_deg: 25.4, floor: 300 });
+  const pos = (pts) => `<gml:Polygon><gml:exterior><gml:LinearRing><gml:posList srsDimension="3">${[...pts, pts[0]].map((p) => p.join(' ')).join(' ')}</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon>`;
+  const g3 = (p, z) => [...truth.toGeo(p), z];
+  // Satteldach über dem 10 × 6-Teil (First entlang x, 35°), Pultdach-frei: nur dieser Teil hat ein Steildach
+  const k = Math.tan((35 * Math.PI) / 180) * 3, ze = 305.6;
+  const roofA = [g3([0, 0], ze), g3([10, 0], ze), g3([10, 3], ze + k), g3([0, 3], ze + k)];
+  const roofB = [g3([0, 3], ze + k), g3([10, 3], ze + k), g3([10, 6], ze), g3([0, 6], ze)];
+  const flat = [g3([0, 6], 303), g3([4, 6], 303), g3([4, 9], 303), g3([0, 9], 303)];
+  const gml = `<?xml version="1.0"?><core:CityModel xmlns:core="x" xmlns:bldg="y" xmlns:gml="z">
+  <core:cityObjectMember><bldg:Building gml:id="DEXX_ANDERES"><bldg:boundedBy><bldg:GroundSurface>${pos([[400000, 5000000, 0], [400010, 5000000, 0], [400010, 5000010, 0]])}</bldg:GroundSurface></bldg:boundedBy></bldg:Building></core:cityObjectMember>
+  <core:cityObjectMember><bldg:Building gml:id="DEXX_HAUS">
+    <bldg:boundedBy><bldg:GroundSurface><bldg:lod2MultiSurface>${pos(L.map((p) => g3(p, 300.1)))}</bldg:lod2MultiSurface></bldg:GroundSurface></bldg:boundedBy>
+    <bldg:boundedBy><bldg:RoofSurface>${pos(roofA)}</bldg:RoofSurface></bldg:boundedBy>
+    <bldg:boundedBy><bldg:RoofSurface>${pos(roofB)}</bldg:RoofSurface></bldg:boundedBy>
+    <bldg:boundedBy><bldg:RoofSurface>${pos(flat)}</bldg:RoofSurface></bldg:boundedBy>
+  </bldg:Building></core:cityObjectMember></core:CityModel>`;
+  wf(join(dir, 'lod2.gml'), gml);
+  execFileSync('node', [join(ENGINE_ROOT, 'scripts/fit-footprint.mjs'), join(dir, 'lod2.gml'), '--data', join(dir, 'data'), '--near', '500105,5400195', '--floor', '300', '--crs', 'EPSG:25832', '--write']);
+  const site = yaml.load(rf(join(dir, 'data', 'model.yaml'), 'utf8')).site;
+  const gr = site.georef;
+  check('LoD2-Einpassung: Nordrichtung und Plan-Ursprung gefunden, site.georef geschrieben',
+    Math.abs(gr.north_deg - 25.4) < 0.3 && Math.hypot(gr.origin[0] - 500100, gr.origin[1] - 5400200) < 0.15 && gr.floor === 300 && gr.crs === 'EPSG:25832' && site.north_deg === 24,
+    JSON.stringify(gr));
+  const out = execFileSync('node', [join(ENGINE_ROOT, 'scripts/roof-from-lod2.mjs'), join(dir, 'lod2.gml'), '--data', join(dir, 'data')], { encoding: 'utf8' });
+  const lines = out.split('\n').filter((l) => l.trim().startsWith('- {'));
+  check('Dach aus LoD2: Satteldach 35° mit First entlang x, Traufe 5,6 m; flacher Teil auf 3 m',
+    lines.length === 2 && /type: gable, pitch: 35(\.0)?, ridge: x, eaves: 5\.6/.test(lines[0]) && /type: flat, eaves: 3/.test(lines[1]), out);
+}
+
 // Magicplan-Import: Etagen drehen, Raum-IDs eindeutig, Räume teilen (Python, ohne PDF)
 {
   const { spawnSync } = await import('node:child_process');
