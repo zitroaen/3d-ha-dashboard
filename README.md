@@ -35,7 +35,7 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Lichterkette) aus dem Katalog.
 - **Wetter:** Wolken, Regen (nasse Flächen), Schnee (weiße Decke) und Nebel aus der HA-Wetter-Entity; Symbol und
   Temperatur oben, antippen zeigt die Vorhersage.
-- **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden.
+- **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden (Doppeltippen: Standardansicht).
 - **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
 - **Einstellungen (Zahnrad):** Darstellung Hell/Dunkel (Glas-Design, folgt HA), Tageszeit Automatisch/Tag/Nacht, Qualität Automatisch/Hoch/Sparsam, Bearbeiten,
   Link-Check, Version.
@@ -52,6 +52,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   mit HA-Entities verknüpfen (Liste aller Entities, vorgefiltert nach HA-Bereich), Gesten und Zustandsanzeige je
   Objekt einstellen, speichern.
 - **Link-Check:** zeigt verknüpfte und fehlende Entities.
+- **Standardansicht:** eigene Kameraperspektive festlegen; Doppeltippen auf den Kompass oder eine einstellbare
+  Inaktivität bringt sie zurück (Wand-Tablets).
 - **Daten statt Code:** Ein Modell (`model.yaml`) beschreibt Gebäude mit Etagen, Außenbereiche (Terrasse, Garten,
   Einfahrt) und alle Objekte; es wird zur Laufzeit geladen – Änderungen brauchen keinen Build. Versioniertes Format
   mit Schema, künftige Versionen werden automatisch migriert. Grundriss-Import aus Magicplan-PDF-Reports.

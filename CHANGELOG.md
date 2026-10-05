@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.22.0
+
+- **Standardansicht:** Einstellungen → „Aktuelle Ansicht als Standard“ merkt sich Ebene, Blickwinkel und Zoom (je
+  Gerät). **Doppeltippen auf den Kompass** fährt dorthin zurück (einfaches Tippen nordet weiter ein); ohne
+  festgelegte Ansicht gilt die Startansicht.
+- **Nach Inaktivität zurück:** Aus, 30 s, 1, 2 oder 5 min ohne Berührung – dann fährt die Kamera in die
+  Standardansicht (nicht im Editor und nicht bei offenen Fenstern), z. B. für Wand-Tablets.
+
 ## 0.21.0
 
 - **Magicplan-Import:** Etagen drehen (`floors.<Name>.rotate`: 90/180/270, vor dem Versatz) – Magicplan legt jede

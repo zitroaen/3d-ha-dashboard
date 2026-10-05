@@ -71,8 +71,9 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 
 ## Code-Aufbau
 
-- `src/main.js` Custom Element, Kompass, Editier-Werkzeugleiste, Link-Check, HA-Anbindung · `src/menu.js` Einstellungsmenü
-  (Zahnrad: Tageszeit, Qualität, Bearbeiten, Link-Check, Info; Ansicht pro Gerät in localStorage)
+- `src/main.js` Custom Element, Kompass (Tippen: einnorden, Doppeltippen: Standardansicht), Editier-Werkzeugleiste,
+  Link-Check, HA-Anbindung · `src/menu.js` Einstellungsmenü (Zahnrad: Tageszeit, Qualität, Bearbeiten, Link-Check,
+  Standardansicht, Info; Ansicht pro Gerät in localStorage)
 - `src/model/` Datenmodell: `model.js` (Parsen, `toScene()` = Adapter Modell → Szene, `writeBack()` Editor → Modell,
   Gesten/Aktionen), `migrate.js` (Version, Migrationen), `catalog.js` (Modellkatalog mit Fähigkeiten), `yaml.js`
   (YAML-Schreiber) · `schema/model.schema.json` JSON-Schema
@@ -265,6 +266,11 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   getestet über `tests/plan_transform_test.py` aus `npm run test:unit`): erst im eigenen Ursprung extrahieren, dann
   `rotate` (um die Umrandung der Außenwände, Ursprung bleibt links oben), dann `offset`; doppelte Raum-IDs bekommen
   das Etagenkürzel (Türen/Fenster folgen); `split` macht aus der Seite links einer Linie eine Belag-Zone (`zones`).
+- Standardansicht (0.22.0): je Gerät in den Ansichts-Einstellungen (`prefs.homeView` = `scene.getView()`: Ebene,
+  Drehpunkt, Kamera relativ dazu, Zoom, halbe Bildhöhe; `prefs.homeAfter` Sekunden). `scene.setView()` fährt sanft hin
+  und passt den Bildausschnitt bewusst nicht neu ein (sonst verschöbe `_fitFrustum` die Ansicht); ohne Standard
+  `resetView()` (Startansicht). Kompass: zweites Tippen binnen 350 ms = Standardansicht. Inaktivität: `pointerdown`/
+  `wheel`/`keydown` im Shadow-DOM starten den Zeitgeber neu; im Editor und bei offenen Fenstern wird verschoben.
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).
