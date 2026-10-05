@@ -66,6 +66,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
 | `node scripts/terrain-from-scan.mjs scan.obj --cell 0.5 --rotate … --offset x,y --floor … --write` | Höhenraster `site.terrain` aus einem LiDAR-Scan (OBJ) |
 | `node scripts/terrain-from-geotiff.mjs dgm.tif … --write` | Höhenraster aus DGM (GeoTIFF/XYZ), Einpassung `site.georef` oder `--origin/--north/--floor` |
+| `node scripts/trees-from-ndom.mjs ndom.tif … --write` | Bäume aus einem nDOM (Wipfel, Kronendurchmesser) als Objekte |
 | `node scripts/orthophoto-crop.mjs dop.tif … --write` | Luftbild `site.terrain.texture` aus einem Orthophoto (zuschneiden, in Plan-Ausrichtung drehen) |
 
 Alle Werkzeuge nehmen den Datenordner aus `DATA_DIR` (bzw. `--data` oder `ha3d.config.json` der Instanz), Standard
@@ -83,7 +84,8 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/scene.js` Kamera, Himmel (Sonne/Mond aus `sun.sun`), Render-on-demand, Antippen, Licht-Zustand
 - `src/house.js` Bauwerk einer Etage (Räume, Wände, Böden) · `src/openings.js` Fenster und Türen im Detail
   · `src/roofshape.js` Dachform (Ebenen, Flächen, Profile) · `src/roof.js` Steildach zeichnen, Wände unter der Schräge
-- `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen)
+- `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen) · `src/vegetation.js` Bäume und
+  Sträucher als Instanzen (Vorlagen je Form/Detailstufe, Variation, Detailstufen nach Bildschirmgröße)
 - `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE`
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
 - `src/environment.js` Himmel als Umgebung (PMREM, Spiegelungen)
@@ -287,3 +289,11 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Pakete (eigener TIFF-Leser: LZW/Deflate/Prädiktoren; JPEG-TIFF -> gdal_translate); Bild-Umrechnung im Test-Browser.
   Das Demo-Luftbild ist ein erfundenes SVG (Bilder außerhalb von docs/ blockt der Datenschutz-Check); im Bundle-Demo
   fehlt es (src/demo.js entfernt es).
+- Bäume als Instanzen (0.24.0): `tree`/`shrub` gehen im Haus nicht in den PartCollector, sondern über `P.plants` in
+  ein `VegetationSet` je Einrichtungs-Schicht: je Form zwei `InstancedMesh` (nah/fern) mit einer Vorlage aus
+  Vertex-Farben und `vegCrown` (Laub), ein gemeinsames Material (`patchVegetation`: Laub × `vegTint` je Instanz).
+  `roomIdx` und `vegTint` sind Instanz-Attribute; roomlight.js rechnet bei Instanzen mit `instanceMatrix`. Detailstufe
+  je Pflanze in `scene._vegetationLod()` vor jedem Bild (Kronendurchmesser × Pixel je Meter ≥ `NEAR_PX`, nur bei
+  Änderung neu verteilt, dann Schatten neu). Editor und Katalog-Vorschau bauen die Pflanze einzeln aus derselben
+  Vorlage (Laubfarbe eingebacken). Keine Sichtbarkeitsprüfung je Instanz: nah herangezoomt werden alle Pflanzen in
+  voller Stufe gezeichnet (200 Bäume ~117k Dreiecke, knapp im Budget) – bei Bedarf als Nächstes nachrüsten.
