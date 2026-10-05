@@ -581,7 +581,11 @@ Hinweise:
 2. eindeutige IDs (Gebäude, Etagen je Gebäude, Bereiche, Objekte),
 3. Verweise: `space`, `windows[].room`, `doors[].rooms`, Modelle aus dem Katalog, `light` genau bei Leuchten,
 4. Lage: jedes Objekt mit `space` liegt in dessen Polygon; Leuchten unter der Raumhöhe,
-5. Entity-IDs syntaktisch gültig, Texturen vorhanden.
+5. Entity-IDs syntaktisch gültig, Texturen (auch das Luftbild) vorhanden,
+6. Steildächer: Fenster über der Dachfläche (werden gekürzt oder weggelassen – Gaube anlegen?), Wände der obersten
+   Etage ohne Dachteil darüber,
+7. Grenzen des Raumlichts: höchstens 4095 Bereiche (Räume, Dachteile, Außenbereiche zusammen) und 4096 Leuchten; je
+   Bereich leuchten höchstens 12 Leuchten (Hinweis, wenn es mehr sind). Die Lichttabelle wächst mit dem Haus.
 
 Mit HA-Export (`ENTITIES`) prüft `npm run link-check` zusätzlich, ob die verknüpften Entities existieren.
 
@@ -734,6 +738,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **0.27.0 (ohne Formatänderung):** mehr Bereiche – die Lichttabelle wächst mit der Zahl der Bereiche und Leuchten
+  (vorher höchstens 64 Räume bzw. 128 Bereiche und Leuchten); Prüfung meldet die Grenzen.
 - **Version 2, Ergänzung (0.26.0, abwärtskompatibel, ohne neue Felder):** Fenster unter Dachschrägen werden gekürzt
   bzw. weggelassen; Prüfung warnt dazu und bei Wänden der obersten Etage ohne Dach darüber.
 - **Version 2, Ergänzung (0.25.0, abwärtskompatibel):** `site.attribution` (Quellenangaben, im Info-Menü);

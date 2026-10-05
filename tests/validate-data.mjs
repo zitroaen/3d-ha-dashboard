@@ -9,6 +9,7 @@ import { pointInPoly } from '../src/geometry.js';
 import { CATALOG, hasCapability } from '../src/model/catalog.js';
 import { parseModel, spacesOf, roleEntities, roofParts, toScene } from '../src/model/model.js';
 import { ceilingFn, windowUnderRoof } from '../src/roof.js';
+import { LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from '../src/roomlight.js';
 import { FURNITURE, LAMPS } from '../src/models.js';
 
 const errors = [], warnings = [];
@@ -113,6 +114,18 @@ for (const o of model.objects || []) {
       }
     }
   }
+}
+
+// Grenzen der Lichttabelle: Bereiche (Räume, Dachteile, Außenbereiche) + Außenlicht, Lampen, Lampen je Bereich
+{
+  const scene = toScene(model);
+  const areas = scene.house.floors.reduce((n, f) => n + f.rooms.length, 0);
+  if (areas + 1 > LIGHT_TABLE_MAX) errors.push(`${areas} Bereiche (Räume, Dachteile, Außenbereiche) – höchstens ${LIGHT_TABLE_MAX - 1} bekommen Raumlicht; Außenbereiche zusammenfassen (mit Höhenraster reichen wenige)`);
+  const lamps = scene.devices.filter((d) => d.type === 'light');
+  if (lamps.length > LIGHT_TABLE_MAX) errors.push(`${lamps.length} Leuchten – höchstens ${LIGHT_TABLE_MAX} werden dargestellt`);
+  const per = new Map();
+  for (const l of lamps) per.set(`${l.floor}/${l.room}`, (per.get(`${l.floor}/${l.room}`) || 0) + 1);
+  for (const [k, n] of per) if (n > MAX_LAMPS_PER_ROOM) warnings.push(`${k.replace(/^__aussen\//, '')}: ${n} Leuchten – nur ${MAX_LAMPS_PER_ROOM} je Bereich leuchten (Bereich teilen oder Leuchten zusammenfassen)`);
 }
 
 // Luftbild: Datei vorhanden, nur mit Höhenraster wirksam

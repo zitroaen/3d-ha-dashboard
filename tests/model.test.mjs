@@ -11,6 +11,7 @@ import { terrainGrid, clipTerrain, terrainShade, aerialTransform } from '../src/
 import { readTiff, readXyz, readWorldFile, sampleRaster, georef } from '../scripts/lib/geodata.mjs';
 import { buildRailing } from '../src/railing.js';
 import { vegTemplate, vegPlacement, REF } from '../src/vegetation.js';
+import { LightTable, LIGHT_TABLE_MAX } from '../src/roomlight.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 import { roofShape, minusConvex } from '../src/roofshape.js';
@@ -432,6 +433,17 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const b = vegPlacement({ kind: 'tree', pos: [3, 4], size: [4, 4, 6] }, 'round', () => null);
   const c = vegPlacement({ kind: 'tree', pos: [9, 1], size: [4, 4, 6] }, 'round', () => null);
   check('Pflanzen: Variation aus der Position (gleich bleibt gleich, anders variiert)', a.local.equals(b.local) && !a.local.equals(c.local) && a.crown === 4);
+}
+
+// Lichttabelle wächst mit der Zahl der Bereiche/Lampen (in 64er-Schritten, höchstens LIGHT_TABLE_MAX)
+{
+  const T = new LightTable();
+  const w0 = T.width, grew = T.ensure(300), w1 = T.width, same = T.ensure(200);
+  T.setRoomRange(290, 5, 2);
+  const o = T.data[(2 * T.width + 289) * 4];
+  T.ensure(1e6);
+  check('Lichttabelle: 64 -> 320 Spalten für 300 Bereiche, Raum 290 eingetragen, Obergrenze',
+    w0 === 64 && grew && w1 === 320 && !same && T.width === LIGHT_TABLE_MAX && o === 5, `${w0} ${w1} ${T.width}`);
 }
 
 // nDOM -> Bäume: Wipfel, Kronendurchmesser, Gebäude ausgespart
