@@ -311,3 +311,8 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   niedrigste Wandoberkante (`ceilingFn`) über die Fensterbreite: kürzen (5 cm darunter) oder weglassen (< 30 cm über
   der Brüstung; die Öffnung wird als volle Wand gezeichnet, vom Dach gekappt), unter einer Gaube (`roofCut[].dormers`)
   immer weglassen. Die Prüfung meldet dieselben Fälle und Wände der obersten Etage ohne Dachteil darüber.
+- Lichttabelle dynamisch (0.27.0): `LightTable.ensure(n)` legt die Float-Textur bei Bedarf breiter an (64er-Schritte,
+  höchstens `LIGHT_TABLE_MAX` = 4096); `scene._growLightTable` gibt die neue Textur an das gemeinsame Uniform
+  `uLights` (die Shader lesen per texelFetch, unabhängig von der Breite). Der Pseudo-Raum `aussen` ist
+  `scene.outdoorIdx` = Zahl der Bereiche + 1 (vorher fest 64 – kollidierte ab 64 Bereichen). 12 Leuchten je Bereich
+  bleiben die Schleifengrenze im Shader.

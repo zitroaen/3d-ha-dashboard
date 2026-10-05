@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.27.0
+
+- **Mehr Bereiche:** Die Lichttabelle wächst mit dem Haus (Spalten = Bereiche bzw. Leuchten, in 64er-Schritten, bis
+  4096) – vorher endete das Raumlicht bei 128 Bereichen (Räume + Dächer + Außenbereiche), danach überschrieben sich
+  die Einträge. `npm run validate` meldet verständlich, wenn eine Grenze erreicht ist (auch mehr als 12 Leuchten in
+  einem Bereich).
+
 ## 0.26.0
 
 - **Fenster unter Steildächern:** Fenster in Wänden, die unter der Dachfläche enden (Kniestock), ragen nicht mehr
