@@ -316,3 +316,8 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   `uLights` (die Shader lesen per texelFetch, unabhängig von der Breite). Der Pseudo-Raum `aussen` ist
   `scene.outdoorIdx` = Zahl der Bereiche + 1 (vorher fest 64 – kollidierte ab 64 Bereichen). 12 Leuchten je Bereich
   bleiben die Schleifengrenze im Shader.
+- Garten-Katalog (0.28.0): prozedural in `src/models.js`; lange Objekte (`fence`, `power_line`, `hedge`) entlang
+  `linePath()` (gerade oder `path`) und mit `groundAt` aus furnishing.js auf dem Gelände, ohne Kontaktschatten.
+  Farben bewusst aus vorhandenen Materialien (Eiche hell, Regentonnen-Grün, Alu dunkel, Laub) – Ebene 2 des
+  Demo-Hauses liegt damit genau am Budget (145; neu ist nur das Netz des Trampolins). Weitere Modelle: erst Material
+  teilen oder zusammenfassen.

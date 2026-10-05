@@ -1,5 +1,14 @@
 # Änderungen
 
+## 0.28.0
+
+- **Garten-Katalog:** Schaukel (`swing`), Rutsche (`slide`), Spielturm mit Rutsche (`climbing_frame`), Trampolin mit
+  Netz (`trampoline`), Sandkasten (`sandbox`), Hochbeet aus Holz (`raised_bed`), Komposter (`compost`), Zaun
+  (`fence`: Lattenzaun, Maschendraht, Stabgitter – entlang einer Linie oder eines Pfads) und Freileitung
+  (`power_line`: Holzmasten mit durchhängenden Seilen). Zaun und Freileitung folgen dem Gelände; alle mit
+  Katalog-Vorschau. Möglichst vorhandene Materialien (Leistungsbudget).
+- Demo-Haus: Spielwiese östlich der Garage, Lattenzaun, Freileitung am Feldweg.
+
 ## 0.27.0
 
 - **Mehr Bereiche:** Die Lichttabelle wächst mit dem Haus (Spalten = Bereiche bzw. Leuchten, in 64er-Schritten, bis
