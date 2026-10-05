@@ -574,14 +574,29 @@ try {
   await settle(page, atHome, home);
   const backByTap = await page.evaluate(atHome, home);
   // nach Inaktivität (hier 1 s) wieder zurück
+  // erst woanders hinschauen und warten, bis die Kamera steht (faceNorth läuft im nächsten Bild – auf langsamer
+  // CI-Grafik sonst womöglich nach dem Zeitgeber), dann den Zeitgeber scharf schalten
   await page.evaluate(() => {
     const p = window.panel;
     p.setLevel(0);
     p.view.faceNorth(0);
+    p.view._anim?.finish();
+  });
+  await steady(page);
+  await page.evaluate(() => {
+    const p = window.panel;
     p._applyPrefs({ ...p.prefs, homeAfter: '1' });
   });
   await settle(page, atHome, home);
   const backByIdle = await page.evaluate(atHome, home);
+  // zur Diagnose, falls es scheitert: aktuelle Ansicht und was den Zeitgeber aufhalten könnte
+  const idleState = await page.evaluate(() => {
+    const p = window.panel;
+    return {
+      view: p.view.getView(), homeAfter: p.prefs?.homeAfter, timer: !!p._idleTimer, editing: p.hasAttribute('editing'), menu: !!p.menu?.isOpen,
+      open: [...p.shadowRoot.querySelectorAll('.show')].map((e) => e.className), connected: p.isConnected,
+    };
+  });
   await page.evaluate(() => {
     const p = window.panel;
     p.menu.prefs = { ...p.menu.prefs, homeAfter: '0', homeView: null };
@@ -590,7 +605,7 @@ try {
   });
   ok(home?.level === 1 && near(home.zoom, 1.7) && backByTap && backByIdle,
     'Standardansicht: festlegen, Doppeltippen auf den Kompass und Inaktivität bringen Ebene, Blickwinkel und Zoom zurück',
-    `Standardansicht: ${JSON.stringify(home)} Doppeltippen=${backByTap} Inaktivität=${backByIdle}`);
+    `Standardansicht: ${JSON.stringify(home)} Doppeltippen=${backByTap} Inaktivität=${backByIdle} jetzt=${JSON.stringify(idleState)}`);
 
   // ---------------- Leistungsanzeige ----------------
   await page.evaluate(() => window.panel._applyPrefs({ ...window.panel.prefs, fps: 'on' }));
