@@ -65,6 +65,8 @@ export const PALETTE = {
   alu: { color: 0xc4c7ca, roughness: 0.35, metalness: 0.7 },
   // Innenausstattung
   glass_cab: { color: 0xc9dde4, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false },
+  // Garten-Spielgeräte und -Bauten
+  net: { color: 0x2b2d30, roughness: 0.8, transparent: true, opacity: 0.35, depthWrite: false },
   // Bäume und Sträucher (src/vegetation.js): Farben stecken in der Geometrie
   veg: { color: 0xffffff, roughness: 0.9, vertexColors: true },
 };
@@ -236,6 +238,25 @@ export class PartCollector {
 // Möbel. Signatur: (P, item) — P ist bereits auf Position/Drehung/Raum des Möbels gesetzt.
 // item.size = [Breite, Tiefe, Höhe] überschreibt die Standardmaße, soweit das Modell es nutzt.
 // ---------------------------------------------------------------------------------------------
+
+/** Strecken einer Linie (Zaun, Hecke, Freileitung): params.path (Punkte relativ zur Position) oder gerade entlang x */
+function linePath(it, L) {
+  const path = Array.isArray(it.path) && it.path.length >= 2 ? it.path : [[-L / 2, 0], [L / 2, 0]];
+  return path.slice(1).map((b, i) => [path[i], b]);
+}
+
+/** Rutschfläche von (x0, h) hinab nach (x1, 0) entlang +x, mit Seitenwangen */
+function slideAt(P, color, x0, x1, h, w) {
+  const len = Math.hypot(x1 - x0, h), ang = Math.atan2(h, x1 - x0);
+  const m = new THREE.Matrix4().makeRotationZ(-ang).setPosition((x0 + x1) / 2, h / 2 + 0.05, 0);
+  P.add(new THREE.BoxGeometry(len, 0.03, w), color, 'lit', m);
+  for (const z of [-w / 2, w / 2]) {
+    P.add(new THREE.BoxGeometry(len, 0.14, 0.03), color, 'lit', new THREE.Matrix4().makeRotationZ(-ang).setPosition((x0 + x1) / 2, h / 2 + 0.12, z));
+  }
+  // Auslauf und Stützen
+  P.box(color, 0.4, 0.03, w, x1 + 0.15, 0.2, 0);
+  P.rod('alu_dark', [x1 - 0.1, 0, 0], [x1 - 0.1, 0.25, 0], 0.025, { seg: 6 });
+}
 
 /** Baum oder Strauch im Einzelaufbau: Vorlage der nahen Detailstufe mit Variation und Farbe wie im Haus */
 function plant(P, it) {
@@ -555,6 +576,220 @@ export const FURNITURE = {
       g.applyMatrix4(new THREE.Matrix4().makeRotationY(-Math.atan2(bz - az, bx - ax)).setPosition((ax + bx) / 2, H / 2, (az + bz) / 2));
       for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + groundAt(p.getX(i), p.getZ(i)));
       P.add(g, s % 2 ? 'leaf_green' : c);
+    }
+  },
+
+  /** Schaukel: size = [Breite, Tiefe, Höhe]; params.seats (1 oder 2), params.color = Sitzbrett */
+  swing(P, it) {
+    const [W, D, H] = [it.size?.[0] ?? 2.4, it.size?.[1] ?? 1.6, it.size?.[2] ?? 2.2];
+    const n = Math.max(1, Math.min(3, it.seats ?? 2));
+    // A-Gestell aus Rundhölzern an beiden Enden, Querbalken oben
+    for (const sx of [-1, 1]) {
+      const x = (sx * W) / 2;
+      for (const sz of [-1, 1]) P.rod('oak_light', [x, 0, (sz * D) / 2], [x, H, 0], 0.05, { seg: 8 });
+      P.rod('oak_light', [x, H * 0.35, -D * 0.33], [x, H * 0.35, D * 0.33], 0.035, { seg: 6 });
+    }
+    P.rod('oak_light', [-W / 2 - 0.1, H, 0], [W / 2 + 0.1, H, 0], 0.06, { seg: 8 });
+    for (let i = 0; i < n; i++) {
+      const x = -W / 2 + ((i + 0.5) * W) / n, seat = 0.45;
+      for (const dx of [-0.2, 0.2]) P.rod('alu_dark', [x + dx, H, 0], [x + dx, seat + 0.03, 0], 0.008, { seg: 4 });
+      P.box(it.color || 'barrel_green', 0.45, 0.04, 0.18, x, seat, 0);
+    }
+  },
+
+  /** Rutsche: size = [Länge, Breite, Höhe der Plattform]; Leiter hinten (−x), Rutschfläche nach +x; params.color */
+  slide(P, it) {
+    const [L, W, H] = [it.size?.[0] ?? 3, it.size?.[1] ?? 0.55, it.size?.[2] ?? 1.5];
+    const lx = -L / 2, top = lx + 0.6;
+    slideAt(P, it.color || 'barrel_green', top, L / 2, H, W);
+    // Leiter mit Holmen und Sprossen
+    for (const z of [-W / 2, W / 2]) {
+      P.rod('alu_dark', [lx, 0, z], [top - 0.1, H + 0.6, z], 0.025, { seg: 6 });
+    }
+    for (let k = 1; k <= 5; k++) {
+      const t = k / 6, x = lx + (top - 0.1 - lx) * t, y = (H + 0.6) * t;
+      if (y < H + 0.05) P.rod('alu_dark', [x, y, -W / 2], [x, y, W / 2], 0.018, { seg: 4 });
+    }
+    P.box('oak_light', 0.4, 0.05, W + 0.1, top - 0.15, H - 0.05, 0);
+  },
+
+  /** Spielturm mit Plattform, Dach, Leiter und Rutsche: size = [Breite, Tiefe, Höhe]; params.color (Dach), params.slide */
+  climbing_frame(P, it) {
+    const [W, D, H] = [it.size?.[0] ?? 1.5, it.size?.[1] ?? 1.5, it.size?.[2] ?? 2.9];
+    const deck = Math.min(1.5, H * 0.45);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.box('oak_light', 0.09, H * 0.82, 0.09, (sx * (W - 0.09)) / 2, 0, (sz * (D - 0.09)) / 2);
+    P.box('oak_light', W, 0.05, D, 0, deck, 0); // Plattform
+    // Geländer auf drei Seiten (vorne offen für die Rutsche)
+    for (const [x, z, w, d] of [[0, -D / 2, W, 0.04], [-W / 2, 0, 0.04, D], [W / 2, 0, 0.04, D]]) P.box('oak_light', w, 0.08, d, x, deck + 0.6, z);
+    for (let k = 0; k < 5; k++) P.box('oak_light', 0.04, 0.6, 0.04, -W / 2 + 0.1 + k * ((W - 0.2) / 4), deck, -D / 2);
+    // Satteldach (First entlang z), zwei geneigte Platten
+    const yr = H * 0.82, rh = H - yr, half = W / 2 + 0.1, slope = Math.hypot(half, rh), ang = Math.atan2(rh, half);
+    for (const sx of [-1, 1]) {
+      const m = new THREE.Matrix4().makeRotationZ(-sx * ang).setPosition((sx * half) / 2, yr + rh / 2, 0);
+      P.add(new THREE.BoxGeometry(slope, 0.03, D + 0.2), it.color || 'leaf_green', 'lit', m); // grünes Dach (vorhandenes Material)
+    }
+    if (it.slide !== false) slideAt(P, 'barrel_green', W / 2, W / 2 + deck * 1.9, deck, 0.5);
+    // Leiter hinten
+    for (const x of [-0.25, 0.25]) P.rod('oak_light', [x, 0, -D / 2 - 0.5], [x, deck, -D / 2], 0.03, { seg: 6 });
+    for (let k = 1; k <= 4; k++) {
+      const t = k / 5;
+      P.rod('oak_light', [-0.25, deck * t, -D / 2 - 0.5 * (1 - t)], [0.25, deck * t, -D / 2 - 0.5 * (1 - t)], 0.02, { seg: 4 });
+    }
+  },
+
+  /** Trampolin: size = [Durchmesser, –, Höhe des Rahmens]; params.net (Sicherheitsnetz, Standard an) */
+  trampoline(P, it) {
+    const Dm = it.size?.[0] ?? 3, H = it.size?.[2] ?? 0.8, r = Dm / 2;
+    P.add(new THREE.TorusGeometry(r, 0.04, 6, 32).rotateX(Math.PI / 2), 'alu_dark', 'lit', new THREE.Matrix4().makeTranslation(0, H, 0));
+    P.cyl('black_matte', r * 0.9, r * 0.9, 0.01, 0, H - 0.01, 0, { seg: 32 });
+    P.add(new THREE.CylinderGeometry(r, r * 0.9, 0.012, 32, 1, true), 'barrel_green', 'lit', new THREE.Matrix4().makeTranslation(0, H + 0.005, 0)); // Randabdeckung
+    const legs = 6;
+    for (let i = 0; i < legs; i++) {
+      const a = (i / legs) * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
+      P.rod('alu_dark', [x, 0, z], [x, H, z], 0.025, { seg: 6 });
+      if (it.net !== false) P.rod('alu_dark', [x, H, z], [x * 0.98, H + 1.7, z * 0.98], 0.02, { seg: 6 });
+    }
+    if (it.net !== false) {
+      P.add(new THREE.CylinderGeometry(r * 0.98, r, 1.6, 32, 1, true), 'net', 'lit', new THREE.Matrix4().makeTranslation(0, H + 0.85, 0));
+      P.add(new THREE.TorusGeometry(r * 0.98, 0.02, 4, 32).rotateX(Math.PI / 2), 'alu_dark', 'lit', new THREE.Matrix4().makeTranslation(0, H + 1.7, 0));
+    }
+  },
+
+  /** Sandkasten mit Holzrahmen (Sitzbrettern): size = [Breite, Tiefe, Höhe] */
+  sandbox(P, it) {
+    const [W, D, H] = [it.size?.[0] ?? 1.5, it.size?.[1] ?? 1.5, it.size?.[2] ?? 0.3];
+    for (const [x, z, w, d] of [[0, -D / 2 + 0.06, W, 0.12], [0, D / 2 - 0.06, W, 0.12], [-W / 2 + 0.06, 0, 0.12, D - 0.24], [W / 2 - 0.06, 0, 0.12, D - 0.24]]) {
+      P.box('oak_light', w, H, d, x, 0, z);
+      P.box('oak_light', w + (w > d ? 0.04 : 0.1), 0.025, d + (d > w ? 0.04 : 0.1), x, H, z); // Sitzbrett
+    }
+    P.box('oak_light', W - 0.24, H * 0.8, D - 0.24, 0, 0, 0); // Sand (vorhandenes Material: kein Zeichenaufruf mehr)
+  },
+
+  /** Hochbeet aus Holz: size = [Länge, Breite, Höhe]; Erde oben, params.color = Holz */
+  raised_bed(P, it) {
+    const [L, W, H] = [it.size?.[0] ?? 2, it.size?.[1] ?? 0.8, it.size?.[2] ?? 0.7];
+    const wood = it.color || 'oak_light', n = Math.max(2, Math.round(H / 0.15));
+    for (let k = 0; k < n; k++) {
+      const y = (k * H) / n, h = H / n - 0.01;
+      P.box(wood, L, h, 0.04, 0, y, -W / 2 + 0.02);
+      P.box(wood, L, h, 0.04, 0, y, W / 2 - 0.02);
+      P.box(wood, 0.04, h, W - 0.08, -L / 2 + 0.02, y, 0);
+      P.box(wood, 0.04, h, W - 0.08, L / 2 - 0.02, y, 0);
+    }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.box('wood_dark', 0.07, H + 0.02, 0.07, sx * (L / 2 - 0.035), 0, sz * (W / 2 - 0.035));
+    P.box('wood_dark', L - 0.08, 0.03, W - 0.08, 0, H - 0.08, 0); // Erde
+  },
+
+  /** Komposter aus Latten (offene Front oben): size = [Breite, Tiefe, Höhe] */
+  compost(P, it) {
+    const [W, D, H] = [it.size?.[0] ?? 1, it.size?.[1] ?? 1, it.size?.[2] ?? 0.85];
+    const n = Math.max(3, Math.round(H / 0.12));
+    for (let k = 0; k < n; k++) {
+      const y = (k * H) / n, h = H / n - 0.03;
+      if (k < n - 2) P.box('wood_dark', W, h, 0.03, 0, y, D / 2 - 0.015); // Front unten geschlossen
+      P.box('wood_dark', W, h, 0.03, 0, y, -D / 2 + 0.015);
+      P.box('wood_dark', 0.03, h, D, -W / 2 + 0.015, y, 0);
+      P.box('wood_dark', 0.03, h, D, W / 2 - 0.015, y, 0);
+    }
+    P.blob('bark', W * 0.42, H * 0.25, D * 0.42, 0, H * 0.55, 0, { seg: 8 }); // Kompost
+  },
+
+  /**
+   * Zaun entlang einer Linie: size = [Länge, –, Höhe] entlang der lokalen x-Achse oder params.path (Punkte relativ zur
+   * Position); params.style = wood (Lattenzaun, Standard), chain_link (Maschendraht), bars (Stabgitter);
+   * params.color. Pfosten alle 2 m bzw. 2,5 m, folgt dem Gelände.
+   */
+  fence(P, it, { groundAt = () => 0 } = {}) {
+    const L = it.size?.[0] ?? 6, H = it.size?.[2] ?? (it.style === 'bars' ? 1.2 : 1.0);
+    const style = it.style || 'wood';
+    const post = style === 'wood' ? 'oak_light' : 'alu_dark';
+    const color = it.color || (style === 'wood' ? 'oak_light' : style === 'bars' ? 'alu_dark' : 'steel_dark');
+    const spacing = style === 'wood' ? 2 : 2.5;
+    for (const [a, b] of linePath(it, L)) {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len < 0.05) continue;
+      const n = Math.max(1, Math.round(len / spacing));
+      const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      const g = (p) => groundAt(p[0], p[1]);
+      for (let k = 0; k <= n; k++) {
+        const p = at(k / n), y = g(p);
+        P.box(post, 0.08, H + 0.08, 0.08, p[0], y, p[1]);
+      }
+      for (let k = 0; k < n; k++) {
+        const p = at(k / n), q = at((k + 1) / n), yp = g(p), yq = g(q);
+        if (style === 'wood') {
+          // zwei Querriegel, senkrechte Latten alle 12 cm
+          for (const f of [0.25, 0.75]) P.rod(post, [p[0], yp + H * f, p[1]], [q[0], yq + H * f, q[1]], 0.025, { seg: 4 });
+          const m = Math.max(1, Math.floor(Math.hypot(q[0] - p[0], q[1] - p[1]) / 0.12));
+          for (let j = 1; j < m; j++) {
+            const r = [p[0] + ((q[0] - p[0]) * j) / m, p[1] + ((q[1] - p[1]) * j) / m], y = g(r);
+            P.box(color, 0.08, H - 0.05, 0.018, r[0], y + 0.05, r[1], { rotY: -Math.atan2(q[1] - p[1], q[0] - p[0]) });
+          }
+        } else if (style === 'bars') {
+          // Doppelstabmatte: zwei waagrechte Doppelstäbe, senkrechte Stäbe alle 5 cm
+          for (const f of [0.05, 0.5, 0.95]) P.rod(color, [p[0], yp + H * f, p[1]], [q[0], yq + H * f, q[1]], 0.008, { seg: 4 });
+          const m = Math.max(1, Math.floor(Math.hypot(q[0] - p[0], q[1] - p[1]) / 0.05));
+          for (let j = 1; j < m; j++) {
+            const r = [p[0] + ((q[0] - p[0]) * j) / m, p[1] + ((q[1] - p[1]) * j) / m], y = g(r);
+            P.rod(color, [r[0], y + 0.02, r[1]], [r[0], y + H, r[1]], 0.005, { seg: 3 });
+          }
+        } else {
+          // Maschendraht: Spanndrähte und halbdurchsichtiges Geflecht
+          for (const f of [0.08, 0.5, 0.97]) P.rod(color, [p[0], yp + H * f, p[1]], [q[0], yq + H * f, q[1]], 0.006, { seg: 3 });
+          const geo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(p[0], yp + 0.05, p[1]), new THREE.Vector3(q[0], yq + 0.05, q[1]), new THREE.Vector3(q[0], yq + H, q[1]),
+            new THREE.Vector3(p[0], yp + 0.05, p[1]), new THREE.Vector3(q[0], yq + H, q[1]), new THREE.Vector3(p[0], yp + H, p[1]),
+          ]);
+          const back = geo.clone();
+          back.index = null;
+          const pos = back.attributes.position;
+          for (let v = 0; v < pos.count; v += 3) {
+            const tx = pos.getX(v + 1), ty = pos.getY(v + 1), tz = pos.getZ(v + 1);
+            pos.setXYZ(v + 1, pos.getX(v + 2), pos.getY(v + 2), pos.getZ(v + 2));
+            pos.setXYZ(v + 2, tx, ty, tz);
+          }
+          P.add(geo, 'net');
+          P.add(back, 'net');
+        }
+      }
+    }
+  },
+
+  /**
+   * Freileitung: Holzmasten entlang einer Linie (size[0] = Länge, oder params.path), Abstand params.span (Standard
+   * 30 m), Höhe size[2] (8 m); params.wires (3) durchhängende Seile zwischen den Mastspitzen, folgt dem Gelände.
+   */
+  power_line(P, it, { groundAt = () => 0 } = {}) {
+    const L = it.size?.[0] ?? 60, H = it.size?.[2] ?? 8, span = it.span ?? 30, wires = Math.max(1, Math.min(5, it.wires ?? 3));
+    const pts = [];
+    for (const [a, b] of linePath(it, L)) {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const n = Math.max(1, Math.round(len / span));
+      for (let k = pts.length ? 1 : 0; k <= n; k++) pts.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+    }
+    const tops = pts.map((p, i) => {
+      const y = groundAt(p[0], p[1]);
+      P.cyl('bark', 0.11, 0.14, H, p[0], y, p[1], { seg: 8 });
+      // Querträger quer zur Leitung
+      const q = pts[Math.min(i + 1, pts.length - 1)], o = pts[Math.max(i - 1, 0)];
+      const dx = q[0] - o[0], dz = q[1] - o[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l;
+      const cw = 0.4 * (wires - 1) + 0.3;
+      P.rod('bark', [p[0] - nx * cw / 2, y + H - 0.4, p[1] - nz * cw / 2], [p[0] + nx * cw / 2, y + H - 0.4, p[1] + nz * cw / 2], 0.05, { seg: 6 });
+      return { p, y: y + H - 0.32, n: [nx, nz] };
+    });
+    for (let i = 0; i + 1 < tops.length; i++) {
+      const A = tops[i], B = tops[i + 1];
+      const len = Math.hypot(B.p[0] - A.p[0], B.p[1] - A.p[1]), sag = Math.min(1.2, len * 0.025);
+      for (let w = 0; w < wires; w++) {
+        const off = (w - (wires - 1) / 2) * 0.4;
+        const pa = [A.p[0] + A.n[0] * off, A.p[1] + A.n[1] * off], pb = [B.p[0] + B.n[0] * off, B.p[1] + B.n[1] * off];
+        const seg = 10;
+        for (let k = 0; k < seg; k++) {
+          const t0 = k / seg, t1 = (k + 1) / seg;
+          const Y = (t) => A.y + (B.y - A.y) * t - sag * 4 * t * (1 - t); // Parabel als Kettenlinie
+          P.rod('alu_dark', [pa[0] + (pb[0] - pa[0]) * t0, Y(t0), pa[1] + (pb[1] - pa[1]) * t0], [pa[0] + (pb[0] - pa[0]) * t1, Y(t1), pa[1] + (pb[1] - pa[1]) * t1], 0.012, { seg: 3 });
+        }
+      }
     }
   },
 

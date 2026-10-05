@@ -17,7 +17,7 @@ const GLOW_OFF = { shade: 0x8f897d, bulb: 0x7d786f, disc: 0x1f1e1c };
 const glowOff = (key) => GLOW_OFF[key] ?? (/#[0-9a-f]{6}$/i.test(key) ? Number.parseInt(key.slice(-6), 16) : 0x777777);
 
 // Kein Kontaktschatten: liegt flach am Boden oder hängt an der Wand
-const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door', 'wall_clock']);
+const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door', 'wall_clock', 'fence', 'power_line', 'hedge']);
 
 /** Weicher Kontaktschatten (Alpha-Verlauf, Rechteck mit runden Ecken), einmal pro Szene */
 function contactTexture() {
