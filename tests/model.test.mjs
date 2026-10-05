@@ -284,6 +284,14 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
     t.origin.join() === '7,0' && t.heights.length === 5 && t.heights.every((r) => r.join() === '0.3,0.2,0.1,0'), JSON.stringify(t));
 }
 
+// Magicplan-Import: Etagen drehen, Raum-IDs eindeutig, Räume teilen (Python, ohne PDF)
+{
+  const { spawnSync } = await import('node:child_process');
+  const py = ['python3', 'python'].find((c) => spawnSync(c, ['--version']).status === 0);
+  const r = py ? spawnSync(py, [join(ENGINE_ROOT, 'tests/plan_transform_test.py')], { encoding: 'utf8' }) : null;
+  check('Magicplan-Import: Umformungen (tests/plan_transform_test.py)', r?.status === 0, py ? r.stdout + r.stderr : 'kein Python gefunden');
+}
+
 if (failed) {
   console.error(`\n✖ ${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

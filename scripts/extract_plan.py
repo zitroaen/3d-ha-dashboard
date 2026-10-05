@@ -13,14 +13,20 @@ Deckenhöhen ("DECKENHÖHE: 2.50 m") kommen aus dem Seitentext.
 Optionale Konfiguration (JSON), alles optional:
     {
       "building": { "id": "haus", "name": "Wohnhaus", "kind": "house" },
-      "floors": { "Erdgeschoss": { "id": "eg", "level": 0, "elevation": 0, "offset": [0, 0] } },
+      "floors": { "Erdgeschoss": { "id": "eg", "level": 0, "elevation": 0, "rotate": 0, "offset": [0, 0],
+                                   "room_ids": { "Bad": "bad_eg" },               # nur in dieser Etage
+                                   "split": [{ "room": "kueche", "line": [[3.2, 0], [3.2, 4]], "surface": "flagstone" }] } },
       "room_ids": { "Badezimmer": "bad" },              # Magicplan-Name -> Raum-ID (sonst aus dem Namen)
       "surface": { "bad": "tiles" },                    # Raum-ID -> Bodenbelag (sonst nach Raumname geraten)
       "front_door_rooms": ["diele"]                     # Außentüren dieser Räume massiv (sonst verglast)
     }
-Mehrere Etagen: Jede Etage bekommt ihren eigenen Ursprung (linke obere Ecke ihrer Außenwände); die Lage der
-Etagen zueinander ("offset": [dx, dy] je Etage, in Grundstückskoordinaten), Ebene ("level", sonst Reihenfolge im
-Report) und Höhe ("elevation") bitte in der Konfiguration setzen. Raum-IDs müssen im ganzen Modell eindeutig sein.
+Mehrere Etagen: Jede Etage bekommt ihren eigenen Ursprung (linke obere Ecke ihrer Außenwände). Magicplan legt jede
+Etage mit eigener Ausrichtung ab: "rotate" (90, 180, 270 Grad im Uhrzeigersinn, um die Umrandung der Etage) dreht
+sie vor dem Versatz; die Lage zueinander ("offset": [dx, dy] je Etage, in Grundstückskoordinaten), Ebene ("level",
+sonst Reihenfolge im Report) und Höhe ("elevation") bitte in der Konfiguration setzen. Raum-IDs müssen im ganzen
+Modell eindeutig sein: "room_ids" gibt es global und je Etage; kommt eine ID trotzdem in einer früheren Etage vor,
+bekommt sie das Etagenkürzel vorangestellt (og_bad). "split" teilt einen Raum an einer Linie (Plan-Koordinaten wie in
+der Debug-Grafik, nach Drehung und Versatz): die Seite links der Linie wird eine Belag-Zone mit "surface".
 
 Benötigt: pip install pymupdf
 """
@@ -152,7 +158,7 @@ def signed_area(poly):
 
 def extract_floor(doc, fid, cfg, conf):
     M_PER_PT = cfg["scale"] or 25.4 / 72 / 1000 * 95
-    room_ids = conf.get("room_ids", {})
+    room_ids = {**conf.get("room_ids", {}), **cfg.get("room_ids", {})}
     floor_material = conf.get("surface", conf.get("floor_material", {}))
     front_rooms = set(conf.get("front_door_rooms", []))
     plan = doc[cfg["plan_page"]].get_drawings()
@@ -357,6 +363,10 @@ def debug_svg(floor, path):
         cx = sum(p[0] for p in r["polygon"]) / len(r["polygon"]) * s
         cy = sum(p[1] for p in r["polygon"]) / len(r["polygon"]) * s
         out.append(f'<text x="{cx}" y="{cy}" text-anchor="middle">{r["id"]}</text>')
+    for r in floor["rooms"]:
+        for z in r.get("zones", []):  # Belag-Zonen (split) gestrichelt
+            pts = " ".join(f"{x * s},{y * s}" for x, y in z["polygon"])
+            out.append(f'<polygon points="{pts}" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="6 4"/>')
     for w in floor["walls"]:
         pts = " ".join(f"{x * s},{y * s}" for x, y in w)
         out.append(f'<polygon points="{pts}" fill="#111" fill-opacity="0.85"/>')
@@ -379,6 +389,8 @@ def to_v2_floor(f):
         room = {"id": r["id"], "name": r["name"], "polygon": r["polygon"], "surface": r["floor"]}
         if r.get("ceiling"):
             room["height"] = r["ceiling"]
+        if r.get("zones"):
+            room["zones"] = r["zones"]
         rooms.append(room)
     doors = []
     for d in f["doors"]:
@@ -408,14 +420,21 @@ def main():
     if not detected:
         sys.exit("Keine Etagenseite gefunden (Überschrift '▼<Etage>' mit 'RÄUME:' darunter) – ist das ein Magicplan-Report?")
     floors = []
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from plan_transform import rotate_floor, translate_floor, unique_room_ids, split_rooms
     for level, cfg in enumerate(detected):
         fc = floor_conf.get(cfg["name"], {})
         fid = fc.get("id") or FLOOR_IDS.get(cfg["name"].lower()) or slug(cfg["name"])
-        cfg.update(level=fc.get("level", level), elevation=fc.get("elevation", 0.0), offset=fc.get("offset", [0, 0]))
-        floors.append(extract_floor(doc, fid, cfg, conf))
-        floors[-1]["ceiling"] = cfg["ceiling"]
+        # erst im eigenen Ursprung extrahieren, dann drehen und verschieben
+        cfg.update(level=fc.get("level", level), elevation=fc.get("elevation", 0.0), offset=[0, 0], room_ids=fc.get("room_ids", {}))
+        f = extract_floor(doc, fid, cfg, conf)
+        f["ceiling"] = cfg["ceiling"]
+        translate_floor(rotate_floor(f, fc.get("rotate", 0)), fc.get("offset", [0, 0]))
+        floors.append(f)
+    unique_room_ids(floors)
+    for f, cfg in zip(floors, detected):
+        split_rooms(f, floor_conf.get(cfg["name"], {}).get("split"))
     house = {"floors": floors}
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
     from house_fixes import fix_house  # Fensterbänder zusammenfassen, Wandstreifen entfernen
     fix_house(house)
     b = conf.get("building", {})
