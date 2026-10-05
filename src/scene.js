@@ -1,6 +1,7 @@
 // three.js-Szene: Kamera, Licht, Umgebung, Render-on-demand, Antippen von Räumen und Lampen.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FloorModel, createSharedMaterials } from './house.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
@@ -184,9 +185,55 @@ export class HouseScene {
       this.scene.add(fm.group);
       this.floors.push(fm);
     }
-    // Dächer liegen eine Ebene über ihrem Gebäude, bekommen aber keinen eigenen Ebenen-Knopf
+    this._mergeLevels();
+    // Dächer liegen eine Ebene über ihrem Gebäude, bekommen aber keinen eigenen Ebenen-Knopf – außer über der
+    // obersten Ebene: dort zeigt ein Knopf „Dach“ alle Gebäude mit ihren Dächern
     this.levels = [...new Set(this.floors.filter((f) => !f.floor.roof).map((f) => f.floor.level ?? 0))].sort((a, b) => a - b);
+    const roofTop = Math.max(...this.floors.filter((f) => f.floor.roof).map((f) => f.floor.level ?? 0));
+    if (this.levels.length && roofTop > this.levels.at(-1)) this.levels.push(roofTop);
     this.setLevel(this.levels.includes(0) ? 0 : this.levels[0], { silent: true });
+  }
+
+  /**
+   * Zeichenaufrufe sparen: Etagen derselben Ebene sind immer gemeinsam sichtbar – ihre Bauwerk-Meshes mit gleichem
+   * Material (Wände, Fensterrahmen, Glas …) werden zu einem Mesh in der ersten Etage der Ebene zusammengefasst.
+   * Treffer-Flächen (Antippen) bleiben je Etage.
+   */
+  _mergeLevels() {
+    const levels = new Map();
+    for (const fm of this.floors) {
+      const l = fm.floor.level ?? 0;
+      levels.set(l, [...(levels.get(l) || []), fm]);
+    }
+    for (const fms of levels.values()) {
+      if (fms.length < 2) continue;
+      const host = fms[0];
+      const buckets = new Map();
+      for (const fm of fms) {
+        for (const m of fm.group.children) {
+          if (!m.isMesh || m.material === this.shared.hitMaterial) continue;
+          const g = m.geometry;
+          const key = [m.material.uuid, m.castShadow, m.receiveShadow, m.renderOrder, !!g.index, Object.keys(g.attributes).sort().join()].join('|');
+          if (!buckets.has(key)) buckets.set(key, []);
+          buckets.get(key).push([fm, m]);
+        }
+      }
+      for (const list of buckets.values()) {
+        if (list.length < 2) continue;
+        const geos = list.map(([fm, m]) => m.geometry.clone().translate(0, fm.group.position.y - host.group.position.y, 0));
+        const merged = mergeGeometries(geos, false);
+        for (const g of geos) g.dispose();
+        if (!merged) continue;
+        const first = list[0][1];
+        const mesh = new THREE.Mesh(merged, first.material);
+        Object.assign(mesh, { castShadow: first.castShadow, receiveShadow: first.receiveShadow, renderOrder: first.renderOrder });
+        for (const [fm, m] of list) {
+          fm.group.remove(m);
+          m.geometry.dispose();
+        }
+        host.group.add(mesh);
+      }
+    }
   }
 
   /**
@@ -217,6 +264,7 @@ export class HouseScene {
   /** Name einer Ebene: Namen der Gebäude-Etagen (ohne Doppelungen) */
   levelName(level = this.level) {
     const names = this.floors.filter((f) => (f.floor.level ?? 0) === level && !f.floor.outdoor && !f.floor.roof).map((f) => f.floor.name);
+    if (!names.length && this.floors.some((f) => (f.floor.level ?? 0) === level && f.floor.roof)) return 'Dach';
     return [...new Set(names)].join(' · ') || 'Außen';
   }
 
@@ -228,6 +276,12 @@ export class HouseScene {
   /** Bodenhöhe eines Objekts in einem Außenbereich (Gelände) relativ zur Etage; in Räumen 0 */
   baseAt(floorKey, roomId, pos) {
     const fm = this.floorModel(floorKey);
+    if (fm?.floor.roof) {
+      // Dach: Oberseite des Dachteils (flach: seine Lage, Steildach: Höhe der Dachfläche)
+      const r = fm.rooms.get(roomId)?.room;
+      if (!r) return 0;
+      return (r.elevation || 0) + (r.roof ? Math.max(0, r.roof.shape.height(pos)) : 0);
+    }
     const r = fm?.floor.outdoor && fm.rooms.get(roomId)?.room;
     if (!r) return 0;
     return r.heights ? heightAt(r.polygon, r.heights, pos) : r.elevation || 0;
@@ -385,8 +439,24 @@ export class HouseScene {
       slab.userData.level = fm.floor.level ?? 0;
       slab.visible = slab.userData.level <= this.level;
       this.slabs.push(slab);
-      this.scene.add(slab);
     }
+    // Platten einer Ebene in ein Mesh (ein Zeichenaufruf je Ebene und Schattenart)
+    const slabGroups = new Map();
+    for (const slab of this.slabs) {
+      slab.updateMatrix();
+      const key = `${slab.userData.level}|${slab.castShadow}`;
+      if (!slabGroups.has(key)) slabGroups.set(key, []);
+      slabGroups.get(key).push(slab.geometry.applyMatrix4(slab.matrix));
+    }
+    this.slabs = [...slabGroups].map(([key, geos]) => {
+      const [level, cast] = key.split('|');
+      const slab = new THREE.Mesh(mergeGeometries(geos.map((g) => (g.index ? g.toNonIndexed() : g)), false), slabMat);
+      Object.assign(slab, { castShadow: cast === 'true', receiveShadow: true });
+      slab.userData.level = Number(level);
+      slab.visible = slab.userData.level <= this.level;
+      this.scene.add(slab);
+      return slab;
+    });
 
     // Himmel: Halbkugel-Licht (Himmel/Boden) + ein Gestirn mit Schatten – tagsüber die Sonne, nachts der Mond.
     this.hemi = new THREE.HemisphereLight();

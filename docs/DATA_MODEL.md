@@ -71,19 +71,61 @@ Wohnhaus, Garage, Gartenhaus, Carport … jeweils mit Etagen.
 | `name` | ja | | Anzeigename |
 | `kind` | nein | `house` | `house`, `garage`, `garden_house`, `carport`, `other` (nur Information) |
 | `floors` | ja | | Etagen, mindestens eine |
-| `roof` | nein | Flachdach | Dach über der obersten Etage, siehe unten; `false` = keins |
+| `roof` | nein | Flachdach | Dach über der obersten Etage: ein Dachteil oder eine Liste davon, siehe unten; `false` = keins |
 
-**Dach:** Jedes Gebäude bekommt ein Flachdach über seiner obersten Etage. Es erscheint, sobald eine höhere Ebene
-gezeigt wird (z. B. die Garage, wenn das 1. OG des Hauses gewählt ist), und ist ein eigener Bereich: Objekte darauf
-(Balkonkraftwerk, Satellitenschüssel …) haben `space: <Dach-ID>`, ihre Höhen zählen ab der Dachfläche.
+**Dach:** Jedes Gebäude bekommt ein Dach über seiner obersten Etage – ohne Angabe ein Flachdach. Es erscheint, sobald
+eine höhere Ebene gezeigt wird (z. B. die Garage, wenn das 1. OG des Hauses gewählt ist); über der obersten Ebene
+gibt es dafür den Knopf **Dach**. Jeder Dachteil ist ein eigener Bereich: Objekte darauf (Balkonkraftwerk,
+Satellitenschüssel …) haben `space: <Dach-ID>`, ihre Höhen zählen ab der Dachfläche (auf Steildächern an ihrer Stelle).
+
+Mehrere Dachteile (Liste) beschreiben z. B. Hauptdach und Anbau, eine Dachterrasse in einem Walmdach (Steildach mit
+`opening` plus flacher Teil mit demselben Umriss) oder ein abgesetztes Pultdach (zwei Pultdächer mit Höhenversatz).
+Jeder Teil hat einen **konvexen** Umriss; L-förmige Häuser bekommen zwei Teile, die sich durchdringen.
 
 | Feld | Pflicht | Standard | Bedeutung |
 |---|---|---|---|
-| `id` | nein | `<Gebäude-ID>_dach` | Bereichs-ID des Dachs |
+| `id` | nein | `<Gebäude-ID>_dach` (weitere `_dach_2` …) | Bereichs-ID des Dachteils |
 | `name` | nein | `Dach` | Anzeigename |
-| `surface` | nein | `roof` | Oberfläche (Dachbahn) |
-| `polygon` | nein | Hülle der obersten Etage | Umriss |
-| `thickness` | nein | 0.2 | Dachaufbau über den Wänden (Meter) |
+| `type` | nein | `flat` | `flat` (Flachdach), `gable` (Satteldach), `hip` (Walmdach), `half_hip` (Krüppelwalm), `shed` (Pultdach) |
+| `surface` | nein | `roof` bzw. `roof_tiles` | Oberfläche: `roof` (Dachbahn, Standard flach), `roof_tiles` (Ziegel, Standard geneigt) oder ein Belag (z. B. `slabs` für eine Dachterrasse) |
+| `color` | nein | Ziegelrot | Farbe der Oberfläche (`#rrggbb`), z. B. `#4a4d52` für anthrazit |
+| `polygon` | nein | Hülle der obersten Etage | Umriss = Außenkante der Wände (Traufe ohne Überstand), konvex |
+| `thickness` | nein | 0.2 | Dachaufbau (Meter) |
+| `eaves` | nein | Höhe der obersten Etage | Traufhöhe bzw. Kniestock über dem Fußboden der obersten Etage (Oberkante der Wand unter dem Dach); bei flachen Teilen die Lage der Dachfläche |
+| `pitch` | nein | 35 (Pultdach 15) | Dachneigung in Grad |
+| `ridge` | nein | entlang der längsten Kante | Firstrichtung: `x`, `y` oder Grad (von +x Richtung +y); Kanten parallel dazu sind Traufen, die anderen Giebel |
+| `slope` | nein | quer zum First | nur Pultdach: Fallrichtung (dorthin läuft das Wasser) – `+x`, `-x`, `+y`, `-y` oder Grad |
+| `overhang` | nein | 0 | Dachüberstand an Traufe und Ortgang (Meter) |
+| `top` | nein | | Dach in dieser Höhe über der Traufe waagrecht abschneiden (Plateau) |
+| `opening` | nein | | Aussparung (konvexes Polygon), z. B. für eine Dachterrasse; die Kante bekommt eine Brüstung bis auf den flachen Teil darin |
+| `hip_height` | nein | 60 % der Firsthöhe | nur Krüppelwalm: Höhe über der Traufe, ab der der Walm beginnt |
+| `hip_pitch` | nein | Neigung + 15 | nur Krüppelwalm: Neigung des Walms |
+| `dormers` | nein | | Gauben, siehe unten |
+| `chimneys` | nein | | Schornsteine, siehe unten |
+
+Die Dachfläche ist an jeder Stelle die niedrigste der Dachebenen (jede Traufe trägt eine Ebene mit `pitch`). Das
+ergibt auf konvexen Umrissen genau Sattel-, Walm-, Krüppelwalm- und Pultdach.
+
+**Oberste Etage unter einem Steildach:** Liegt die Traufe (`eaves`) unter der Etagenhöhe, enden die Wände der obersten
+Etage unter der Dachfläche – Kniestock, Giebelwände und Innenwände zeigen die Dachschräge (höchstens bis zur
+Etagenhöhe, z. B. Kehlbalkenlage). Darüber zeichnet das Dach die Giebelwände bis zum First. Deckenleuchten unter der
+Schräge hängen an der Schräge. Dachteile über einer tieferen Etage (Anbau) schneiden nichts; ihre Giebelwände
+beginnen an der Traufe.
+
+**Gauben** (`roof.dormers[]`): stehen auf der Dachfläche an `pos`, die Front zeigt zur Traufe.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `pos` | ja | | Mitte der Front (Plan) |
+| `width` | nein | 1.6 | Breite |
+| `height` | nein | 1.4 | Höhe der Front über der Dachfläche |
+| `type` | nein | `shed` | `shed` (Schleppgaube), `flat` (Flachdachgaube), `gable` (Satteldachgaube) |
+| `pitch` | nein | 10 / 0 / 40 | Neigung des Gaubendachs |
+| `window` | nein | `true` | Fenster in der Front |
+| `window_width` | nein | Breite − 0,4 | Fensterbreite |
+
+**Schornsteine** (`roof.chimneys[]`): `pos` (Mitte, Plan), `size` (`[Breite, Tiefe]`, Standard `[0.5, 0.5]`),
+`height` (über dem höchsten Punkt der Dachfläche darunter, Standard 0.8).
 
 ### Etage (`buildings[].floors[]`)
 
@@ -306,6 +348,7 @@ die keine Leuchte sind (Leuchten zeigen ihren Zustand durch ihr Licht). Keine An
 | `slabs` | Großformatplatten (60 × 30 cm, hellgrau) |
 | `stone` | Naturstein (Trockenmauer, Blockstufen) |
 | `roof` | Flachdach (dunkle Dachbahn) |
+| `roof_tiles` | Dachziegel (Falzziegel, Farbe über `color` des Dachs) |
 
 ## Katalog
 
@@ -546,6 +589,9 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.17.0, abwärtskompatibel):** Steildächer – `buildings[].roof` auch als Liste von
+  Dachteilen mit `type` (`gable`, `hip`, `half_hip`, `shed`), `pitch`, `ridge`, `slope`, `overhang`, `eaves`, `top`,
+  `opening`, `hip_height`, `hip_pitch`, `color`, `dormers`, `chimneys`; Oberfläche `roof_tiles`.
 - **Version 2, Ergänzung (0.16.0, abwärtskompatibel):** `buildings[].roof` (Flachdach als eigener Bereich, sichtbar
   ab der Ebene darüber); Oberfläche `roof`; Katalog `garage_door`, `solar_panels`.
 - **Version 2, Ergänzung (0.15.0, abwärtskompatibel):** Objekte mit `state` (fester Zustand für Animationen) und

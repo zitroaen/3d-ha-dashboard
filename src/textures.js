@@ -164,6 +164,39 @@ export function slabTexture(seed = 17) {
   return toTexture(c, meters);
 }
 
+// Dachziegel (Falzziegel): Reihen 0,3 m (Lattung), 4 Ziegel je 1,2 m, grau – die Farbe kommt aus dem Material
+// (Ziegelrot, Anthrazit …). v läuft die Dachfläche hinauf: Schatten oben unter der Nase des Ziegels darüber.
+export function roofTileTexture(seed = 29) {
+  const size = 512, meters = 1.2;
+  const px = size / meters;
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const r = rng(seed);
+  const w = 0.3 * px, h = 0.3 * px;
+  for (let row = 0; row * h < size; row++) {
+    for (let col = 0; col * w < size; col++) {
+      const x = col * w, y = row * h, l = 0.86 + (r() - 0.5) * 0.12;
+      const grad = g.createLinearGradient(0, y, 0, y + h);
+      grad.addColorStop(0, `rgb(${70 * l | 0},${70 * l | 0},${70 * l | 0})`);
+      grad.addColorStop(0.18, `rgb(${170 * l | 0},${170 * l | 0},${170 * l | 0})`);
+      grad.addColorStop(0.92, `rgb(${215 * l | 0},${215 * l | 0},${215 * l | 0})`);
+      grad.addColorStop(1, `rgb(${235 * l | 0},${235 * l | 0},${235 * l | 0})`);
+      g.fillStyle = grad;
+      g.fillRect(x, y, w, h);
+      // Wölbung: Mulde in der Mitte etwas dunkler, Falz rechts als feine Fuge
+      const across = g.createLinearGradient(x, 0, x + w, 0);
+      across.addColorStop(0, 'rgba(255,255,255,0.10)');
+      across.addColorStop(0.55, 'rgba(0,0,0,0.12)');
+      across.addColorStop(1, 'rgba(255,255,255,0.06)');
+      g.fillStyle = across;
+      g.fillRect(x, y, w, h);
+      g.fillStyle = 'rgba(0,0,0,0.45)';
+      g.fillRect(x + w - 2, y, 2, h);
+    }
+  }
+  return toTexture(c, meters);
+}
+
 // Naturstein-Trockenmauer (auch Blockstufen): Lagen unregelmäßiger Sandsteinblöcke, dunkle Fugen; 1,2 m kachelbar
 export function stoneTexture(seed = 23) {
   const size = 512, meters = 1.2;

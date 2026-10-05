@@ -114,6 +114,29 @@ export class Builder {
     [0, 1, 2, 0, 2, 3].forEach(push);
   }
 
+  /** Senkrechte Fläche zwischen a und b mit schräger Oberkante (ya1 bei a, yb1 bei b), einseitig. UV: Länge × Höhe. */
+  quadVT(a, b, y0, ya1, yb1, roomIdx) {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const A = [a[0], y0, a[1]], B = [b[0], y0, b[1]], C = [b[0], yb1, b[1]], D = [a[0], ya1, a[1]];
+    const uvs = [[0, y0], [len, y0], [len, yb1], [0, ya1]];
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      this.pos.push(...[A, B, C, D][i]);
+      this.room.push(roomIdx);
+      this.uv.push(...uvs[i]);
+    }
+  }
+
+  /** Dreieck mit eigenen UV-Koordinaten; up: Normale nach oben (true), unten (false) oder wie angegeben (null) */
+  triUV(a, b, c, ua, ub, uc, roomIdx, up = null) {
+    if (up != null) {
+      const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+      if ((ny > 0) !== up) [b, c, ub, uc] = [c, b, uc, ub];
+    }
+    this.pos.push(...a, ...b, ...c);
+    this.uv.push(...ua, ...ub, ...uc);
+    this.room.push(roomIdx, roomIdx, roomIdx);
+  }
+
   /** Waagrechtes Polygon auf Höhe y (Normale nach oben, oder nach unten wenn down). */
   polyH(poly, y, roomIdx, down = false, uvScale = 1) {
     const contour = poly.map(([x, z]) => new THREE.Vector2(x, z));

@@ -9,6 +9,8 @@ import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.
 import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, activityOf, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
+import { roofShape, minusConvex } from '../src/roofshape.js';
+import { ceilingFn } from '../src/roof.js';
 
 let failed = 0;
 const check = (name, cond, info = '') => {
@@ -152,6 +154,49 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
     && roof.rooms[0].polygon.length === 4 && pv?.floor === 'garage/__dach' && pv.room === 'garage_dach', JSON.stringify(roof?.rooms[0]));
   m.buildings.find((b) => b.id === 'garage').roof = false;
   check('Dach abschaltbar (roof: false)', !toScene({ ...m, objects: [] }).house.floors.some((f) => f.id === 'garage/__dach'));
+}
+
+// Steildächer: Form als untere Hülle der Dachebenen
+{
+  const rect = [[0, 0], [10, 0], [10, 8], [0, 8]];
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  const gable = roofShape({ type: 'gable', polygon: rect, pitch: 45 });
+  check('Satteldach: First entlang der langen Seite, Giebel ohne Ebene, Höhe = Abstand zur Traufe',
+    gable.fns.length === 2 && near(gable.height([5, 4]), 4) && near(gable.height([5, 1]), 1) && near(gable.height([0.5, 4]), 4)
+    && gable.faces().length === 2);
+  const prof = gable.profile([0, 8], [0, 0]);
+  check('Satteldach: Giebelprofil mit Knick am First', prof.length === 3 && near(prof[1].t, 0.5) && near(prof[1].h, 4), JSON.stringify(prof));
+  const hip = roofShape({ type: 'hip', polygon: rect, pitch: 45 });
+  check('Walmdach: vier Flächen, an der Schmalseite steigt es auch', hip.faces().length === 4 && near(hip.height([0.5, 4]), 0.5));
+  const half = roofShape({ type: 'half_hip', polygon: rect, pitch: 45 });
+  check('Krüppelwalm: Giebel bis 60 % der Firsthöhe, darüber Walm', near(half.height([0, 4]), 2.4) && half.height([0.5, 4]) > 2.4 && half.height([0.5, 4]) < 4);
+  const shed = roofShape({ type: 'shed', polygon: rect, pitch: 45, slope: '+y' });
+  check('Pultdach: fällt in Fallrichtung (Traufe im Süden = +y)', near(shed.height([5, 8]), 0) && near(shed.height([5, 0]), 8));
+  const over = roofShape({ type: 'gable', polygon: rect, pitch: 45, overhang: 0.5 });
+  check('Dachüberstand: Umriss größer, Traufe darunter', near(over.ext[0][0], -0.5) && near(over.height([5, 8.5]), -0.5));
+  const terrace = roofShape({ type: 'hip', polygon: rect, pitch: 30, opening: [[3, 3], [7, 3], [7, 5], [3, 5]] });
+  const covered = terrace.faces().reduce((a, f) => a + f.poly.reduce((s, p, i) => {
+    const q = f.poly[(i + 1) % f.poly.length];
+    return s + (p[0] * q[1] - q[0] * p[1]) / 2;
+  }, 0), 0);
+  check('Aussparung: Dachfläche = Umriss minus Dachterrasse', near(Math.abs(covered), 80 - 8), covered);
+  check('Konvex minus Loch: disjunkte Stücke', minusConvex(rect, [[3, 3], [7, 3], [7, 5], [3, 5]]).length === 4);
+  const C = ceilingFn([{ shape: gable, eaves: 1 }], 2.4);
+  check('Oberste Etage: Wand unter der Schräge = Kniestock + Dachfläche, höchstens Geschosshöhe',
+    near(C([5, 0.5]), 1.5) && near(C([5, 4]), 2.4) && near(C([20, 20]), 2.4));
+}
+
+// Demo-Haus: mehrere Dachteile, Dachterrasse als flacher Bereich, Steildach schneidet das Obergeschoss
+{
+  const m = parseModel(readFileSync(join(ENGINE_ROOT, 'examples/demo/model.yaml'), 'utf8'));
+  const sc = toScene(m);
+  const roof = sc.house.floors.find((f) => f.id === 'haus/__dach');
+  const og = sc.house.floors.find((f) => f.id === 'haus/og');
+  const ids = roof?.rooms.map((r) => r.id).join();
+  check('Haus: Hauptdach, Anbau und Dachterrasse als Bereiche', ids === 'haus_dach,haus_anbau,dachterrasse' && sc.spaces.get('dachterrasse')?.kind === 'roof', ids);
+  check('Haus: Hauptdach (nicht der Anbau) schneidet die Wände des Obergeschosses (Kniestock)', og?.roofCut?.length === 1 && roof.rooms[0].roof.shape.type === 'half_hip');
+  check('Gartenhaus: abgesetztes Pultdach (zwei Pultflächen, nördliche höher)',
+    sc.house.floors.find((f) => f.id === 'gartenhaus/__dach')?.rooms.map((r) => r.roof?.eaves).join() === '2,2.9');
 }
 
 if (failed) {

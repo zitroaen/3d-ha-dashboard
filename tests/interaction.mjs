@@ -229,8 +229,8 @@ try {
       label: window.panel.shadowRoot.querySelector('.floor').textContent,
     };
   });
-  ok(og.level === 1 && og.shown.join() === '__aussen,garage/__dach,garage/eg,haus/eg,haus/og' && og.label === 'Obergeschoss',
-    `Ebene 1. OG steht auf dem Erdgeschoss, Garten bleibt sichtbar, die Garage zeigt ihr Dach (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
+  ok(og.level === 1 && og.shown.join() === '__aussen,garage/__dach,garage/eg,gartenhaus/__dach,gartenhaus/eg,haus/eg,haus/og' && og.label === 'Obergeschoss',
+    `Ebene 1. OG steht auf dem Erdgeschoss, Garten bleibt sichtbar, Garage und Gartenhaus zeigen ihr Dach (${og.shown})`, `Ebene OG: ${JSON.stringify(og)}`);
   await page.evaluate(() => (window.mockHass.calls.length = 0));
   await steady(page);
   pt = await toScreen(page, [1.5, 2.85, 2.0]);
@@ -241,7 +241,7 @@ try {
     `Studio: ${studio} (angetippt bei ${JSON.stringify(pt)}, Ebene ${await page.evaluate(() => window.panel.view.level)})`);
   await clickShadow('.levels button[data-level="0"]');
   const eg = await page.evaluate(() => window.panel.view.floors.filter((f) => f.group.visible).map((f) => f.floor.id).sort());
-  ok(eg.join() === '__aussen,garage/eg,haus/eg', `Ebene EG blendet das Obergeschoss aus (${eg})`, `Ebene EG: ${eg}`);
+  ok(eg.join() === '__aussen,garage/eg,gartenhaus/eg,haus/eg', `Ebene EG blendet das Obergeschoss aus (${eg})`, `Ebene EG: ${eg}`);
 
   // ---------------- Editiermodus ----------------
   await page.reload();
@@ -506,11 +506,16 @@ try {
     r.doorOff = a('garagentor')?.progress;
     window.panel.setLevel(0);
     r.roofAt0 = v.activeFloors.some((f) => f.floor.id === 'garage/__dach');
+    // oberster Knopf „Dach“: alle Dächer, auch das Steildach des Hauses
+    r.top = window.panel.shadowRoot.querySelector('.levels button')?.textContent;
+    window.panel.setLevel(2);
+    r.houseRoof = v.activeFloors.some((f) => f.floor.id === 'haus/__dach') && window.panel.shadowRoot.querySelector('.floor').textContent;
+    window.panel.setLevel(0);
     return r;
   });
-  ok(door?.domain === 'cover' && door.service === 'open_cover' && garage.level === 1 && garage.roof && garage.buttons === 2 && garage.door > 0
+  ok(door?.domain === 'cover' && door.service === 'open_cover' && garage.level === 1 && garage.roof && garage.buttons === 3 && garage.top === 'Dach' && garage.houseRoof === 'Dach' && garage.door > 0
     && garage.pv === true && garage.pvSpeed === 0.5 && garage.badge === 'Offen' && garage.doorOff === 1 && !garage.roofAt0,
-    'Garagentor: Antippen öffnet (cover.open_cover), Sektionaltor fährt hoch; 1. OG zeigt das Garagendach mit Energiefluss (400 W = halbes Tempo)',
+    'Garagentor: Antippen öffnet (cover.open_cover), Sektionaltor fährt hoch; 1. OG zeigt das Garagendach mit Energiefluss (400 W = halbes Tempo); Knopf „Dach“ zeigt das Steildach des Hauses',
     `Garage: Antippen=${JSON.stringify(door)} ${JSON.stringify(garage)}`);
 
   // ---------------- Leistungsanzeige ----------------

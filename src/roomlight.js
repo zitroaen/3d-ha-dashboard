@@ -141,6 +141,7 @@ export function withRoomLight(material, opts = {}) {
       );
   };
   material.customProgramCacheKey = () => `roomlight2:${JSON.stringify(opts)}`;
+  material.userData.roomLightOpts = opts; // für Kopien mit anderer Farbe
   return material;
 }
 
