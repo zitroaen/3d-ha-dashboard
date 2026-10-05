@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.26.0
+
+- **Fenster unter Steildächern:** Fenster in Wänden, die unter der Dachfläche enden (Kniestock), ragen nicht mehr
+  über das Dach – sie werden auf die verbleibende Wandhöhe gekürzt oder, wenn kaum Platz bleibt, weggelassen; unter
+  einer Gaube übernimmt deren Fenster. `npm run validate` warnt („Fenster liegt über der Dachfläche – Gaube
+  anlegen?“).
+- **Wände ohne Dach:** `npm run validate` meldet Wände der obersten Etage, über denen kein Dachteil liegt, mit Lage.
+
 ## 0.25.0
 
 - **Einpassung an amtliche Gebäudedaten:** `scripts/fit-footprint.mjs` dreht und verschiebt den Grundriss (Wände und

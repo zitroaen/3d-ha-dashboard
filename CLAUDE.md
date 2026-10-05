@@ -307,3 +307,7 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   `scripts/plan_transform.py` (ohne pymupdf, getestet): `merge` per Rastermaske mit morphologischem Schließen
   (überbrückt die Wand), Umriss aus den Rasterkanten mit Douglas-Peucker; Wände im Zwischenraum werden (achsparallel)
   gekürzt; `clip` nur mit konvexen Polygonen (Sutherland–Hodgman). XML ohne Paket per regulären Ausdrücken.
+- Fenster unter Steildächern (0.26.0): `windowUnderRoof()` (roof.js, ohne three.js – auch für die Prüfung) misst die
+  niedrigste Wandoberkante (`ceilingFn`) über die Fensterbreite: kürzen (5 cm darunter) oder weglassen (< 30 cm über
+  der Brüstung; die Öffnung wird als volle Wand gezeichnet, vom Dach gekappt), unter einer Gaube (`roofCut[].dormers`)
+  immer weglassen. Die Prüfung meldet dieselben Fälle und Wände der obersten Etage ohne Dachteil darüber.
