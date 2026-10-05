@@ -66,6 +66,8 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
 | `node scripts/terrain-from-scan.mjs scan.obj --cell 0.5 --rotate … --offset x,y --floor … --write` | Höhenraster `site.terrain` aus einem LiDAR-Scan (OBJ) |
 | `node scripts/terrain-from-geotiff.mjs dgm.tif … --write` | Höhenraster aus DGM (GeoTIFF/XYZ), Einpassung `site.georef` oder `--origin/--north/--floor` |
+| `node scripts/fit-footprint.mjs lod2.gml --write` | Grundriss an CityGML-LoD2 einpassen -> `site.georef` (Nordrichtung, Ursprung, IoU) |
+| `node scripts/roof-from-lod2.mjs lod2.gml` | Dachteile aus LoD2 vorschlagen (Text) |
 | `node scripts/trees-from-ndom.mjs ndom.tif … --write` | Bäume aus einem nDOM (Wipfel, Kronendurchmesser) als Objekte |
 | `node scripts/orthophoto-crop.mjs dop.tif … --write` | Luftbild `site.terrain.texture` aus einem Orthophoto (zuschneiden, in Plan-Ausrichtung drehen) |
 
@@ -103,6 +105,7 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
   aus (nur im Release-Zip) und registriert das Panel `/haus-3d`; Optionen Titel, Symbol, `data_url`; `storage.py`
   gemeinsames Modell (WebSocket `ha_3d_dashboard/model/get|save|subscribe`)
 - `scripts/lib/geodata.mjs` GeoTIFF/XYZ/World-Datei lesen (ohne Pakete), Einpassung Plan <-> Landeskoordinaten
+  · `scripts/lib/citygml.mjs` CityGML-LoD2 lesen (Boden-/Dachflächen), Raster, Dachflächen-Neigung
 - `scripts/` Build, Magicplan-Import, `import-building.mjs`, `house_fixes.py`, Platzhalter-Leuchten, Deploy, `init-instance.mjs`
 
 ## Lichtmodell
@@ -297,3 +300,10 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Änderung neu verteilt, dann Schatten neu). Editor und Katalog-Vorschau bauen die Pflanze einzeln aus derselben
   Vorlage (Laubfarbe eingebacken). Keine Sichtbarkeitsprüfung je Instanz: nah herangezoomt werden alle Pflanzen in
   voller Stufe gezeichnet (200 Bäume ~117k Dreiecke, knapp im Budget) – bei Bedarf als Nächstes nachrüsten.
+- Einpassung und Import (0.25.0): `fit-footprint` vergleicht Raster (0,2 m) der Umrisse: grob alle 1° mit
+  Schwerpunkt-Abgleich, dann je Kandidat zweistufig fein (Drehung/Verschiebung); `site.north_deg` entscheidet zwischen
+  gleich guten Lösungen (symmetrische Häuser), wird aber nicht überschrieben (geografisch vs. Gitternord).
+  `roof-from-lod2` bündelt Dachflächen über gemeinsame Kanten, Typ aus den Fallrichtungen. Magicplan-Korrekturen in
+  `scripts/plan_transform.py` (ohne pymupdf, getestet): `merge` per Rastermaske mit morphologischem Schließen
+  (überbrückt die Wand), Umriss aus den Rasterkanten mit Douglas-Peucker; Wände im Zwischenraum werden (achsparallel)
+  gekürzt; `clip` nur mit konvexen Polygonen (Sutherland–Hodgman). XML ohne Paket per regulären Ausdrücken.

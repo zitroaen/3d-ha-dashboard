@@ -61,6 +61,7 @@ objects: [ ... ]     # Möbel, Leuchten, Geräte – mit Verknüpfung zu Home As
 | `ground` | nein | `{ surface: lawn }` | Boden außerhalb aller Außenbereiche: `{ surface }` |
 | `weather` | nein | automatisch | Wetter-Entity für Himmel, Regen, Schnee, Nebel und die Anzeige oben, z. B. `weather.home`. Ohne Angabe: `weather.home`, `weather.forecast_home`, sonst die erste `weather.*` |
 | `terrain` | nein | eben | Gelände als Höhenraster, siehe unten |
+| `attribution` | nein | | Quellenangabe(n), Text oder Liste – z. B. für Geodaten unter einer Namensnennungs-Lizenz („Geobasisdaten: © …, dl-de/by-2-0“); im Info-Menü angezeigt |
 | `georef` | nein | | Lage des Plans in Landeskoordinaten – nur für die Werkzeuge (Geodaten einlesen), die Anzeige nutzt es nicht; siehe [Geodaten](#geodaten-dgm-und-luftbild) |
 
 **Höhenraster (`site.terrain`):** das Gelände des Grundstücks als Tabelle von Höhen (Meter, wie `elevation`; 0 =
@@ -319,8 +320,11 @@ site:
   georef: { crs: EPSG:25832, origin: [512345.6, 5432109.8], floor: 312.45 }
 ```
 
-Ursprung finden: eine Hausecke im Plan (z. B. `[0, 0]`) im Orthophoto oder in den LoD2-Daten ablesen; die
-Nordrichtung aus einer langen Hauswand. Danach:
+Am einfachsten mit LoD2-Gebäudedaten: `node scripts/fit-footprint.mjs lod2.gml --floor <NHN> --write` passt den
+Grundriss (Wände und Räume aller Etagen) per Überdeckung an den amtlichen Umriss an und schreibt `site.georef`
+(Nordrichtung, Ursprung; Güte als IoU). Ohne LoD2: eine Hausecke im Plan (z. B. `[0, 0]`) im Orthophoto ablesen, die
+Nordrichtung aus einer langen Hauswand. `node scripts/roof-from-lod2.mjs lod2.gml` schlägt danach die Dachteile vor
+(Typ, Neigung, First, Traufe über der obersten Etage, Umriss im Plan). Danach:
 
 1. **Gelände:** `node scripts/terrain-from-geotiff.mjs dgm1_*.tif --cell 1 --write` (oder `*.xyz`; mehrere Kacheln
    möglich; `--margin 15` Meter um das Modell, `--bounds x0,y0,x1,y1` für einen eigenen Ausschnitt; Optionen
@@ -650,8 +654,11 @@ objects:
 
 ## Anleitung für Agenten
 
-1. **Bauwerk:** aus einem Magicplan-PDF (`scripts/extract_plan.py`) oder per Skript nach dem Vorbild
+1. **Bauwerk:** aus einem Magicplan-PDF (`scripts/extract_plan.py`, Korrekturen je Etage in `plan.json`: `rotate`,
+   `offset`, `stretch`, `room_ids`, `merge`, `split`, `clip` – `docs/SETUP.md`) oder per Skript nach dem Vorbild
    `examples/demo/build-house.mjs`. Mehrere Gebäude (Garage, Gartenhaus) in dieselben Grundstückskoordinaten legen.
+   Gibt es LoD2-Daten: `scripts/fit-footprint.mjs` (Einpassung, `site.georef`) und `scripts/roof-from-lod2.mjs`
+   (Dachteile als Vorschlag).
 2. **Nordrichtung** beim Besitzer erfragen (welcher Raum liegt wo?), `site.north_deg` setzen.
 3. **Etagen:** `level` je Stockwerk; gleiche Ebene in mehreren Gebäuden ist erlaubt und erwünscht.
 4. **Außenbereiche** für Terrasse, Garten, Einfahrt anlegen (Polygone, `surface`).
@@ -724,6 +731,9 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.25.0, abwärtskompatibel):** `site.attribution` (Quellenangaben, im Info-Menü);
+  Werkzeuge `scripts/fit-footprint.mjs` (Einpassung an LoD2 -> `site.georef`) und `scripts/roof-from-lod2.mjs`;
+  Magicplan-Import mit `stretch`, `merge`, `clip`, `split` mit `into`/`wall` und `room_ids` als `{ id, name, ha_area }`.
 - **Version 2, Ergänzung (0.24.0, abwärtskompatibel):** Katalog `hedge` (Hecke entlang einer Linie oder `path`),
   `tree` mit `shape: fruit` (Obstbaum); Bäume und Sträucher als Instanzen mit Detailstufen und Variation aus der
   Position (gleiche Daten, anderes Aussehen); Werkzeug `scripts/trees-from-ndom.mjs`.

@@ -49,8 +49,15 @@ nachsteuern: Gebäude-ID, -Name und -Art (`building`), Raum-IDs (`room_ids`), Bo
 massiver Haustür (`front_door_rooms`), Etagen-ID, -Ebene, -Höhe, -Drehung und -Versatz (`floors`). Magicplan legt
 jede Etage mit eigenem Ursprung und eigener Ausrichtung ab: `floors.<Name>.rotate` (90/180/270, im Uhrzeigersinn) dreht
 sie vor dem `offset`. Raum-IDs je Etage: `floors.<Name>.room_ids`; doppelte IDs bekommen automatisch das Etagenkürzel
-(`og_bad`). `floors.<Name>.split: [{ room, line: [[x, y], [x, y]], surface }]` teilt einen Raum an einer Linie in zwei
-Böden (die Seite links der Linie, wie in der Debug-Grafik gesehen, wird eine Belag-Zone). Weitere Gebäude (Garage,
+(`og_bad`); ein Eintrag darf statt der ID auch `{ id, name, ha_area }` sein. `floors.<Name>.split: [{ room, line:
+[[x, y], [x, y]], surface }]` teilt einen Raum an einer Linie in zwei Böden (die Seite links der Linie, wie in der
+Debug-Grafik gesehen, wird eine Belag-Zone); mit `into: { id, name }` wird sie ein eigener Raum, mit `wall: 0.1` kommt
+eine Raumteiler-Wand dazu. Weitere Korrekturen je Etage, in dieser Reihenfolge nach Drehung und Versatz:
+`stretch: { axis: y, from: 4, src: 9.8, dst: 9.95 }` (Messfehler: alles jenseits von `from` so strecken, dass `src` auf
+`dst` landet), `merge: [{ rooms: [wohnen, essen], id: wohnen, name: Wohnen/Essen }]` (Räume samt Wand dazwischen
+zusammenlegen, Durchgang ohne Tür), `split`, `clip: { polygon: [[x, y], …], wall: 0.24 }` (Etage auf ein konvexes
+Polygon beschneiden und dort mit Wänden schließen – z. B. wenn eine obere Etage über den Umriss darunter hinausragt).
+Weitere Gebäude (Garage,
 Gartenhaus) als eigene PDFs mit eigener `building.id` importieren oder von Hand ergänzen. Danach die Debug-Grafik ansehen und mit dem Besitzer abgleichen.
 Mehrere Räume gleichen Namens werden durchnummeriert (`schlafzimmer_2`) – nach richtigen Namen fragen.
 
@@ -70,6 +77,15 @@ node engine/scripts/terrain-from-scan.mjs ~/scan.obj --cell 0.5 --rotate 12 --of
 `--floor` ist die Höhe des EG-Fußbodens im Scan, Drehung und Versatz legen den Scan auf den Grundriss (zwei
 Hausecken als Passpunkte). Danach Rasen, Wege und Beete mit `follow: terrain` auf das Gelände legen; ebene Terrassen und
 Mauern bekommen ihre Höhe über `elevation` und Kanten zum Hang automatisch.
+
+**Amtliche Gebäudedaten (LoD2) und Geodaten:** Viele Länder bieten Gebäude als CityGML-LoD2 an (Suchbegriff „LoD2
+Download“ im Geoportal). `node engine/scripts/fit-footprint.mjs lod2.gml --near <Ost>,<Nord> --floor <NHN EG> --crs
+EPSG:25832 --write` dreht und verschiebt den Grundriss, bis er auf dem amtlichen Umriss liegt (Ausgabe: Nordrichtung,
+Überdeckung als IoU; gleichwertige Lösungen bei symmetrischen Häusern) und schreibt `site.georef`. Danach liefern
+`roof-from-lod2.mjs` einen Vorschlag für die Dachteile (als Text zum Übernehmen) und `terrain-from-geotiff.mjs`,
+`orthophoto-crop.mjs`, `trees-from-ndom.mjs` Gelände, Luftbild und Bäume (`docs/DATA_MODEL.md`, Abschnitt Geodaten).
+Quellenangaben der Daten (Namensnennung) gehören nach `site.attribution` – das Panel zeigt sie im Info-Menü. Die
+heruntergeladenen Dateien gehören nicht ins Repo.
 
 **Nordrichtung:** Besitzer fragen, welcher Raum in welche Himmelsrichtung liegt (oder Luftbild), und `site.north_deg`
 in `data/model.yaml` setzen (Norden im Plan, Grad im Uhrzeigersinn von oben). Beispiel: Wohnzimmer links im Plan liegt im

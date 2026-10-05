@@ -62,7 +62,7 @@ export class SettingsMenu {
   }
 
   /**
-   * @param info { canEdit, version, source, quality (tatsächliche Stufe bei „Automatisch“), daylight }
+   * @param info { canEdit, version, source, quality (tatsächliche Stufe bei „Automatisch“), daylight, attribution (Quellenangaben) }
    */
   open(info) {
     this.info = info;
@@ -81,7 +81,7 @@ export class SettingsMenu {
 
   render() {
     if (!this.isOpen) return;
-    const { canEdit, version, source, quality, weather } = this.info || {};
+    const { canEdit, version, source, quality, weather, attribution = [] } = this.info || {};
     const seg = (pref, opts) => `<div class="seg" role="group">${opts.map(([v, l]) =>
       `<button data-pref="${pref}" data-value="${v}" class="${this.prefs[pref] === v ? 'on' : ''}" aria-pressed="${this.prefs[pref] === v}">${l}</button>`).join('')}</div>`;
     const autoQ = this.prefs.quality === 'auto' && quality ? `<p class="hint">Automatisch gewählt: ${quality === 'high' ? 'Hoch' : 'Sparsam'}</p>` : '';
@@ -115,6 +115,7 @@ export class SettingsMenu {
         </section>
         <section><h3>Info</h3>
           <p class="about">Version ${esc(version)}<br>${esc(source)}</p>
+          ${attribution.length ? `<p class="about">Quellen: ${attribution.map(esc).join('<br>')}</p>` : ''}
         </section>
       </div>`;
   }

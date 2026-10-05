@@ -119,10 +119,14 @@ try {
   await clickShadow('.settings-toggle');
   const menu = await page.evaluate(() => {
     const r = window.panel.shadowRoot.querySelector('.settings');
-    return { open: r.classList.contains('show'), items: [...r.querySelectorAll('button[data-act], button[data-pref]')].map((b) => b.dataset.act || `${b.dataset.pref}:${b.dataset.value}`).join() };
+    return {
+      open: r.classList.contains('show'), items: [...r.querySelectorAll('button[data-act], button[data-pref]')].map((b) => b.dataset.act || `${b.dataset.pref}:${b.dataset.value}`).join(),
+      about: [...r.querySelectorAll('.about')].map((p) => p.textContent).join(' | '),
+    };
   });
   ok(menu.open && /daytime:day/.test(menu.items) && /quality:low/.test(menu.items) && /edit/.test(menu.items) && /links/.test(menu.items),
     'Einstellungsmenü: Tageszeit, Qualität, Bearbeiten, Link-Check', `Menü: ${JSON.stringify(menu)}`);
+  ok(/Quellen: .*erfunden/.test(menu.about), `Info nennt die Quellen (site.attribution): ${menu.about}`, `Quellenangabe fehlt: ${menu.about}`);
   await page.screenshot({ path: join(OUT, 'demo_einstellungen.png') });
   // Darstellung Hell (Glas hell), Bild für die Sichtprüfung, dann zurück auf Automatisch (= HA dunkel)
   await clickShadow('.settings button[data-pref="theme"][data-value="light"]');

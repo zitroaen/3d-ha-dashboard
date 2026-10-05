@@ -1,5 +1,17 @@
 # Änderungen
 
+## 0.25.0
+
+- **Einpassung an amtliche Gebäudedaten:** `scripts/fit-footprint.mjs` dreht und verschiebt den Grundriss (Wände und
+  Räume aller Etagen), bis er auf dem Umriss aus CityGML-LoD2 liegt – Ergebnis Nordrichtung und Plan-Ursprung in
+  Landeskoordinaten (`site.georef`), Güte als Überdeckung (IoU); gleichwertige Lösungen werden genannt.
+- **Dach aus LoD2:** `scripts/roof-from-lod2.mjs` schlägt Dachteile vor (Satteldach, Walm, Krüppelwalm, Pultdach,
+  flache Teile – mit Neigung, First, Traufhöhe und Umriss im Plan), als Text zum Übernehmen.
+- **Magicplan-Import:** `stretch` (Messfehler ab einer Linie ausgleichen), `merge` (Räume samt Wand dazwischen
+  zusammenlegen), `clip` (Etage auf ein Polygon beschneiden und mit Wänden schließen), `split` mit `into` (eigener
+  Raum) und `wall` (Raumteiler-Wand), `room_ids` mit Name und HA-Bereich.
+- **Quellenangaben:** `site.attribution` erscheint im Info-Menü (Namensnennung für Geodaten).
+
 ## 0.24.0
 
 - **Bäume und Sträucher als Instanzen:** je Form ein `InstancedMesh` – Hunderte Pflanzen mit wenigen

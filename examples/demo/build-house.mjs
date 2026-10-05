@@ -280,7 +280,11 @@ const prev = (prevText.trim() && yaml.load(prevText)) || {};
 const model = {
   schema: 'ha3d',
   version: 2,
-  site: { name: 'Demohaus', north_deg: 20, ground: { surface: 'lawn' }, terrain: { ...terrain(), texture: { file: 'textures/luftbild.svg', strength: 0.8 } } },
+  site: {
+    name: 'Demohaus', north_deg: 20, ground: { surface: 'lawn' },
+    attribution: 'Luftbild und Gelände: erfunden (Demo-Haus, keine echten Geodaten)',
+    terrain: { ...terrain(), texture: { file: 'textures/luftbild.svg', strength: 0.8 } },
+  },
   buildings,
   outdoor,
   objects: prev.objects || [],
