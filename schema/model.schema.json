@@ -354,7 +354,51 @@
         "tap": { "$ref": "#/$defs/action" },
         "double_tap": { "$ref": "#/$defs/action" },
         "hold": { "$ref": "#/$defs/action" },
-        "badge": { "type": "boolean" }
+        "badge": {
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "show": { "type": "boolean" },
+                "entities": { "$ref": "#/$defs/entityListOrEmpty" },
+                "when": { "$ref": "#/$defs/condition" }
+              }
+            }
+          ]
+        },
+        "player": {
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "entity": { "$ref": "#/$defs/entityId" },
+                "when": { "$ref": "#/$defs/condition" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "entityListOrEmpty": {
+      "oneOf": [
+        { "$ref": "#/$defs/entityId" },
+        { "type": "array", "items": { "$ref": "#/$defs/entityId" } }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entity": { "$ref": "#/$defs/entityId" },
+        "attribute": { "type": "string" },
+        "state": { "oneOf": [{ "type": ["string", "number", "boolean"] }, { "type": "array", "items": { "type": ["string", "number", "boolean"] } }] },
+        "not_state": { "oneOf": [{ "type": ["string", "number", "boolean"] }, { "type": "array", "items": { "type": ["string", "number", "boolean"] } }] },
+        "above": { "type": "number" },
+        "below": { "type": "number" }
       }
     },
     "action": {
