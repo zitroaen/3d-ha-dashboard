@@ -1,5 +1,15 @@
 # Änderungen
 
+## 0.19.0
+
+- **Fassaden:** `buildings[].facade` – Putz in beliebiger Farbe, Holzschalung (z. B. Schwedenrot mit weißen
+  Eckbrettern), Ziegel oder Naturstein; optional ein Sockel (z. B. Naturstein), der auf der untersten Etage bis auf das
+  Gelände reicht. Gilt für alle Außenwände samt Giebeln und Gauben.
+- **Geländer und Brüstungen:** `railing` an Terrassen, Balkonen, Veranden und Dachterrassen – Balustrade mit weißen
+  Docken, Metall oder Glas; Höhe und Kanten wählbar, am Hang folgt es dem Gelände.
+- **Demo-Haus:** Putzfassade mit Natursteinsockel, Gartenhaus in Schwedenrot mit Veranda und Balustrade,
+  Glasgeländer auf der Dachterrasse.
+
 ## 0.18.0
 
 - **Gelände als Höhenraster:** `site.terrain` (Ursprung, Rasterweite, Höhen-Tabelle, Lücken erlaubt) – z. B. aus

@@ -165,6 +165,7 @@ buildings:
         windows:
           - { sill: 0.9, top: 2, rect: [2, 0, 3.4, 0.3], room: studio }
           - { sill: 0.5, top: 2, rect: [2, 7.7, 3.6, 8], room: studio }
+    facade: { type: plaster, color: "#ece5d8", plinth: { height: 0.45, material: stone } }
     roof:
       - type: half_hip
         ridge: "y"
@@ -186,6 +187,7 @@ buildings:
         polygon: [[6.7, 1.2], [9.4, 1.2], [9.4, 6.8], [6.7, 6.8]]
         eaves: -0.25
         surface: slabs
+        railing: { style: glass, height: 1 }
   - id: garage
     name: Garage
     kind: garage
@@ -219,6 +221,7 @@ buildings:
   - id: gartenhaus
     name: Gartenhaus
     kind: garden_house
+    facade: { type: wood_siding, plinth: { height: 0.25, material: stone } }
     floors:
       - id: eg
         name: Gartenhaus
@@ -366,6 +369,11 @@ outdoor:
     surface: lawn
     follow: terrain
     polygon: [[-4, 0], [-0.4, 0], [-0.4, -6], [10.4, -6], [10.4, 0], [15.5, 0], [15.5, -11], [-4, -11]]
+  - id: veranda
+    name: Veranda
+    polygon: [[15.6, 7], [16.5, 7], [16.5, 9.4], [15.6, 9.4]]
+    surface: wood
+    railing: { style: balusters, height: 0.9, edges: [0, 2] }
   - id: garten
     name: Garten
     surface: lawn

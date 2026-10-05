@@ -8,6 +8,7 @@ import { ENGINE_ROOT } from './lib/config.mjs';
 import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.js';
 import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, activityOf, terrainOf, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
 import { terrainGrid, clipTerrain } from '../src/terrain.js';
+import { buildRailing } from '../src/railing.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 import { roofShape, minusConvex } from '../src/roofshape.js';
@@ -234,6 +235,22 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   check('Haus: Hauptdach (nicht der Anbau) schneidet die Wände des Obergeschosses (Kniestock)', og?.roofCut?.length === 1 && roof.rooms[0].roof.shape.type === 'half_hip');
   check('Gartenhaus: abgesetztes Pultdach (zwei Pultflächen, nördliche höher)',
     sc.house.floors.find((f) => f.id === 'gartenhaus/__dach')?.rooms.map((r) => r.roof?.eaves).join() === '2,2.9');
+}
+
+// Fassaden und Geländer
+{
+  const sc = toScene(parseModel(demoText));
+  const f = (id) => sc.house.floors.find((x) => x.id === id);
+  check('Fassade: je Gebäude an allen Etagen und am Dach, Sockel nur auf der untersten Etage',
+    f('haus/eg').facade?.type === 'plaster' && f('haus/eg').lowest && !f('haus/og').lowest && f('haus/__dach').facade?.plinth
+    && f('gartenhaus/eg').facade.type === 'wood_siding' && !f('garage/eg').facade);
+  const out = f(OUTDOOR_FLOOR).rooms.find((r) => r.id === 'veranda');
+  const terr = f('haus/__dach').rooms.find((r) => r.id === 'dachterrasse');
+  check('Geländer: an Außenbereichen und flachen Dachteilen', out.railing?.style === 'balusters' && terr.railing?.style === 'glass');
+  const calls = { frame: 0, glass: 0 };
+  const mk = (role) => ({ skirt: () => calls[role]++, triUV: () => {} });
+  buildRailing([[0, 0], [2, 0], [2, 2], [0, 2]], { style: 'glass', edges: [0] }, () => 0, (role) => mk(role === 'glass' ? 'glass' : 'frame'), 1);
+  check('Geländer: zwei Pfosten, Handlauf und eine Glasscheibe an der gewählten Kante', calls.glass === 1 && calls.frame === 12, JSON.stringify(calls));
 }
 
 // Werkzeug: Höhenraster aus einem Scan (OBJ, Y nach oben), eingepasst mit Drehung, Versatz und Fußbodenhöhe
