@@ -10,6 +10,7 @@ import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsB
 import { terrainGrid, clipTerrain, terrainShade, aerialTransform } from '../src/terrain.js';
 import { readTiff, readXyz, readWorldFile, sampleRaster, georef } from '../scripts/lib/geodata.mjs';
 import { buildRailing } from '../src/railing.js';
+import { vegTemplate, vegPlacement, REF } from '../src/vegetation.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 import { roofShape, minusConvex } from '../src/roofshape.js';
@@ -420,6 +421,47 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const t = JSON.parse(rf2(join(dir, 't.json'), 'utf8'));
   // Plan (0,0) = Pixel (0,0); Plan-y nach unten = Süden = nächste Bildzeile
   check('DGM -> Höhenraster: Lage, Nordrichtung, Fußboden', t.heights.length === 2 && t.heights[0].join() === '0,2,4' && t.heights[1].join() === '0.5,2.5,4.5', JSON.stringify(t));
+}
+
+// Pflanzen-Vorlagen: wenige Dreiecke je Detailstufe, Variation fest aus der Position
+{
+  const tris = (shape, near) => vegTemplate(shape, near).attributes.position.count / 3;
+  const counts = Object.keys(REF).map((s) => [s, tris(s, true), tris(s, false)]);
+  check('Pflanzen: nah ≤ 300, fern ≤ 120 Dreiecke je Form', counts.every(([, n, f]) => n <= 300 && f <= 120 && f < n), JSON.stringify(counts));
+  const a = vegPlacement({ kind: 'tree', pos: [3, 4], size: [4, 4, 6] }, 'round', () => null);
+  const b = vegPlacement({ kind: 'tree', pos: [3, 4], size: [4, 4, 6] }, 'round', () => null);
+  const c = vegPlacement({ kind: 'tree', pos: [9, 1], size: [4, 4, 6] }, 'round', () => null);
+  check('Pflanzen: Variation aus der Position (gleich bleibt gleich, anders variiert)', a.local.equals(b.local) && !a.local.equals(c.local) && a.crown === 4);
+}
+
+// nDOM -> Bäume: Wipfel, Kronendurchmesser, Gebäude ausgespart
+{
+  const { mkdtempSync, writeFileSync: wf, readFileSync: rf, mkdirSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { execFileSync } = await import('node:child_process');
+  const dir = mkdtempSync(join(tmpdir(), 'ha3d-ndom-'));
+  mkdirSync(join(dir, 'data'));
+  wf(join(dir, 'data', 'model.yaml'), [
+    'schema: ha3d', 'version: 2',
+    'site: { name: Test, georef: { origin: [1000, 2000] } }',
+    'buildings:',
+    '  - id: haus', '    name: Haus', '    floors:',
+    '      - { id: eg, name: EG, level: 0, height: 2.5, walls: [], rooms: [{ id: raum, name: Raum, polygon: [[18, 3], [23, 3], [23, 8], [18, 8]] }] }',
+    'objects: []', '',
+  ].join('\n'));
+  // Kegelförmige Kronen: Baum bei (5, 5), 8 m hoch, Radius 2,5 m; „Baum“ im Haus bei (20, 5)
+  const lines = [];
+  for (let y = 0; y <= 12; y += 0.5) for (let x = 0; x <= 26; x += 0.5) {
+    const cone = (cx, cy, H, R) => Math.max(0, H * (1 - Math.hypot(x - cx, y - cy) / R));
+    const z = Math.max(cone(5, 5, 8, 2.5) > 0 ? 3 + cone(5, 5, 5, 2.5) : 0, cone(20, 5, 9, 2));
+    lines.push(`${1000 + x} ${2000 - y} ${z.toFixed(3)}`);
+  }
+  wf(join(dir, 'ndom.xyz'), lines.join('\n'));
+  execFileSync('node', [join(ENGINE_ROOT, 'scripts/trees-from-ndom.mjs'), join(dir, 'ndom.xyz'), '--data', join(dir, 'data'), '--bounds', '0,0,26,12', '--write']);
+  const objs = yaml.load(rf(join(dir, 'data', 'model.yaml'), 'utf8')).objects;
+  const t = objs[0];
+  check('nDOM -> Bäume: ein Baum, Wipfel, Krone, Höhe; Gebäude ausgespart',
+    objs.length === 1 && t.model === 'tree' && t.pos.join() === '5,5' && Math.abs(t.size[0] - 5) < 1 && Math.abs(t.size[2] - 8) < 0.1, JSON.stringify(objs));
 }
 
 // Magicplan-Import: Etagen drehen, Raum-IDs eindeutig, Räume teilen (Python, ohne PDF)

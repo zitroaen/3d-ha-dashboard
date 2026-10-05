@@ -1,5 +1,17 @@
 # Änderungen
 
+## 0.24.0
+
+- **Bäume und Sträucher als Instanzen:** je Form ein `InstancedMesh` – Hunderte Pflanzen mit wenigen
+  Zeichenaufrufen. Detailstufen nach Bildschirmgröße (nah: Krone aus mehreren unregelmäßigen, verrauschten Teilen;
+  fern: eine Low-Poly-Form); Drehung, Proportionen und Laubton variieren je Pflanze aus ihrer Position. Ein Laubbaum
+  kostet nah ~260 statt ~1000 Dreiecke, fern ~90. Das Leistungsbudget prüft jetzt auch 200 Bäume.
+- **Neue Formen:** Obstbaum (`shape: fruit`, niedrig und breit), überarbeitete Laub-, Nadel-, Säulenbäume und
+  Birken (Stamm mit scharfen Ringen); **Hecke** (`hedge`) entlang einer Linie oder eines Pfads, folgt dem Gelände.
+- **Werkzeug `scripts/trees-from-ndom.mjs`:** Bäume aus einem nDOM (Höhe über Gelände) – Wipfel, Kronendurchmesser,
+  Gebäude ausgespart – als Objekte ins Modell.
+- Kontaktschatten unter Objekten am Hang folgen dem Gelände (vorher schnitten sie gerade Kanten hinein).
+
 ## 0.23.0
 
 - **Luftbild auf dem Gelände:** `site.terrain.texture` legt ein Bild (z. B. ein Orthophoto) auf den Boden und alle

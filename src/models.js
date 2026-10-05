@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { vegShape, vegPlacement, vegGeometry, vegTemplate } from './vegetation.js';
 
 /** Material-Palette (Schlüssel -> MeshStandardMaterial-Parameter). Wird in furnishing.js mit Raumlicht versehen. */
 export const PALETTE = {
@@ -64,6 +65,8 @@ export const PALETTE = {
   alu: { color: 0xc4c7ca, roughness: 0.35, metalness: 0.7 },
   // Innenausstattung
   glass_cab: { color: 0xc9dde4, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false },
+  // Bäume und Sträucher (src/vegetation.js): Farben stecken in der Geometrie
+  veg: { color: 0xffffff, roughness: 0.9, vertexColors: true },
 };
 
 /** Farbe als Material-Schlüssel: Palette-Name oder '#rrggbb' (eigene Farbe, z. B. aus params.color) */
@@ -233,6 +236,22 @@ export class PartCollector {
 // Möbel. Signatur: (P, item) — P ist bereits auf Position/Drehung/Raum des Möbels gesetzt.
 // item.size = [Breite, Tiefe, Höhe] überschreibt die Standardmaße, soweit das Modell es nutzt.
 // ---------------------------------------------------------------------------------------------
+
+/** Baum oder Strauch im Einzelaufbau: Vorlage der nahen Detailstufe mit Variation und Farbe wie im Haus */
+function plant(P, it) {
+  const shape = vegShape(it);
+  const { local, tint, crown } = vegPlacement(it, shape, (k) => {
+    const p = paletteParams(k);
+    return p ? new THREE.Color(p.color) : null;
+  });
+  if (P.plants) {
+    // im Haus: als Instanz (furnishing.js), hier nur die Ausdehnung
+    P.plants(shape, P.matrix.clone().multiply(local), tint, crown);
+    P.bounds?.union(vegTemplate(shape, true).boundingBox.clone().applyMatrix4(local));
+    return;
+  }
+  P.add(vegGeometry(shape, tint), 'veg', 'lit', local);
+}
 
 export const FURNITURE = {
   /** Allgemeiner Quader für Geräte ohne eigenes Modell (Waschmaschine, Wärmepumpe …): size, params.color. */
@@ -487,41 +506,13 @@ export const FURNITURE = {
   },
 
   /**
-   * Baum: size = [Kronendurchmesser, –, Höhe]; params.shape round (Laubbaum, Standard), conifer (Nadelbaum),
-   * column (Säulenbaum, schmal und hoch) oder birch (Birke: weißer Stamm, lockere Krone); params.color = Laubfarbe.
+   * Baum: size = [Kronendurchmesser, –, Höhe]; params.shape round (Laubbaum, Standard), fruit (Obstbaum: niedrig,
+   * breit), conifer (Nadelbaum), column (Säulenbaum, schmal und hoch) oder birch (Birke: weißer Stamm, lockere
+   * Krone); params.color = Laubfarbe, params.stakes = Dreibock (junger Baum). Im Haus als Instanzen gezeichnet
+   * (src/vegetation.js); hier der Einzelaufbau (Editor, Vorschau) mit derselben Form.
    */
   tree(P, it) {
-    const [Dm, , H] = [it.size?.[0] ?? 3, 0, it.size?.[2] ?? it.size?.[1] ?? 5];
-    const r = Dm / 2;
-    if (it.shape === 'conifer') {
-      P.cyl('bark', 0.08, 0.12, H * 0.25, 0, 0, 0, { seg: 8 });
-      const c = it.color || 'conifer';
-      for (let i = 0; i < 3; i++) {
-        const y0 = H * (0.15 + i * 0.25), h = H * (0.45 - i * 0.07), rr = r * (1 - i * 0.28);
-        P.cyl(c, 0, rr, h, 0, y0, 0, { seg: 10 });
-      }
-      return;
-    }
-    if (it.shape === 'column') {
-      P.cyl('bark', 0.07, 0.11, H * 0.2, 0, 0, 0, { seg: 8 });
-      P.blob(it.color || 'leaf_dark', r * 0.5, H * 0.42, r * 0.5, 0, H * 0.55, 0);
-      P.blob(it.color || 'leaf_green', r * 0.38, H * 0.3, r * 0.38, r * 0.12, H * 0.62, 0);
-      return;
-    }
-    if (it.shape === 'birch') {
-      // schlanker weißer Stamm mit dunklen Ringen, mehrere kleine, lockere Kronenteile
-      P.cyl('birch_bark', 0.06, 0.1, H * 0.75, 0, 0, 0, { seg: 8 });
-      for (let i = 0; i < 4; i++) P.cyl('black_matte', 0.101 - i * 0.008, 0.101 - i * 0.008, 0.03, 0, H * (0.12 + i * 0.15), 0, { seg: 8 });
-      const c = it.color || 'leaf_light';
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2;
-        P.blob(i % 2 ? 'leaf_green' : c, r * 0.42, r * 0.5, r * 0.42, Math.cos(a) * r * 0.42, H * 0.62 + (i % 3) * r * 0.25, Math.sin(a) * r * 0.42);
-      }
-      P.blob(c, r * 0.4, r * 0.55, r * 0.4, 0, H * 0.82, 0);
-      return;
-    }
-    const c = it.color || 'leaf_green';
-    const trunk = Math.max(0.6, H - Dm * 0.9);
+    plant(P, it);
     if (it.stakes) {
       // Dreibock aus Pfählen mit Querlatten (junger Baum)
       const ps = [0, 2.094, 4.189].map((a) => [Math.cos(a) * 0.32, Math.sin(a) * 0.32]);
@@ -531,22 +522,40 @@ export const FURNITURE = {
         P.rod('oak_light', [a[0], 1.75, a[1]], [b[0], 1.75, b[1]], 0.025, { seg: 4 });
       }
     }
-    P.cyl('bark', 0.1, 0.16, trunk + r * 0.3, 0, 0, 0, { seg: 8 });
-    const cy = H - r * 0.95;
-    P.blob(c, r * 0.85, r * 0.8, r * 0.85, 0, cy, 0);
-    // drei Nebenkronen, damit die Krone nicht wie eine Kugel aussieht
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2 + 0.6;
-      P.blob(i === 1 ? 'leaf_dark' : c, r * 0.55, r * 0.5, r * 0.55, Math.cos(a) * r * 0.45, cy - r * 0.15 + i * r * 0.12, Math.sin(a) * r * 0.45);
-    }
   },
 
   /** Strauch/Busch: size = [Breite, Tiefe, Höhe], params.color = Laubfarbe */
   shrub(P, it) {
-    const [W, D, H] = it.size || [1.2, 1.0, 1.0];
+    plant(P, it);
+  },
+
+  /**
+   * Hecke entlang einer Linie: size = [Länge, Breite, Höhe] entlang der lokalen x-Achse (rot dreht sie), oder
+   * params.path = Punkte [[x, z], …] relativ zur Position (Ecken, Bögen); params.color = Laubfarbe. Am Hang folgt
+   * sie dem Gelände (groundAt).
+   */
+  hedge(P, it, { groundAt = () => 0 } = {}) {
+    const [L, W, H] = [it.size?.[0] ?? 4, it.size?.[1] ?? 0.7, it.size?.[2] ?? 1.6];
+    const path = Array.isArray(it.path) && it.path.length >= 2 ? it.path : [[-L / 2, 0], [L / 2, 0]];
     const c = it.color || 'leaf_dark';
-    P.blob(c, W * 0.45, H * 0.55, D * 0.45, 0, H * 0.45, 0);
-    P.blob('leaf_green', W * 0.3, H * 0.4, D * 0.3, W * 0.18, H * 0.4, -D * 0.1);
+    for (let s = 0; s + 1 < path.length; s++) {
+      const [ax, az] = path[s], [bx, bz] = path[s + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 0.05) continue;
+      // Quader mit Unterteilung, Oberfläche verrauscht (geschnittene, aber nicht glatte Hecke); Enden überlappen
+      const n = Math.max(2, Math.round(len / 0.5));
+      const g = new THREE.BoxGeometry(len + W * 0.6, H, W, n, 3, 2);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        const k = (jitter(Math.round((x + ax * 7) * 13), Math.round((y + az * 5) * 13) + Math.round(z * 13)) - 0.5) * 0.12;
+        const foot = y < -H / 2 + 1e-6; // unten etwas schmaler (Stämme), oben verrauscht
+        p.setXYZ(i, x, y > H / 2 - 1e-6 ? y + k * 1.5 : y, z * (foot ? 0.85 : 1 + k));
+      }
+      g.applyMatrix4(new THREE.Matrix4().makeRotationY(-Math.atan2(bz - az, bx - ax)).setPosition((ax + bx) / 2, H / 2, (az + bz) / 2));
+      for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + groundAt(p.getX(i), p.getZ(i)));
+      P.add(g, s % 2 ? 'leaf_green' : c);
+    }
   },
 
   /**

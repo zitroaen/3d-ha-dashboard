@@ -476,6 +476,14 @@ Standard `[B, T, H]` in Metern. Parameter gehören nach `params`. Farben (`param
 `grass_green`, `alu_dark`, `sling_grey`, `table_top`, `pine`, `barrel_green`; Innenausstattung: `glass_cab` (Glas). Statt eines Palettennamens geht auch eine eigene
 Farbe `#rrggbb`.
 
+**Bäume und Sträucher** (`tree`, `shrub`) werden als Instanzen gezeichnet: wenige Zeichenaufrufe auch für Hunderte
+Pflanzen. Je Pflanze wählt die Ansicht nach ihrer Größe auf dem Bildschirm eine Detailstufe (nah: Krone aus mehreren
+unregelmäßigen Teilen, fern: eine einfache Form); Drehung, Proportionen (±10 %) und Laubton variieren fest nach der
+Position. Bäume aus einem Oberflächenmodell: `node scripts/trees-from-ndom.mjs ndom.tif --write` (nDOM = Höhe über
+Gelände, GeoTIFF oder XYZ; Einpassung wie beim [Gelände](#geodaten-dgm-und-luftbild); `--min 3` Mindesthöhe,
+`--shrubs` auch Sträucher) legt Objekte `ndom_1 …` an – Wipfel als lokale Maxima, Kronendurchmesser aus der Fläche,
+Gebäude ausgespart.
+
 Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` prüft, dass beide übereinstimmen).
 
 <!-- katalog:start -->
@@ -504,6 +512,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `grass` | Pflanze | | 0.6 × 0.6 × 0.7 | `color` (Ziergras: `grass_straw`, `grass_green`) |
 | `grill` | Möbel | | 1.3 × 0.55 × 1.15 | (Gasgrill) |
 | `hearth` | Möbel | | | |
+| `hedge` | Pflanze | | 4 × 0.7 × 1.6 | `color`, `path` (Punkte `[[x, z], …]` relativ zur Position für Ecken; sonst gerade entlang der lokalen x-Achse, Länge = `size[0]`) – Hecke; folgt am Hang dem Gelände |
 | `high_chair` | Möbel | | 0.46 × 0.55 × 0.8 | `color` (Standard Buche) – mitwachsender Hochstuhl |
 | `kids_table` | Möbel | | 0.8 × 0.55 × 0.5 | `color` (Platte) – Kindertisch mit zwei Stühlchen |
 | `marker` | Gerät | | 0.12 | `color` |
@@ -512,7 +521,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `radiator` | Möbel | | | |
 | `robot_vacuum` | Gerät | | 0.36 × 0.75 × 0.42 | `color` – Saugroboter mit Absaugstation (Station hinten, −z an die Wand); Animation: fährt Runden, solange er saugt (`vacuum`: cleaning), danach wieder in der Station |
 | `rug` | Möbel | | 2.0 × 3.0 | `color` |
-| `shrub` | Pflanze | | 1.2 × 1.0 × 1.0 | `color` |
+| `shrub` | Pflanze | | 1.2 × 1.0 × 1.0 | `color` – als Instanz gezeichnet (siehe Bäume) |
 | `sideboard` | Möbel | | 1.2 × 0.45 × 0.6 | |
 | `sofa_u` | Möbel | | 3.5 × 2.4 × 0.82 | `seat_depth`, `left`, `right`, `color` |
 | `solar_panels` | Gerät | | 2.29 × 1.72 × 0.1 | `panels` (2), `cable_to` (`[x, z]` Kabel bis zum Dachrand), `drop` (Kabel hinunter, m), `peak` (800 W) – Balkonkraftwerk flach; Animation: Energiefluss im Kabel, solange Leistung ≥ 1 W (Tempo aus Leistung/`peak`) |
@@ -520,7 +529,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
 | `toy_storage` | Möbel | | | `columns` |
-| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`, `column`, `birch`), `color`, `stakes` (Dreibock aus Baumpfählen) |
+| `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round` Laubbaum, `fruit` Obstbaum, `conifer`, `column`, `birch`), `color`, `stakes` (Dreibock aus Baumpfählen) – `size` = [Kronendurchmesser, –, Höhe] |
 | `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
 | `wall_clock` | Möbel | | 0.35 | `color` (Rahmen) – Wanduhr, `elevation` = Mitte (Standard 1,9 m) |
 | `ball` | Leuchte | `light` | | `radius` |
@@ -715,6 +724,9 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.24.0, abwärtskompatibel):** Katalog `hedge` (Hecke entlang einer Linie oder `path`),
+  `tree` mit `shape: fruit` (Obstbaum); Bäume und Sträucher als Instanzen mit Detailstufen und Variation aus der
+  Position (gleiche Daten, anderes Aussehen); Werkzeug `scripts/trees-from-ndom.mjs`.
 - **Version 2, Ergänzung (0.23.0, abwärtskompatibel):** `site.terrain.texture` (Luftbild auf dem Gelände mit
   `origin`/`size`/`rot` oder `affine`, `strength`, `exclude`), `site.terrain.shading` (Hangschattierung),
   `site.georef` (Einpassung für Werkzeuge); Werkzeuge `scripts/terrain-from-geotiff.mjs`,
