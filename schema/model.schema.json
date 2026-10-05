@@ -57,7 +57,43 @@
               "type": "array",
               "minItems": 2,
               "items": { "type": "array", "minItems": 2, "items": { "type": ["number", "null"] } }
+            },
+            "shading": { "type": "number", "minimum": 0, "maximum": 1.5 },
+            "texture": {
+              "oneOf": [
+                { "type": "string", "minLength": 1 },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["file"],
+                  "properties": {
+                    "file": { "type": "string", "minLength": 1 },
+                    "origin": { "$ref": "#/$defs/pos" },
+                    "size": {
+                      "oneOf": [
+                        { "type": "number", "exclusiveMinimum": 0 },
+                        { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2 }
+                      ]
+                    },
+                    "rot": { "type": "number" },
+                    "affine": { "type": "array", "items": { "type": "number" }, "minItems": 6, "maxItems": 6 },
+                    "strength": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "exclude": { "type": "array", "items": { "$ref": "#/$defs/polygon" } }
+                  }
+                }
+              ]
             }
+          }
+        },
+        "georef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["origin"],
+          "properties": {
+            "origin": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+            "north_deg": { "type": "number" },
+            "floor": { "type": "number" },
+            "crs": { "type": "string" }
           }
         }
       }

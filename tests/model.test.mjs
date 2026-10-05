@@ -7,7 +7,8 @@ import * as yaml from 'js-yaml';
 import { ENGINE_ROOT } from './lib/config.mjs';
 import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.js';
 import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, activityOf, terrainOf, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
-import { terrainGrid, clipTerrain } from '../src/terrain.js';
+import { terrainGrid, clipTerrain, terrainShade, aerialTransform } from '../src/terrain.js';
+import { readTiff, readXyz, readWorldFile, sampleRaster, georef } from '../scripts/lib/geodata.mjs';
 import { buildRailing } from '../src/railing.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
@@ -282,6 +283,143 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const t = JSON.parse(rf(join(dir, 't.json'), 'utf8'));
   check('Scan -> Höhenraster: gedreht, verschoben, Fußboden = 0',
     t.origin.join() === '7,0' && t.heights.length === 5 && t.heights.every((r) => r.join() === '0.3,0.2,0.1,0'), JSON.stringify(t));
+}
+
+// Hangschattierung: Mulde dunkler als ebene Fläche, Kuppe/Ebene fast ohne
+{
+  const heights = Array.from({ length: 21 }, (_, j) => Array.from({ length: 21 }, (_, i) => {
+    const r = Math.hypot(i - 10, j - 10);
+    return r < 6 ? -1.5 * Math.cos((r / 6) * Math.PI / 2) : 0; // Mulde in der Mitte
+  }));
+  const g = terrainGrid({ origin: [0, 0], cell: 1, heights });
+  const sh = terrainShade(g);
+  const at = (i, j) => sh[j * g.nx + i];
+  check('Hangschattierung: Mulde dunkler, ebener Rand fast unverändert', at(10, 10) > 0.1 && at(0, 0) < 0.02 && at(10, 10) <= 0.55, `${at(10, 10)} ${at(0, 0)}`);
+  check('Hangschattierung: shading 0 schaltet ab', terrainShade(g, { strength: 0 }).every((v) => v === 0));
+}
+
+// Luftbild-Lage: origin/size/rot und World-Datei-Matrix
+{
+  const t = aerialTransform({ origin: [10, 20], size: [40, 30], rot: 90 });
+  const uv = (p) => [t.U[0] * p[0] + t.U[1] * p[1] + t.U[2], t.V[0] * p[0] + t.V[1] * p[1] + t.V[2]];
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+  // rot 90: Bildzeilen laufen in +y, Bild-unten zeigt nach −x
+  check('Luftbild: Ecken bei rot 90', near(uv([10, 20]), [0, 0]) && near(uv([10, 60]), [1, 0]) && near(uv([-20, 20]), [0, 1]) && near(t.toPlan(1, 1), [-20, 60]));
+  const a = aerialTransform({ affine: [0.2, 0, 5, 0, 0.2, -3] }, 100, 50);
+  check('Luftbild: affine (Pixel) -> u, v', near([a.U[0] * 25 + a.U[1] * 7 + a.U[2], a.V[0] * 25 + a.V[1] * 7 + a.V[2]], [1, 1]));
+  check('Luftbild: unbrauchbare Lage -> null', aerialTransform({ size: 0 }) === null);
+}
+
+// Geodaten: GeoTIFF (unkomprimiert, Deflate + Gleitkomma-Prädiktor, LZW + Prädiktor 2), XYZ, World-Datei, Einpassung
+{
+  const { deflateSync } = await import('node:zlib');
+  const W = 5, H = 4;
+  const val = (x, y) => 300 + x * 2 + y * 0.5; // Höhe in m (NHN)
+  /** Kleines GeoTIFF schreiben (ein Streifen, little endian) */
+  const tiff = ({ fmt = 3, bits = 32, comp = 1, pred = 1 }) => {
+    const bytes = bits / 8;
+    const raw = Buffer.alloc(W * H * bytes);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const o = (y * W + x) * bytes, v = val(x, y);
+      if (fmt === 3) raw.writeFloatLE(v, o);
+      else raw.writeUInt16LE(Math.round(v * 10), o);
+    }
+    let data = raw;
+    if (pred === 3) {
+      // Gleitkomma-Prädiktor: Bytes nach Ebenen (höchstwertige zuerst), dann Differenzen
+      data = Buffer.alloc(raw.length);
+      for (let y = 0; y < H; y++) {
+        const row = Buffer.alloc(W * bytes);
+        for (let x = 0; x < W; x++) for (let b = 0; b < bytes; b++) row[b * W + x] = raw[(y * W + x) * bytes + (bytes - 1 - b)];
+        for (let i = row.length - 1; i > 0; i--) row[i] = (row[i] - row[i - 1]) & 255;
+        row.copy(data, y * W * bytes);
+      }
+    }
+    if (pred === 2) {
+      data = Buffer.from(raw);
+      for (let y = 0; y < H; y++) for (let x = W - 1; x > 0; x--) {
+        const o = (y * W + x) * 2;
+        data.writeUInt16LE((raw.readUInt16LE(o) - raw.readUInt16LE(o - 2)) & 0xffff, o);
+      }
+    }
+    if (comp === 8) data = deflateSync(data);
+    if (comp === 5) data = lzwEncode(data);
+    const entries = [
+      [256, 3, [W]], [257, 3, [H]], [258, 3, [bits]], [259, 3, [comp]], [262, 3, [1]], [273, 4, [0]], [277, 3, [1]],
+      [278, 3, [H]], [279, 4, [data.length]], [317, 3, [pred]], [339, 3, [fmt === 3 ? 3 : 1]],
+      [33550, 12, [1, 1, 0]], [33922, 12, [0, 0, 0, 1000, 2000, 0]],
+    ];
+    const ifdOff = 8, ifdSize = 2 + entries.length * 12 + 4;
+    let extra = ifdOff + ifdSize;
+    const ext = [];
+    const ifd = Buffer.alloc(ifdSize);
+    ifd.writeUInt16LE(entries.length, 0);
+    entries.forEach(([tag, type, vals], k) => {
+      const e = 2 + k * 12, size = { 3: 2, 4: 4, 12: 8 }[type];
+      ifd.writeUInt16LE(tag, e); ifd.writeUInt16LE(type, e + 2); ifd.writeUInt32LE(vals.length, e + 4);
+      const buf = Buffer.alloc(vals.length * size);
+      vals.forEach((v, i) => (type === 3 ? buf.writeUInt16LE(v, i * 2) : type === 4 ? buf.writeUInt32LE(v, i * 4) : buf.writeDoubleLE(v, i * 8)));
+      if (buf.length <= 4) buf.copy(ifd, e + 8);
+      else { ifd.writeUInt32LE(extra, e + 8); ext.push(buf); extra += buf.length; }
+    });
+    const head = Buffer.from([0x49, 0x49, 42, 0, 8, 0, 0, 0]);
+    const out = Buffer.concat([head, ifd, ...ext, data]);
+    out.writeUInt32LE(extra, ifdOff + 2 + 5 * 12 + 8); // StripOffsets
+    return out;
+  };
+  /** LZW-Kodierer (TIFF, MSB zuerst, frühe Breitenumschaltung) */
+  function lzwEncode(src) {
+    const out = [];
+    let acc = 0, nb = 0, width = 9;
+    const put = (code) => {
+      acc = (acc << width) | code; nb += width;
+      while (nb >= 8) { out.push((acc >> (nb - 8)) & 255); nb -= 8; }
+      acc &= (1 << nb) - 1;
+    };
+    let dict = new Map(), next = 258;
+    const reset = () => { dict = new Map(); for (let i = 0; i < 256; i++) dict.set(String(i), i); next = 258; width = 9; };
+    reset();
+    put(256);
+    let w = '';
+    for (const b of src) {
+      const wc = w ? `${w},${b}` : String(b);
+      if (dict.has(wc)) { w = wc; continue; }
+      put(dict.get(w));
+      dict.set(wc, next++);
+      if (next + 1 >= 1 << width && width < 12) width++;
+      w = String(b);
+    }
+    if (w) put(dict.get(w));
+    put(257);
+    if (nb) out.push((acc << (8 - nb)) & 255);
+    return Buffer.from(out);
+  }
+  const probe = (r) => [sampleRaster(r, 1002.5, 1998.5), sampleRaster(r, 1000.5, 1999.5)];
+  const ok = (r, k = 1) => {
+    const [a, b] = probe(r);
+    return Math.abs(a - val(2, 1) * k) < 1e-3 && Math.abs(b - val(0, 0) * k) < 1e-3;
+  };
+  check('GeoTIFF unkomprimiert: Werte und Lage (Pixelmitte)', ok(readTiff(tiff({}))), JSON.stringify(probe(readTiff(tiff({})))));
+  check('GeoTIFF Deflate + Gleitkomma-Prädiktor', ok(readTiff(tiff({ comp: 8, pred: 3 }))), JSON.stringify(probe(readTiff(tiff({ comp: 8, pred: 3 })))));
+  check('GeoTIFF LZW + Prädiktor 2 (16 Bit)', ok(readTiff(tiff({ fmt: 1, bits: 16, comp: 5, pred: 2 })), 10), JSON.stringify(probe(readTiff(tiff({ fmt: 1, bits: 16, comp: 5, pred: 2 })))));
+  const xyz = readXyz('1000.5 1999.5 300\n1001.5 1999.5 302\n1000.5 1998.5 300.5\n1001.5 1998.5 302.5\n');
+  check('XYZ: Gitter aus Punkten', Math.abs(sampleRaster(xyz, 1001, 1999) - 301.25) < 1e-9 && xyz.width === 2 && xyz.height === 2);
+  const wf = readWorldFile('0.2\n0\n0\n-0.2\n500000.1\n5600000.1\n');
+  check('World-Datei: Bezug Pixelmitte -> Ecke', Math.abs(wf[2] - 500000) < 1e-9 && Math.abs(wf[5] - 5600000.2) < 1e-9);
+  const g = georef({ origin: [1000, 2000], north_deg: 90, floor: 300 });
+  // Norden zeigt im Plan nach rechts: Plan (5, 0) liegt 5 m nördlich, Plan (0, 5) 5 m östlich
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+  check('Einpassung: Nordrichtung und Rückweg', near(g.toGeo([5, 0]), [1000, 2005]) && near(g.toGeo([0, 5]), [1005, 2000]) && near(g.toPlan(g.toGeo([3, -7])), [3, -7]));
+  // Werkzeug: DGM -> site.terrain
+  const { mkdtempSync, writeFileSync: wf2, readFileSync: rf2 } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { execFileSync } = await import('node:child_process');
+  const dir = mkdtempSync(join(tmpdir(), 'ha3d-'));
+  wf2(join(dir, 'dgm.tif'), tiff({ comp: 8, pred: 3 }));
+  execFileSync('node', [join(ENGINE_ROOT, 'scripts/terrain-from-geotiff.mjs'), join(dir, 'dgm.tif'), '--origin', '1000.5,1999.5', '--north', '0', '--floor', '300', '--cell', '1', '--bounds', '0,0,2,1', '--out', join(dir, 't.json')]);
+  const t = JSON.parse(rf2(join(dir, 't.json'), 'utf8'));
+  // Plan (0,0) = Pixel (0,0); Plan-y nach unten = Süden = nächste Bildzeile
+  check('DGM -> Höhenraster: Lage, Nordrichtung, Fußboden', t.heights.length === 2 && t.heights[0].join() === '0,2,4' && t.heights[1].join() === '0.5,2.5,4.5', JSON.stringify(t));
 }
 
 // Magicplan-Import: Etagen drehen, Raum-IDs eindeutig, Räume teilen (Python, ohne PDF)

@@ -29,8 +29,9 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   der obersten Etage Kniestock und Dachschräge.
 - **Fassaden und Geländer:** Putz, Holzschalung (z. B. Schwedenrot mit weißen Ecken), Ziegel, Naturstein, Sockel;
   Balustraden, Metall- und Glasgeländer für Terrassen, Balkone und Dachterrassen.
-- **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände als Höhenraster (auch aus einem LiDAR-Scan,
-  `scripts/terrain-from-scan.mjs`), Bereiche folgen dem Hang; Trockenmauern,
+- **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände als Höhenraster (aus einem LiDAR-Scan oder
+  offenen Geodaten: DGM, `scripts/terrain-from-geotiff.mjs`), Luftbild darauf (`scripts/orthophoto-crop.mjs`),
+  dezente Hangschattierung; Bereiche folgen dem Hang; Trockenmauern,
   Hochbeete und Stufen; Bäume, Sträucher, Gräser, Blumen, Gartenmöbel und Gartenleuchten (Poller, Strahler,
   Lichterkette) aus dem Katalog.
 - **Wetter:** Wolken, Regen (nasse Flächen), Schnee (weiße Decke) und Nebel aus der HA-Wetter-Entity; Symbol und

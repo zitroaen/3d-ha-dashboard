@@ -3,7 +3,7 @@
 // Krüppelwalmdach, Dachterrasse auf dem Anbau), Garage daneben, Gartenhaus mit abgesetztem Pultdach und
 // Außenbereiche (Terrasse, Einfahrt, Beete, Südhang; im Norden eine in den Hang gegrabene Terrasse mit Trockenmauern). Die Objekte (objects) in model.yaml bleiben unverändert.
 //   node examples/demo/build-house.mjs
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as yaml from 'js-yaml';
 import { toYaml, yamlHeader } from '../../src/model/yaml.js';
@@ -239,13 +239,48 @@ function northTerrace() {
   ];
 }
 
+/**
+ * Erfundenes „Luftbild“ als SVG (keine echten Geodaten): deckt den Rasterbereich ab (x −10 … 26, y −14 … 24, 20 px je
+ * Meter). Rasen mit Mähstreifen und Flecken, im Westen ein Feldweg, im Süden ein Acker, im Osten eine Wiese.
+ */
+function aerialSvg() {
+  const X0 = -10, Y0 = -14, W = 36, H = 38, S = 20;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const px = (x) => r3((x - X0) * S), py = (y) => r3((y - Y0) * S);
+  const blobs = Array.from({ length: 70 }, () => {
+    const x = X0 + rnd() * W, y = Y0 + rnd() * H, r = 0.6 + rnd() * 2.2;
+    const c = rnd() < 0.5 ? '#3f6a2a' : '#7d8f3c';
+    return `<ellipse cx="${px(x)}" cy="${py(y)}" rx="${r3(r * S)}" ry="${r3(r * S * (0.6 + rnd() * 0.6))}" fill="${c}" opacity="${r3(0.18 + rnd() * 0.2)}"/>`;
+  });
+  const stripes = Array.from({ length: Math.ceil(W / 1.6) }, (_, i) =>
+    `<rect x="${px(X0 + i * 1.6)}" y="0" width="${0.8 * S}" height="${H * S}" fill="#fff" opacity="0.05"/>`);
+  const furrows = Array.from({ length: 12 }, (_, i) =>
+    `<rect x="0" y="${py(18.6 + i * 0.45)}" width="${W * S}" height="${0.2 * S}" fill="#5b4430" opacity="0.35"/>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * S}" height="${H * S}" viewBox="0 0 ${W * S} ${H * S}">
+<filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="3" seed="4"/><feColorMatrix values="0 0 0 0 0.2  0 0 0 0 0.3  0 0 0 0 0.1  0 0 0 0.35 0"/></filter>
+<rect width="100%" height="100%" fill="#5f8a37"/>
+${blobs.join('\n')}
+${stripes.join('\n')}
+<rect x="0" y="${py(18.2)}" width="${W * S}" height="${(Y0 + H - 18.2) * S}" fill="#8a6c48"/>
+${furrows.join('\n')}
+<path d="M ${px(-8.6)} 0 C ${px(-7.4)} ${py(0)}, ${px(-9.2)} ${py(10)}, ${px(-8)} ${H * S}" stroke="#b9ab8c" stroke-width="${2.6 * S}" fill="none"/>
+<path d="M ${px(-8.6)} 0 C ${px(-7.4)} ${py(0)}, ${px(-9.2)} ${py(10)}, ${px(-8)} ${H * S}" stroke="#7f8f4e" stroke-width="${0.5 * S}" fill="none" opacity="0.7"/>
+<rect x="${px(17)}" y="0" width="${(X0 + W - 17) * S}" height="${py(18.2)}" fill="#7a9a45" opacity="0.45"/>
+<rect width="100%" height="100%" filter="url(#n)"/>
+</svg>
+`;
+}
+
 const file = fileURLToPath(new URL('./model.yaml', import.meta.url));
+mkdirSync(fileURLToPath(new URL('./textures/', import.meta.url)), { recursive: true });
+writeFileSync(fileURLToPath(new URL('./textures/luftbild.svg', import.meta.url)), aerialSvg());
 const prevText = existsSync(file) ? readFileSync(file, 'utf8') : '';
 const prev = (prevText.trim() && yaml.load(prevText)) || {};
 const model = {
   schema: 'ha3d',
   version: 2,
-  site: { name: 'Demohaus', north_deg: 20, ground: { surface: 'lawn' }, terrain: terrain() },
+  site: { name: 'Demohaus', north_deg: 20, ground: { surface: 'lawn' }, terrain: { ...terrain(), texture: { file: 'textures/luftbild.svg', strength: 0.8 } } },
   buildings,
   outdoor,
   objects: prev.objects || [],

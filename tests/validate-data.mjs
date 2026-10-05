@@ -80,6 +80,11 @@ for (const o of model.objects || []) {
   if (tex && !existsSync(join(DATA_DIR, tex))) errors.push(`Objekt ${o.id}: Textur ${tex} fehlt im Datenordner`);
 }
 
+// Luftbild: Datei vorhanden, nur mit Höhenraster wirksam
+const aerial = model.site?.terrain?.texture;
+const aerialFile = typeof aerial === 'string' ? aerial : aerial?.file;
+if (aerialFile && !existsSync(join(DATA_DIR, aerialFile))) errors.push(`site.terrain.texture: ${aerialFile} fehlt im Datenordner`);
+
 // Entities mehrfach zugeordnet (Hinweis, kein Fehler: z. B. eine Steckdose für zwei Lampen)
 const ents = (model.objects || []).flatMap((o) => roleEntities(o, 'power'));
 for (const e of ents.filter((e, i) => ents.indexOf(e) !== i)) warnings.push(`Entity ${e} mehrfach als power zugeordnet`);

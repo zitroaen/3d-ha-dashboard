@@ -1,5 +1,18 @@
 # Änderungen
 
+## 0.23.0
+
+- **Luftbild auf dem Gelände:** `site.terrain.texture` legt ein Bild (z. B. ein Orthophoto) auf den Boden und alle
+  Flächen mit dem Boden-Belag; Lage über `origin`/`size`/`rot` oder eine World-Datei-Matrix (`affine`), ohne Angabe
+  genau über dem Höhenraster. `strength` mischt mit dem Rasen, `exclude` spart Flächen aus; am Bildrand weicher
+  Übergang. Höchstens 4096 Pixel je Seite, kein zusätzlicher Zeichenaufruf.
+- **Hangschattierung:** Mulden, Böschungsfüße und steile Flächen werden einmalig berechnet etwas abgedunkelt
+  (`site.terrain.shading`, 0 = aus) – Hänge bleiben auch bei hoher Sonne lesbar.
+- **Geodaten-Werkzeuge:** `scripts/terrain-from-geotiff.mjs` (DGM als GeoTIFF oder XYZ -> `site.terrain`) und
+  `scripts/orthophoto-crop.mjs` (Orthophoto zuschneiden und in Plan-Ausrichtung drehen); Einpassung über
+  `site.georef` (Plan-Ursprung in Landeskoordinaten, Nordrichtung, Höhe des EG-Fußbodens). Ohne zusätzliche Pakete.
+- Demo-Haus mit erfundenem Luftbild (SVG).
+
 ## 0.22.0
 
 - **Standardansicht:** Einstellungen → „Aktuelle Ansicht als Standard“ merkt sich Ebene, Blickwinkel und Zoom (je

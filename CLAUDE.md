@@ -65,6 +65,8 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude; Etagen drehen/verschieben, Raum-IDs, Räume teilen: `scripts/plan_transform.py`) |
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
 | `node scripts/terrain-from-scan.mjs scan.obj --cell 0.5 --rotate … --offset x,y --floor … --write` | Höhenraster `site.terrain` aus einem LiDAR-Scan (OBJ) |
+| `node scripts/terrain-from-geotiff.mjs dgm.tif … --write` | Höhenraster aus DGM (GeoTIFF/XYZ), Einpassung `site.georef` oder `--origin/--north/--floor` |
+| `node scripts/orthophoto-crop.mjs dop.tif … --write` | Luftbild `site.terrain.texture` aus einem Orthophoto (zuschneiden, in Plan-Ausrichtung drehen) |
 
 Alle Werkzeuge nehmen den Datenordner aus `DATA_DIR` (bzw. `--data` oder `ha3d.config.json` der Instanz), Standard
 ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zusätzliche Screenshot-Ansichten.
@@ -89,14 +91,16 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
   · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige, fester Zustand)
   · `src/catalogpanel.js` Katalog und Lager im Editor · `src/preview.js` Vorschaubilder · `src/ha.js` Zustand/Dienste
-- `src/railing.js` Geländer · `src/terrain.js` Höhenraster (Höhe, Normalen, Zuschnitt auf Bereiche) · `src/ground.js` Boden (Höhe daneben für
-  Kanten, Bodennetz mit Aussparungen)
+- `src/railing.js` Geländer · `src/terrain.js` Höhenraster (Höhe, Normalen, Zuschnitt auf Bereiche, Hangschattierung,
+  Luftbild-Lage) · `src/ground.js` Boden (Höhe daneben für Kanten, Bodennetz mit Aussparungen, Schattierungs-Textur,
+  Luftbild laden)
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
   (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `performance.mjs` (Leistungsbudget), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
 - `custom_components/ha_3d_dashboard/` HA-Integration: Config-Flow (ein Klick), liefert `frontend/ha-3d-dashboard.js`
   aus (nur im Release-Zip) und registriert das Panel `/haus-3d`; Optionen Titel, Symbol, `data_url`; `storage.py`
   gemeinsames Modell (WebSocket `ha_3d_dashboard/model/get|save|subscribe`)
+- `scripts/lib/geodata.mjs` GeoTIFF/XYZ/World-Datei lesen (ohne Pakete), Einpassung Plan <-> Landeskoordinaten
 - `scripts/` Build, Magicplan-Import, `import-building.mjs`, `house_fixes.py`, Platzhalter-Leuchten, Deploy, `init-instance.mjs`
 
 ## Lichtmodell
@@ -274,3 +278,12 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).
+- Luftbild und Hangschattierung (0.23.0): Das Luftbild liegt auf dem Boden-Belag-Material (`site.ground`, Shader-Option
+  `aerial`: Plan -> Bild über zwei vec3, globale Uniforms in roomlight.js) – damit auch auf Rasen-Bereichen, ohne
+  eigenes Mesh oder Material. Laden über ein Canvas (verkleinert auf 4096, `exclude` ausgestanzt = Alpha 0, am Rand
+  5 % Überblendung); `whenReady()` wartet darauf. Hangschattierung einmal je Rasterpunkt (Horizont in 8 Richtungen +
+  Steilheit) als HalfFloat-Textur (r = Abdunklung, g = Geländehöhe); alle Materialien im Freien lesen sie, aber nur
+  auf Flächen nahe der Geländehöhe und nach oben gerichtet (nicht auf Dächern, Mauerkronen). Geodaten-Werkzeuge ohne
+  Pakete (eigener TIFF-Leser: LZW/Deflate/Prädiktoren; JPEG-TIFF -> gdal_translate); Bild-Umrechnung im Test-Browser.
+  Das Demo-Luftbild ist ein erfundenes SVG (Bilder außerhalb von docs/ blockt der Datenschutz-Check); im Bundle-Demo
+  fehlt es (src/demo.js entfernt es).
