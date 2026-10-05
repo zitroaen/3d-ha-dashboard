@@ -61,6 +61,7 @@ objects: [ ... ]     # Möbel, Leuchten, Geräte – mit Verknüpfung zu Home As
 | `ground` | nein | `{ surface: lawn }` | Boden außerhalb aller Außenbereiche: `{ surface }` |
 | `weather` | nein | automatisch | Wetter-Entity für Himmel, Regen, Schnee, Nebel und die Anzeige oben, z. B. `weather.home`. Ohne Angabe: `weather.home`, `weather.forecast_home`, sonst die erste `weather.*` |
 | `terrain` | nein | eben | Gelände als Höhenraster, siehe unten |
+| `georef` | nein | | Lage des Plans in Landeskoordinaten – nur für die Werkzeuge (Geodaten einlesen), die Anzeige nutzt es nicht; siehe [Geodaten](#geodaten-dgm-und-luftbild) |
 
 **Höhenraster (`site.terrain`):** das Gelände des Grundstücks als Tabelle von Höhen (Meter, wie `elevation`; 0 =
 EG-Fußboden), z. B. aus einem LiDAR-Scan (`scripts/terrain-from-scan.mjs`).
@@ -70,6 +71,24 @@ EG-Fußboden), z. B. aus einem LiDAR-Scan (`scripts/terrain-from-scan.mjs`).
 | `origin` | nein | `[0, 0]` | Plan-Punkt des ersten Werts (Zeile 0, Spalte 0) |
 | `cell` | nein | 0.5 | Rasterweite (Meter) |
 | `heights` | ja | | Zeilen in +y, Werte darin in +x: `heights[j][i]` liegt bei `origin + [i, j] · cell`; `null` = keine Angabe (aus den Nachbarn ergänzt) |
+| `shading` | nein | 1 | Hangschattierung: Mulden, Böschungsfüße und steile Flächen etwas dunkler (0 = aus, bis 1,5 = kräftiger) |
+| `texture` | nein | | Luftbild auf dem Gelände: Dateiname (deckt dann genau das Raster ab) oder Angaben wie unten |
+
+**Luftbild (`site.terrain.texture`):** ein Bild im Datenordner (JPG, PNG, auch SVG), das auf dem Boden-Belag liegt –
+auf dem Gelände zwischen den Bereichen und auf allen Flächen mit demselben Belag wie `site.ground` (z. B. Rasen).
+Wege, Beete, Terrassen und Dächer behalten ihren Belag. Außerhalb des Bilds bleibt der bisherige Boden (am Rand
+weich überblendet). Höchstens 4096 Pixel je Seite (größere Bilder werden verkleinert); kein zusätzlicher
+Zeichenaufruf.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `file` | ja | | Bilddatei relativ zum Datenordner, z. B. `textures/luftbild.jpg` |
+| `origin` | nein | linke obere Ecke des Rasters | Plan-Punkt der linken oberen Bildecke |
+| `size` | nein | Größe des Rasters | `[Breite, Höhe]` des Bilds in Metern (eine Zahl = quadratisch) |
+| `rot` | nein | 0 | Drehung: Richtung der Bildzeilen im Plan, Grad von +x nach +y |
+| `affine` | nein | | statt `origin`/`size`/`rot`: `[a, b, c, d, e, f]` wie eine World-Datei, x = a·Spalte + b·Zeile + c, y = d·Spalte + e·Zeile + f (Bezug: Pixelecke) |
+| `strength` | nein | 0.85 | Deckkraft über dem prozeduralen Rasen (0 … 1); weniger, damit Schatten und Dächer im Bild nicht doppelt wirken |
+| `exclude` | nein | | Polygone, auf denen das Bild nicht liegt (z. B. Dachüberstände, Schlagschatten der Gebäude im Bild) |
 
 Jede Zelle besteht aus zwei Dreiecken (Diagonale von rechts oben nach links unten), dazwischen ist die Höhe linear;
 gezeichnet mit weichen Normalen. Außerhalb des Rasters setzt der Boden den Rand fort. Unter Gebäuden und
@@ -277,6 +296,41 @@ outdoor:
 --floor <Höhe des EG-Fußbodens im Scan> --write` liest einen texturierten oder untexturierten OBJ-Export (Scaniverse,
 Polycam, 3D Scanner App; USDZ in der App als OBJ exportieren), passt ihn ein und schreibt `site.terrain`. Je
 Rasterpunkt zählt die niedrigste Fläche (Boden unter Büschen, `--mode max` für die höchste).
+
+### Geodaten: DGM und Luftbild
+
+Viele Länder stellen Geländehöhen (DGM1: 1-m-Raster), Orthophotos (DOP20: 20 cm je Pixel) und Gebäude (LoD2) als
+offene Daten bereit – meist in ETRS89/UTM (EPSG:25832 bzw. 25833) als GeoTIFF, XYZ-Text oder JPG mit World-Datei.
+Suchbegriffe im Geoportal des Landes: „DGM1 Download“, „DOP20 Download“, „Open Data Geobasisdaten“. Lizenzen
+verlangen meist eine Namensnennung (`site.attribution`).
+
+**Einpassung (`site.georef`)** – wo der Plan in den Landeskoordinaten liegt (nur für die Werkzeuge):
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `origin` | ja | | `[Ost, Nord]` des Plan-Ursprungs (0, 0) in den Koordinaten der Daten |
+| `north_deg` | nein | `site.north_deg` | Gitternord im Plan (Grad im Uhrzeigersinn von Plan-oben); weicht bei UTM um die Meridiankonvergenz (~1–2°) von geografisch Nord ab |
+| `floor` | nein | 0 | Höhe des EG-Fußbodens im Höhensystem der Daten (z. B. NHN) – wird zu 0 |
+| `crs` | nein | | Koordinatensystem zur Erinnerung, z. B. `EPSG:25832` |
+
+```yaml
+site:
+  north_deg: 20
+  georef: { crs: EPSG:25832, origin: [512345.6, 5432109.8], floor: 312.45 }
+```
+
+Ursprung finden: eine Hausecke im Plan (z. B. `[0, 0]`) im Orthophoto oder in den LoD2-Daten ablesen; die
+Nordrichtung aus einer langen Hauswand. Danach:
+
+1. **Gelände:** `node scripts/terrain-from-geotiff.mjs dgm1_*.tif --cell 1 --write` (oder `*.xyz`; mehrere Kacheln
+   möglich; `--margin 15` Meter um das Modell, `--bounds x0,y0,x1,y1` für einen eigenen Ausschnitt; Optionen
+   `--origin E,N --north Grad --floor m` statt `site.georef`).
+2. **Luftbild:** `node scripts/orthophoto-crop.mjs dop20_*.tif --write` (oder JPG/PNG mit `.jgw`/`.pgw`) schneidet
+   das Bild auf das Raster zu, dreht es in Plan-Ausrichtung und speichert `textures/luftbild.jpg` (`--res 0.2`
+   Meter je Pixel, höchstens 4096 Pixel je Seite). JPEG-komprimierte GeoTIFFs vorher umwandeln:
+   `gdal_translate -co COMPRESS=DEFLATE dop.tif dop_deflate.tif`.
+3. Ansehen (`npm run serve`), `strength` und `exclude` anpassen. Gebäude und ihre Schatten im Luftbild liegen neben
+   den 3D-Gebäuden (Schrägsicht der Kamera, andere Tageszeit) – `exclude` deckt sie ab.
 
 ## `objects` – Objekte
 
@@ -661,6 +715,10 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.23.0, abwärtskompatibel):** `site.terrain.texture` (Luftbild auf dem Gelände mit
+  `origin`/`size`/`rot` oder `affine`, `strength`, `exclude`), `site.terrain.shading` (Hangschattierung),
+  `site.georef` (Einpassung für Werkzeuge); Werkzeuge `scripts/terrain-from-geotiff.mjs`,
+  `scripts/orthophoto-crop.mjs`.
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
 - **Version 2, Ergänzung (0.20.0, abwärtskompatibel):** Katalog `dining_table`, `cabinet`, `corner_cabinet`, `console`,
