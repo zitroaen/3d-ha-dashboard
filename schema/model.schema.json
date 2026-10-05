@@ -117,6 +117,7 @@
             "type": { "enum": ["plaster", "wood_siding", "brick", "stone"] },
             "color": { "type": "string" },
             "corners": { "oneOf": [{ "type": "string" }, { "const": false }] },
+            "flush": { "type": "boolean" },
             "plinth": {
               "type": "object",
               "additionalProperties": false,
