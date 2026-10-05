@@ -179,6 +179,24 @@ export class Builder {
     }
   }
 
+  /**
+   * Gelände-Stücke aus dem Höhenraster (terrain.clipTerrain): Polygone mit Höhe und weicher Normale je Punkt.
+   * Die Normalen bleiben erhalten (keine Kanten zwischen den Rasterdreiecken).
+   */
+  terrain(frags, roomIdx, lift = 0, uvScale = 1) {
+    this.normals ??= new Map();
+    for (const poly of frags) {
+      for (let i = 1; i + 1 < poly.length; i++) {
+        for (const v of [poly[0], poly[i + 1], poly[i]]) {
+          this.normals.set(this.pos.length / 3, v.n);
+          this.pos.push(v.p[0], v.h + lift, v.p[1]);
+          this.room.push(roomIdx);
+          this.uv.push(v.p[0] / uvScale, v.p[1] / uvScale);
+        }
+      }
+    }
+  }
+
   /** @param attr Name des Index-Attributs (Raum oder Lampe) */
   geometry(attr = 'roomIdx') {
     const g = new THREE.BufferGeometry();
@@ -186,6 +204,11 @@ export class Builder {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute(attr, new THREE.Float32BufferAttribute(this.room, 1));
     g.computeVertexNormals();
+    // weiche Normalen der Gelände-Stücke übernehmen
+    if (this.normals?.size) {
+      const nr = g.attributes.normal;
+      for (const [k, n] of this.normals) nr.setXYZ(k, n[0], n[1], n[2]);
+    }
     return g;
   }
 

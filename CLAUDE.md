@@ -20,7 +20,7 @@ spezifiziert (maschinenlesbar: `schema/model.schema.json`).
 ## Harte Regeln
 
 - **Keine privaten Daten.** Nie Grundrisse, Fotos, HA-Exporte, Entity-IDs, Namen oder Adressen echter Häuser
-  committen. Testdaten = Demo-Haus. `npm run privacy` (Teil von `npm test`) blockiert PDFs, Bilder außerhalb von
+  committen. Testdaten = Demo-Haus. `npm run privacy` (Teil von `npm test`) blockiert PDFs, 3D-Scans, Bilder außerhalb von
   `docs/`, Datenordner und Hausdaten außerhalb von `examples/demo`. Lokal prüft er zusätzlich Begriffe aus einer
   gitignorierten `.privacy-terms`.
 - **Offline:** three.js und alles andere wird gebündelt. Keine CDNs, keine externen Requests (die Tests scheitern
@@ -64,6 +64,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run test:unit` | Modell: Migration, YAML, Szenen-Adapter, Zurückschreiben (Teil von `npm test`) |
 | `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude) |
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
+| `node scripts/terrain-from-scan.mjs scan.obj --cell 0.5 --rotate … --offset x,y --floor … --write` | Höhenraster `site.terrain` aus einem LiDAR-Scan (OBJ) |
 
 Alle Werkzeuge nehmen den Datenordner aus `DATA_DIR` (bzw. `--data` oder `ha3d.config.json` der Instanz), Standard
 ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zusätzliche Screenshot-Ansichten.
@@ -87,6 +88,8 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
   · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige, fester Zustand)
   · `src/catalogpanel.js` Katalog und Lager im Editor · `src/preview.js` Vorschaubilder · `src/ha.js` Zustand/Dienste
+- `src/terrain.js` Höhenraster (Höhe, Normalen, Zuschnitt auf Bereiche) · `src/ground.js` Boden (Höhe daneben für
+  Kanten, Bodennetz mit Aussparungen)
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
   (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `performance.mjs` (Leistungsbudget), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
@@ -235,6 +238,15 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Ebenen zusammenfassen (0.17.0): `scene._mergeLevels()` fasst Bauwerk-Meshes aller Etagen einer Ebene je Material in
   der ersten Etage zusammen (Etagen einer Ebene sind immer gemeinsam sichtbar), Bodenplatten je Ebene ebenso;
   Treffer-Flächen bleiben je Etage. Spart ~20 Zeichenaufrufe je Ebene im Demo-Haus.
+- Höhenraster (0.18.0): `site.terrain` (`src/terrain.js`, ohne three.js), Zellen mit fester Diagonale, Lücken aus
+  den Nachbarn gefüllt, außerhalb Rand fortgesetzt. Der Boden ist das Raster minus Gebäude-Grundflächen (unterste
+  Etage: Wände, Räume, Fenster-/Türrechtecke) und aller Außenbereiche (`clipTerrain`: Rasterdreiecke gegen konvexe
+  Stücke, Normalen baryzentrisch aus dem Raster → weiche Schattierung unabhängig vom Zuschnitt). `follow: terrain`
+  zeichnet dieselben Dreiecke im Umriss mit dem eigenen Belag (kein z-fighting, keine Fächer aus langen Dreiecken).
+  Kanten aller Außenbereiche richten sich nach dem, was daneben liegt (`FloorModel._outsideAt`: Nachbarbereich, Gebäude
+  = keine Kante, sonst `ground.at`), mit Raster auch nach oben (Stützmauer). Gebäudesockel (Bodenplatte der untersten
+  Etage) reicht bis auf den Boden. Ohne Raster bleibt das alte Gitter (`ground.at`), nur unter Gelände-Bereichen
+  6 cm statt 1,2 cm tiefer (Flackern). YAML-Schreiber: Zahlentabellen mit langen Zeilen als eine Zeile je Zeile.
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).

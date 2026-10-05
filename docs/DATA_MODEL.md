@@ -60,6 +60,21 @@ objects: [ ... ]     # Möbel, Leuchten, Geräte – mit Verknüpfung zu Home As
 | `north_deg` | nein | 0 | Richtung Norden im Plan, Grad im Uhrzeigersinn von Plan-oben (Sonne, Mond, Kompass). Beispiel: Norden zeigt im Plan nach rechts → 90 |
 | `ground` | nein | `{ surface: lawn }` | Boden außerhalb aller Außenbereiche: `{ surface }` |
 | `weather` | nein | automatisch | Wetter-Entity für Himmel, Regen, Schnee, Nebel und die Anzeige oben, z. B. `weather.home`. Ohne Angabe: `weather.home`, `weather.forecast_home`, sonst die erste `weather.*` |
+| `terrain` | nein | eben | Gelände als Höhenraster, siehe unten |
+
+**Höhenraster (`site.terrain`):** das Gelände des Grundstücks als Tabelle von Höhen (Meter, wie `elevation`; 0 =
+EG-Fußboden), z. B. aus einem LiDAR-Scan (`scripts/terrain-from-scan.mjs`).
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `origin` | nein | `[0, 0]` | Plan-Punkt des ersten Werts (Zeile 0, Spalte 0) |
+| `cell` | nein | 0.5 | Rasterweite (Meter) |
+| `heights` | ja | | Zeilen in +y, Werte darin in +x: `heights[j][i]` liegt bei `origin + [i, j] · cell`; `null` = keine Angabe (aus den Nachbarn ergänzt) |
+
+Jede Zelle besteht aus zwei Dreiecken (Diagonale von rechts oben nach links unten), dazwischen ist die Höhe linear;
+gezeichnet mit weichen Normalen. Außerhalb des Rasters setzt der Boden den Rand fort. Unter Gebäuden und
+Außenbereichen ist der Boden ausgespart – Gebäude stehen auf ihrem Sockel (auf der Talseite reicht er bis auf das
+Gelände), Außenbereiche zeichnen ihre Fläche selbst. Objekte ohne Bereich stehen auf dem Raster.
 
 ## `buildings` – Gebäude
 
@@ -193,11 +208,18 @@ Bereiche wie Räume: Objekte können darin stehen, Außenleuchten beleuchten sie
 | `polygon` | ja | | Fläche; Eckpunkte `[x, y]` oder mit Höhe `[x, y, z]` (Gelände, siehe unten) |
 | `surface` | nein | `lawn` | Oberfläche |
 | `elevation` | nein | 0 | Höhe der Fläche (Terrasse auf Fußbodenhöhe, Garten tiefer); bei Gelände: Höhe der Eckpunkte ohne `z` |
-| `extend` | nein | false | Gelände: der Boden setzt den Bereich nach außen fort, auch wo er höher liegt (Hang, der über das Grundstück hinausläuft) – statt Erdkante |
+| `follow` | nein | | `terrain`: der Bereich liegt auf dem Höhenraster (`site.terrain`) – Rasen, Wege, Beete am Hang brauchen nur ihr Polygon |
+| `extend` | nein | false | Gelände je Eckpunkt: der Boden setzt den Bereich nach außen fort, auch wo er höher liegt (Hang, der über das Grundstück hinausläuft) – statt Erdkante |
 | `edge` | nein | Erde bzw. Belag | Oberfläche der Kante, wo der Bereich über dem Boden liegt (z. B. `stone` für Mauern, Hochbeete, Stufen); ohne Angabe Erde bei `lawn`/`soil`, sonst der Belag selbst |
 | `ha_area` | nein | nach Name | HA-Bereich |
 
-**Gelände (Hang, Böschung):** Hat mindestens ein Eckpunkt eine dritte Koordinate `z`, ist der Bereich schräg: `z` ist
+**Gelände mit Höhenraster:** Außenbereiche mit `follow: terrain` liegen auf dem Raster (dieselben Dreiecke wie der
+Boden, also ohne Flackern). Ebene Bereiche mit `elevation` schneiden sich ins Gelände ein oder stehen darüber: Wo der
+Hang daneben höher ist, bekommen sie eine Kante bis hinauf zum Gelände (Stützmauer, z. B. `edge: stone`), wo er tiefer
+ist, eine Kante bis hinunter. Kanten richten sich immer nach dem, was tatsächlich daneben liegt (Gelände oder
+Nachbarbereich) – auch wenn das ganze Gelände unter 0 liegt.
+
+**Gelände je Eckpunkt (Hang, Böschung, ältere Form):** Hat mindestens ein Eckpunkt eine dritte Koordinate `z`, ist der Bereich schräg: `z` ist
 die Höhe dieses Eckpunkts (Meter, wie `elevation`), zwischen den Eckpunkten wird in Dreiecken linear interpoliert.
 Ein Hang mit gleichmäßigem Gefälle braucht also nur ein Viereck, dessen obere Kante höher liegt als die untere;
 für einen geknickten Hang mehr Eckpunkte am Rand setzen (Punkte im Inneren gibt es nicht). Objekte im Bereich stehen auf dem Gelände (Höhe an ihrer Position),
@@ -212,12 +234,23 @@ in den Hang gegrabene Terrasse: Terrasse auf Fußbodenhöhe, rundherum Mauerstre
 (Beispiel: `northTerrace()` in `examples/demo/build-house.mjs`). Kanten zu höheren Nachbarn verschwinden in deren Kante.
 
 ```yaml
-- id: garten
-  name: Garten
-  surface: lawn
-  # Südhang: oben (Norden) auf Terrassenhöhe, unten 1,5 m tiefer
-  polygon: [[-4, 11.3, -0.05], [11.2, 11.3, -0.05], [11.2, 18, -1.5], [-4, 18, -1.5]]
+site:
+  terrain:
+    origin: [-10, -14]
+    cell: 1
+    heights:
+      - [2.08, 2.08, 2.0, …]   # Zeile y = -14
+      - [1.81, 1.81, 1.82, …]  # Zeile y = -13
+outdoor:
+  - { id: garten, name: Garten, surface: lawn, follow: terrain, polygon: [[-4, 11.3], [11.2, 11.3], [11.2, 18], [-4, 18]] }
+  # ältere Form ohne Raster: Südhang, oben auf Terrassenhöhe, unten 1,5 m tiefer
+  - { id: hang, name: Hang, surface: lawn, polygon: [[-4, 11.3, -0.05], [11.2, 11.3, -0.05], [11.2, 18, -1.5], [-4, 18, -1.5]] }
 ```
+
+**Höhenraster aus einem Scan:** `node scripts/terrain-from-scan.mjs scan.obj --cell 0.5 --rotate <Grad> --offset x,y
+--floor <Höhe des EG-Fußbodens im Scan> --write` liest einen texturierten oder untexturierten OBJ-Export (Scaniverse,
+Polycam, 3D Scanner App; USDZ in der App als OBJ exportieren), passt ihn ein und schreibt `site.terrain`. Je
+Rasterpunkt zählt die niedrigste Fläche (Boden unter Büschen, `--mode max` für die höchste).
 
 ## `objects` – Objekte
 
@@ -589,6 +622,9 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.18.0, abwärtskompatibel):** `site.terrain` (Höhenraster) und `outdoor[].follow:
+  terrain`; Kanten von Außenbereichen relativ zum tatsächlichen Gelände bzw. Nachbarbereich (mit Raster auch nach
+  oben); Werkzeug `scripts/terrain-from-scan.mjs`.
 - **Version 2, Ergänzung (0.17.0, abwärtskompatibel):** Steildächer – `buildings[].roof` auch als Liste von
   Dachteilen mit `type` (`gable`, `hip`, `half_hip`, `shed`), `pitch`, `ridge`, `slope`, `overhang`, `eaves`, `top`,
   `opening`, `hip_height`, `hip_pitch`, `color`, `dormers`, `chimneys`; Oberfläche `roof_tiles`.

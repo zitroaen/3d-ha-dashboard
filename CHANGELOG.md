@@ -1,5 +1,19 @@
 # Änderungen
 
+## 0.18.0
+
+- **Gelände als Höhenraster:** `site.terrain` (Ursprung, Rasterweite, Höhen-Tabelle, Lücken erlaubt) – z. B. aus
+  einem LiDAR-Scan. Sauber trianguliert mit weichen Normalen; außerhalb setzt der Boden das Raster fort.
+- **Bereiche auf dem Gelände:** `follow: terrain` – Rasen, Wege, Beete am Hang brauchen nur ihr Polygon und liegen
+  exakt auf dem Raster (kein Flackern, keine keilförmige Schattierung mehr).
+- **Kanten zum tatsächlichen Gelände:** Terrassen, Mauern, Stufen und Hochbeete bekommen Kanten bis auf das, was
+  daneben liegt – mit Raster auch hinauf zum höheren Hang (Stützmauer). Funktioniert auch, wenn das ganze Gelände
+  unter dem EG-Fußboden liegt. Gebäudesockel reichen am Hang bis auf das Gelände.
+- **Werkzeug** `scripts/terrain-from-scan.mjs`: OBJ-Scan (Scaniverse, Polycam, 3D Scanner App) einpassen (Drehung,
+  Versatz, Fußbodenhöhe) und als `site.terrain` schreiben.
+- Ohne Raster: weniger Flackern zwischen Boden und Gelände-Bereichen.
+- **Demo-Haus:** Gelände als 1-m-Raster (Nordhang, Südhang, Wellen an den Rändern), Gärten folgen dem Raster.
+
 ## 0.17.0
 
 - **Steildächer:** `buildings[].roof` kennt `type` = Satteldach (`gable`), Walmdach (`hip`), Krüppelwalm

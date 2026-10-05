@@ -56,6 +56,17 @@ dem Vorbild `engine/examples/demo/build-house.mjs` (Räume als Rechtecke, Wände
 
 **Außenbereiche** (Terrasse, Einfahrt, Beete, „Gartenräume“) stehen unter `outdoor` in `data/model.yaml`.
 
+**Gelände am Hang:** Grundstück mit dem iPhone (LiDAR) scannen, z. B. mit Scaniverse, Polycam oder 3D Scanner App, als
+OBJ exportieren (nicht ins Repo legen – das ist ein Foto des Grundstücks) und einpassen:
+
+```bash
+node engine/scripts/terrain-from-scan.mjs ~/scan.obj --cell 0.5 --rotate 12 --offset 3.2,-1.5 --floor 0.84 --write
+```
+
+`--floor` ist die Höhe des EG-Fußbodens im Scan, Drehung und Versatz legen den Scan auf den Grundriss (zwei
+Hausecken als Passpunkte). Danach Rasen, Wege und Beete mit `follow: terrain` auf das Gelände legen; ebene Terrassen und
+Mauern bekommen ihre Höhe über `elevation` und Kanten zum Hang automatisch.
+
 **Nordrichtung:** Besitzer fragen, welcher Raum in welche Himmelsrichtung liegt (oder Luftbild), und `site.north_deg`
 in `data/model.yaml` setzen (Norden im Plan, Grad im Uhrzeigersinn von oben). Beispiel: Wohnzimmer links im Plan liegt im
 Süden → Norden zeigt nach rechts → 90.
