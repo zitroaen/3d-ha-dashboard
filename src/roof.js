@@ -183,3 +183,44 @@ export function ceilingProfile(cut, C, a, b) {
   }
   return out.map((x) => ({ ...x, p: P(x.t) }));
 }
+
+/**
+ * Fenster unter einer Dachschräge: niedrigste Wandoberkante entlang der Fensterbreite (ceilingAt der obersten Etage).
+ * Reicht sie nicht bis zum Sturz, wird das Fenster gekürzt (5 cm unter der Schräge); bleiben weniger als 30 cm über
+ * der Brüstung, entfällt es. Liegt es unter einer Gaube (cut[].dormers), entfällt es ebenfalls – die Gaube hat ihr
+ * eigenes Fenster. Liefert { top } (gekürzt), { omit: true, dormer? } oder {} (passt).
+ */
+export function windowUnderRoof(win, ceilingAt, cut = []) {
+  if (!ceilingAt) return {};
+  const [x0, y0, x1, y1] = win.rect;
+  const alongX = x1 - x0 >= y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  let wallTop = Infinity;
+  for (let k = 0; k <= 6; k++) {
+    const t = k / 6;
+    wallTop = Math.min(wallTop, ceilingAt(alongX ? [x0 + (x1 - x0) * t, cy] : [cx, y0 + (y1 - y0) * t]));
+  }
+  const sill = win.sill ?? 0.9, top = win.top ?? 2.1;
+  if (wallTop >= top + 0.04) return {};
+  if (cut.some((r) => underDormer([cx, cy], r))) return { omit: true, dormer: true, wallTop };
+  if (wallTop - 0.05 < sill + 0.3) return { omit: true, wallTop };
+  return { top: Math.round((wallTop - 0.05) * 1000) / 1000, wallTop };
+}
+
+/** Liegt der Punkt (Fenster in der Wand) vor einer Gaube dieses Dachteils? (Breite entlang der Traufe, ≤ 3 m davor) */
+function underDormer(c, r) {
+  for (const d of r.dormers || []) {
+    if (!d.pos) continue;
+    // nächste Kante des Umrisses = Traufe, vor der die Gaube steht
+    let best = null, bd = Infinity;
+    for (const e of r.shape.edges) {
+      const t = Math.max(0, Math.min(e.len, (d.pos[0] - e.a[0]) * e.dir[0] + (d.pos[1] - e.a[1]) * e.dir[1]));
+      const dist = Math.hypot(e.a[0] + e.dir[0] * t - d.pos[0], e.a[1] + e.dir[1] * t - d.pos[1]);
+      if (dist < bd) [best, bd] = [e, dist];
+    }
+    if (!best) continue;
+    const dx = c[0] - d.pos[0], dy = c[1] - d.pos[1];
+    const along = Math.abs(dx * best.dir[0] + dy * best.dir[1]), inward = dx * best.n[0] + dy * best.n[1];
+    if (along <= (d.width ?? 1.6) / 2 + 0.1 && inward <= 0.2 && inward >= -3) return true;
+  }
+  return false;
+}

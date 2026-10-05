@@ -6,7 +6,7 @@ import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
 import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture, flagstoneTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
-import { buildPitchedRoof, ceilingFn, ceilingProfile } from './roof.js';
+import { buildPitchedRoof, ceilingFn, ceilingProfile, windowUnderRoof } from './roof.js';
 import { GROUND_Y } from './ground.js';
 import { clipTerrain } from './terrain.js';
 import { buildRailing, beam } from './railing.js';
@@ -197,9 +197,17 @@ export class FloorModel {
     for (const w of floor.walls) prism(w, 0, H);
 
     // --- Fenster: Brüstung und Sturz in voller Wanddicke, dazu Rahmen, Flügel, Glas, Fensterbank
-    for (const win of floor.windows) {
-      const [x0, y0, x1, y1] = win.rect;
+    for (const w0 of floor.windows) {
+      const [x0, y0, x1, y1] = w0.rect;
       const rect = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+      // unter der Dachschräge (Kniestock): Fenster auf die verbleibende Wandhöhe kürzen, ohne Platz weglassen (die
+      // Öffnung wird dann Wand) – sonst ragte der Rahmen über das Dach (npm run validate warnt)
+      const fit = windowUnderRoof(w0, this.ceilingAt, floor.roofCut);
+      if (fit.omit) {
+        prism(rect, 0, H);
+        continue;
+      }
+      const win = fit.top != null ? { ...w0, top: fit.top } : w0;
       const sill = win.sill ?? 0.9, top = win.top ?? 2.1;
       const roomIdx = win.room ? this.rooms.get(win.room)?.idx || 0 : 0;
       // Brüstung endet unter der Fensterbank (sonst liegen zwei Flächen aufeinander und flackern)
@@ -672,3 +680,4 @@ export function createSharedMaterials() {
   const lampHitGeometry = new THREE.SphereGeometry(0.35, 8, 6);
   return { mat, surface, facadeKey, hitMaterial, lampHitGeometry };
 }
+
