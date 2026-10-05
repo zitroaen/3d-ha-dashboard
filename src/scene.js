@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { FloorModel, createSharedMaterials } from './house.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from './roomlight.js';
-import { pointInPoly, heightAt } from './geometry.js';
+import { pointInPoly, heightAt, Builder } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
 import { makeGround, terrainGroundGeometry, setupTerrainShading, loadAerial, aerialSpec } from './ground.js';
 import { SkyEnvironment } from './environment.js';
@@ -238,6 +238,7 @@ export class HouseScene {
     this.outdoorIdx = base + 1;
     if (this.outdoorIdx > LIGHT_TABLE_MAX) console.warn(`ha-3d-dashboard: ${base} Bereiche – höchstens ${LIGHT_TABLE_MAX - 1} bekommen Raumlicht`);
     this._growLightTable(this.outdoorIdx);
+    this._flushFacades();
     this._mergeLevels();
     // Dächer liegen eine Ebene über ihrem Gebäude, bekommen aber keinen eigenen Ebenen-Knopf – außer über der
     // obersten Ebene: dort zeigt ein Knopf „Dach“ alle Gebäude mit ihren Dächern
@@ -256,6 +257,89 @@ export class HouseScene {
     for (const fms of this._byLevel(this.floors).values()) {
       if (fms.length < 2) continue;
       mergeByMaterial(fms.map((fm) => ({ group: fm.group, y: fm.group.position.y })), (m) => m.material !== this.shared.hitMaterial);
+    }
+  }
+
+  /**
+   * Bündige Fassade (buildings[].facade.flush): Die Außenseite der unteren Etage setzt sich über die Geschossdecke bis
+   * zum Fußboden der Etage darüber fort; stehen deren Außenwände weiter innen (Aufmaß von innen, bis 60 cm), schließt
+   * ein waagrechtes Band in der Fassadenfarbe die Stufe – keine dunkle Wandkappe, keine Lücke. Gehört zur oberen Etage
+   * (nur sichtbar, wenn sie es ist).
+   */
+  _flushFacades() {
+    const REACH = 0.6; // so weit darf die obere Außenwand hinter der unteren liegen
+    for (const fu of this.floors) {
+      const f = fu.floor;
+      if (!f.facade?.flush || f.outdoor || f.roof) continue;
+      // Etage direkt darunter im selben Gebäude
+      const below = this.floors.filter((o) => o !== fu && o.floor.building === f.building && !o.floor.outdoor && !o.floor.roof
+        && (o.floor.level ?? 0) < (f.level ?? 0)).sort((a, b) => (b.floor.level ?? 0) - (a.floor.level ?? 0))[0];
+      if (!below?.extSegs?.length) continue;
+      const dy = (below.floor.elevation || 0) - (f.elevation || 0); // untere Etage in Koordinaten der oberen
+      const y0 = dy + below.H;
+      const covers = (p) => fu.roomAt(p) > 0 || f.walls.some((w) => pointInPoly(p, w));
+      const key = this.shared.facadeKey(f.facade);
+      const b = new Builder();
+      for (const { a, b: e, n } of below.extSegs) {
+        const len = Math.hypot(e[0] - a[0], e[1] - a[1]);
+        const steps = Math.max(1, Math.ceil(len / 0.25));
+        const P = (t) => [a[0] + (e[0] - a[0]) * t, a[1] + (e[1] - a[1]) * t];
+        // Abstand bis zur oberen Etage nach innen (0 … REACH), sonst nicht abgedeckt
+        const depth = (p) => {
+          for (let d = 0.05; d <= REACH + 1e-9; d += 0.05) if (covers([p[0] - n[0] * d, p[1] - n[1] * d])) return d;
+          return null;
+        };
+        // Grenze zwischen abgedeckt und frei auf der Strecke (Halbierung, ~1 mm)
+        const edge = (tIn, tOut) => {
+          for (let i = 0; i < 12; i++) {
+            const m = (tIn + tOut) / 2;
+            if (depth(P(m)) != null) tIn = m; else tOut = m;
+          }
+          return tIn;
+        };
+        for (let k = 0; k < steps; k++) {
+          let t0 = k / steps, t1 = (k + 1) / steps;
+          const tm = (t0 + t1) / 2, ia0 = depth(P(t0)) != null, ib1 = depth(P(t1)) != null, dm = depth(P(tm));
+          // nur teilweise abgedeckt (Ende der oberen Etage): genau bis zur Grenze
+          if (dm != null) {
+            if (!ia0) t0 = edge(tm, t0);
+            if (!ib1) t1 = edge(tm, t1);
+          } else if (ia0) t1 = edge(t0, tm);
+          else if (ib1) t0 = edge(t1, tm);
+          else continue;
+          const pa = P(t0), pb = P(t1);
+          const d = dm ?? depth(P((t0 + t1) / 2));
+          if (d == null) continue;
+          // Außenseite der unteren Etage nach oben verlängert: über die Geschossdecke bis zum Fußboden der oberen
+          const oa = [pa[0] + n[0] * 0.001, pa[1] + n[1] * 0.001], ob = [pb[0] + n[0] * 0.001, pb[1] + n[1] * 0.001];
+          if (y0 < -1e-3) b.quadVT(oa, ob, y0 - 0.01, 0, 0, 0);
+          // Stufe zur zurückliegenden Wand der oberen Etage schließen (waagrechtes Band in der Fassadenfarbe)
+          const ia = [pa[0] - n[0] * d, pa[1] - n[1] * d], ib = [pb[0] - n[0] * d, pb[1] - n[1] * d];
+          b.triUV([pa[0], 0, pa[1]], [pb[0], 0, pb[1]], [ib[0], 0, ib[1]], [0, 0], [1, 0], [1, d], 0, true);
+          b.triUV([pa[0], 0, pa[1]], [ib[0], 0, ib[1]], [ia[0], 0, ia[1]], [0, 0], [1, d], [0, d], 0, true);
+        }
+      }
+      // Kanten der Geschossdecke (Bodenplatte bis auf die Wände darunter) in der Fassade statt dunkel – sonst steht
+      // dort, wo die obere Etage über einem niedrigeren Teil endet, ein dunkler Klotz
+      if (y0 < -1e-3) {
+        const ol = this._houseOutline(fu);
+        for (let i = 0; i < ol.length; i++) {
+          let p = ol[i], q = ol[(i + 1) % ol.length];
+          const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+          if (len < 1e-4) continue;
+          let n = [-(q[1] - p[1]) / len, (q[0] - p[0]) / len];
+          if (pointInPoly([(p[0] + q[0]) / 2 + n[0] * 0.01, (p[1] + q[1]) / 2 + n[1] * 0.01], ol)) {
+            [p, q] = [q, p];
+            n = [-n[0], -n[1]];
+          }
+          const o = (r) => [r[0] + n[0] * 0.002, r[1] + n[1] * 0.002];
+          b.quadVT(o(p), o(q), y0 - 0.01, 0, 0, 0);
+        }
+      }
+      if (b.empty) continue;
+      const mesh = new THREE.Mesh(b.geometry(), this.shared.mat[key]);
+      mesh.castShadow = mesh.receiveShadow = true;
+      fu.group.add(mesh);
     }
   }
 
