@@ -514,7 +514,7 @@ objects:
     params: { radius: 0.12 }
     light: { height: 0.12, range: 2.5, color: "#9fd0ff" }
     ha: { entities: { power: light.demo_garten } }
-  - { id: apfelbaum, name: Apfelbaum, model: tree, space: garten, pos: [1.2, 14.4], size: [3.2, 3.2, 4.5] }
+  - { id: apfelbaum, name: Apfelbaum, model: tree, space: garten, pos: [1.2, 14.4], size: [3.6, 3.6, 3.6], params: { shape: fruit } }
   - id: kirschbaum
     name: Kirschbaum
     model: tree
@@ -672,6 +672,7 @@ objects:
     pos: [6.8, -7.6]
     size: [2.2, 2.2, 4.2]
     params: { stakes: true }
+  - { id: hecke_west, name: Hecke, model: hedge, space: garten_nord, pos: [-3.3, -4.2], rot: 90, size: [7, 0.7, 1.5] }
   - { id: hecke_nord_1, name: Hecke, model: shrub, space: garten_nord, pos: [-2.6, -8.6], size: [2.2, 1.4, 1.6] }
   - { id: hecke_nord_2, name: Hecke, model: shrub, space: garten_nord, pos: [13.4, -8.4], size: [2.6, 1.5, 1.7] }
   - id: pollerleuchte

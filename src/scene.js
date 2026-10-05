@@ -926,6 +926,18 @@ export class HouseScene {
     node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, spec.angle * e));
   }
 
+  /**
+   * Detailstufen der Bäume/Sträucher nach Bildschirmgröße (Pixel je Meter der Orthokamera); bei einem Wechsel auch
+   * die Schatten neu berechnen (die Form ändert sich).
+   */
+  _vegetationLod() {
+    const cam = this.camera, h = this.renderer.domElement.clientHeight || 1;
+    const ppm = (cam.zoom * h) / Math.max(1e-6, cam.top - cam.bottom);
+    let changed = false;
+    for (const layer of this.furnishing || []) changed = layer.vegetation?.updateLod(ppm) || changed;
+    if (changed) this.renderer.shadowMap.needsUpdate = true;
+  }
+
   /** Sofort rendern (für Tests). */
   renderNow() {
     this.controls.update();
@@ -935,6 +947,7 @@ export class HouseScene {
   /** Ein Bild (immer dasselbe, ob in Bewegung oder im Stillstand – kein Nachschärfen nach dem Anhalten) */
   _draw() {
     const t0 = performance.now();
+    this._vegetationLod();
     this.renderer.render(this.scene, this.camera);
     // für die Leistungsanzeige: Bilder und Rechenzeit (CPU-Seite)
     this.frames = (this.frames || 0) + 1;

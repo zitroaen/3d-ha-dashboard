@@ -48,6 +48,7 @@ export const CATALOG = {
   grass: { label: 'Ziergras', category: 'plant', size: [0.6, 0.6, 0.7], params: ['color'] },
   shrub: { label: 'Strauch', category: 'plant', size: [1.2, 1.0, 1.0], params: ['color'] },
   tree: { label: 'Baum', category: 'plant', size: [3, 3, 5], params: ['shape', 'color', 'stakes'] },
+  hedge: { label: 'Hecke', category: 'plant', size: [4, 0.7, 1.6], params: ['color', 'path'] },
   // --- Geräte
   box: { label: 'Gerät (Quader)', category: 'device', size: [0.6, 0.6, 0.85], params: ['color', 'panel'] },
   fridge: { label: 'Kühlschrank', category: 'device', size: [0.6, 0.65, 1.85], params: ['glass', 'color'] },

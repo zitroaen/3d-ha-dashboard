@@ -6,6 +6,7 @@ import { Builder, heightAt } from './geometry.js';
 import { PartCollector, FURNITURE, LAMPS, paletteParams } from './models.js';
 import { withRoomLight, lampMaterial } from './roomlight.js';
 import { normalFromCanvas, weaveCanvas } from './textures.js';
+import { VegetationSet, patchVegetation } from './vegetation.js';
 
 // Stoffe bekommen ein feines Gewebe (Normalen-Karte), sonst wirken Polster wie Kunststoff
 const FABRIC = /^(fabric|cushion|rug|curtain)/;
@@ -68,6 +69,9 @@ export class FurnishingLayer {
     this.warnings = [];
 
     const P = new PartCollector();
+    // Bäume und Sträucher: als Instanzen (src/vegetation.js), wenige Zeichenaufrufe für viele Pflanzen
+    this.vegetation = new VegetationSet(this._material('veg', 'inst'));
+    P.plants = (shape, world, tint, crown) => this.vegetation.add(shape, world, tint, crown, P.idx);
     const pools = new Builder();
     const contact = new Builder();
     for (const it of items) {
@@ -120,6 +124,7 @@ export class FurnishingLayer {
       return m;
     };
     for (const m of P.build((key, kind) => this._material(key, kind))) this.group.add(mergeable(m));
+    if (!this.vegetation.empty) this.vegetation.build(this.group);
     // bewegliche Teile (Ventilatorflügel …): eigene kleine Gruppen, die die Szene im Takt dreht
     this.animated = P.buildAnims((key, kind) => this._material(key, kind));
     for (const a of this.animated) this.group.add(a.node);
@@ -157,7 +162,14 @@ export class FurnishingLayer {
     target.begin(at.x, at.z, at.rot, this._roomIdx(it.room), at.y - (it.elevation ?? 0));
     target.objId = it.id;
     const room = this.floorModel.rooms.get(it.room)?.room;
-    make(target, it, { ceiling: this.floorModel.ceilingAt?.([at.x, at.z]) ?? room?.ceiling ?? this.floorModel.floor.ceiling });
+    // Gelände unter einem Punkt des Objekts (lokal, relativ zum Anker) – für lange Objekte am Hang (Hecke)
+    const terrain = this.shared.ground?.terrain;
+    const follows = terrain && this.floorModel.floor.outdoor && (it.room === 'aussen' || room?.follow);
+    // (Lage aus dem Objekt selbst, auch im Einzelaufbau des Editors mit Ursprung im Anker)
+    const real = anchorOf('item', it), y0 = real.y - (it.elevation ?? 0);
+    const r = -THREE.MathUtils.degToRad(real.rot || 0), c = Math.cos(r), s = Math.sin(r);
+    const groundAt = follows ? (lx, lz) => terrain.height([real.x + lx * c + lz * s, real.z - lx * s + lz * c]) - y0 : () => 0;
+    make(target, it, { ceiling: this.floorModel.ceilingAt?.([at.x, at.z]) ?? room?.ceiling ?? this.floorModel.floor.ceiling, groundAt });
     return target.bounds.clone().translate(new THREE.Vector3(0, -(it.elevation ?? 0), 0));
   }
 
@@ -187,16 +199,28 @@ export class FurnishingLayer {
     const pad = 0.12, sx = (box.max.x - box.min.x) / 2 * 1.15 + pad, sz = (box.max.z - box.min.z) / 2 * 1.15 + pad;
     const cx = (box.max.x + box.min.x) / 2, cz = (box.max.z + box.min.z) / 2;
     const r = -THREE.MathUtils.degToRad(at.rot), c = Math.cos(r), s = Math.sin(r);
+    const terrain = this.shared.ground?.terrain;
+    const terrainHere = terrain && this.floorModel.floor.outdoor && (it.room === 'aussen' || room?.follow);
     const P = ([lx, lz]) => {
       const x = at.x + (cx + lx) * c + (cz + lz) * s, z = at.z - (cx + lx) * s + (cz + lz) * c;
-      const y = room?.heights ? heightAt(room.polygon, room.heights, [x, z]) + 0.02 : (it.base || 0) + 0.012;
+      const y = room?.heights ? heightAt(room.polygon, room.heights, [x, z]) + 0.02
+        : terrainHere ? terrain.height([x, z]) + 0.03
+        : (it.base || 0) + 0.012;
       return [x, y, z];
     };
-    const A = P([-sx, -sz]), B = P([sx, -sz]), C = P([sx, sz]), D = P([-sx, sz]);
-    for (const [p, uv] of [[A, [0, 0]], [C, [1, 1]], [B, [1, 0]], [A, [0, 0]], [D, [0, 1]], [C, [1, 1]]]) {
-      b.pos.push(...p);
-      b.room.push(0);
-      b.uv.push(uv[0], uv[1]);
+    // am Hang in 3 × 3 Felder geteilt, damit das Rechteck dem Gelände folgt (sonst schneidet es gerade Kanten hinein)
+    const n = terrainHere ? 3 : 1;
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < n; k++) {
+        const u0 = i / n, u1 = (i + 1) / n, v0 = k / n, v1 = (k + 1) / n;
+        const Q = (u, v) => [P([-sx + 2 * sx * u, -sz + 2 * sz * v]), [u, v]];
+        const A = Q(u0, v0), B = Q(u1, v0), C = Q(u1, v1), D = Q(u0, v1);
+        for (const [p, uv] of [A, C, B, A, D, C]) {
+          b.pos.push(...p);
+          b.room.push(0);
+          b.uv.push(uv[0], uv[1]);
+        }
+      }
     }
   }
 
@@ -233,6 +257,7 @@ export class FurnishingLayer {
     const k = `${kind}:${key}`;
     if (!cache.has(k)) {
       if (kind === 'glow') cache.set(k, lampMaterial({ strength: 1.6, offColor: glowOff(key) }));
+      else if (kind === 'inst') cache.set(k, patchVegetation(withRoomLight(new THREE.MeshStandardMaterial(paletteParams(key)), { weather: true })));
       else if (key.startsWith('tex:')) {
         // Bildtextur aus dem Datenordner (z. B. tex:textures/gemaelde.jpg)
         cache.set(k, withRoomLight(new THREE.MeshStandardMaterial({ map: this.shared.loadTexture(key.slice(4)), roughness: 0.85 })));
@@ -247,13 +272,14 @@ export class FurnishingLayer {
           Object.assign(params, { normalMap: this.shared.weave, normalScale: new THREE.Vector2(0.5, 0.5) });
         }
         // Laub, Nadeln und Rinde draußen: Schnee bleibt oben liegen, Regen macht sie dunkler
-        cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(params), { weather: /^(leaf|conifer|bark|birch|flower)/.test(key) }));
+        cache.set(k, withRoomLight(new THREE.MeshStandardMaterial(params), { weather: /^(leaf|conifer|bark|birch|flower|veg)/.test(key) }));
       }
     }
     return cache.get(k);
   }
 
   dispose() {
+    this.vegetation?.dispose();
     this.group.removeFromParent();
     this.group.traverse((o) => {
       if (o.isMesh && o.geometry !== this.shared.lampHitGeometry) o.geometry.dispose();

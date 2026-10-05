@@ -65,8 +65,13 @@ varying float vUpN;
 `;
 const VERT_MAIN = /* glsl */ `
 vRoomIdx = roomIdx;
+#ifdef USE_INSTANCING
+vRoomWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+vUpN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal).y;
+#else
 vRoomWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
 vUpN = normalize(mat3(modelMatrix) * objectNormal).y;
+#endif
 `;
 const FRAG_PARS = /* glsl */ `
 uniform highp sampler2D uLights;
