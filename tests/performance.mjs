@@ -51,6 +51,49 @@ try {
       `Ebene ${level}: ${m.calls} Zeichenaufrufe, ${Math.round(m.triangles / 1000)}k Dreiecke (Budget ${BUDGET.calls} / ${BUDGET.triangles / 1000}k); Bildzeit sparsam ${m.fast} ms, hoch ${m.high} ms (Software-Grafik)`,
       `Ebene ${level} über dem Budget: ${JSON.stringify(m)}`);
   }
+  // 200 Bäume und Sträucher (Instanzen, Detailstufen): Ebene 0 bleibt im Budget – in der Übersicht und nah heran
+  const trees = await page.evaluate(() => {
+    const v = window.panel.view, r = v.renderer;
+    window.panel.setLevel(0);
+    const { devices, items } = v.furnishingData;
+    const proto = items.find((i) => i.kind === 'tree' && i.room === 'aussen') || items.find((i) => i.kind === 'tree');
+    const shapes = ['round', 'fruit', 'conifer', 'column', 'birch', 'shrub'];
+    const extra = [];
+    for (let k = 0; k < 200; k++) {
+      // Ring um das Grundstück (Waldrand, Obstwiese), 20 × 10 Plätze
+      const a = (k / 200) * Math.PI * 2, d = 26 + (k % 10) * 2.2;
+      const shape = shapes[k % shapes.length];
+      extra.push({ ...proto, id: `perf_${k}`, src: null, kind: shape === 'shrub' ? 'shrub' : 'tree', shape, pos: [8 + Math.cos(a) * d, 5 + Math.sin(a) * d],
+        size: shape === 'shrub' ? [1.4, 1.2, 1.1] : [3 + (k % 3), 3, 5 + (k % 4)], stakes: false });
+    }
+    v.setFurnishing({ devices, items: [...items, ...extra] });
+    const measure = () => {
+      v.renderNow(); // erstes Bild mit Schatten-Neuberechnung (nur bei Änderungen) – gemessen wird das zweite
+      r.info.reset();
+      r.info.autoReset = false;
+      v.renderNow();
+      const m = { calls: r.info.render.calls, triangles: r.info.render.triangles };
+      r.info.autoReset = true;
+      return m;
+    };
+    v.setQuality('low');
+    const overview = measure();
+    const zoom0 = v.camera.zoom;
+    v.camera.zoom = zoom0 * 4;
+    v.camera.updateProjectionMatrix();
+    const near = measure();
+    v.camera.zoom = zoom0;
+    v.camera.updateProjectionMatrix();
+    v.setFurnishing({ devices, items });
+    v.setQuality('high');
+    return { overview, near };
+  });
+  for (const [name, m] of Object.entries(trees)) {
+    ok(m.calls <= BUDGET.calls && m.triangles <= BUDGET.triangles,
+      `200 Bäume (${name === 'near' ? 'nah' : 'Übersicht'}): ${m.calls} Zeichenaufrufe, ${Math.round(m.triangles / 1000)}k Dreiecke`,
+      `200 Bäume (${name}) über dem Budget: ${JSON.stringify(m)}`);
+  }
+
   // Rendern bei Bedarf: in Ruhe kein Bild; laufende Animation höchstens im gedrosselten Takt (30 Bilder/s)
   const idle = await page.evaluate(async () => {
     const v = window.panel.view;
