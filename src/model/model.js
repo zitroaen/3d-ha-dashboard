@@ -14,6 +14,7 @@ import { CATALOG, DEFAULT_MOUNT, hasCapability } from './catalog.js';
 import { migrate } from './migrate.js';
 import { heightAt, pointInPoly } from '../geometry.js';
 import { roofShape } from '../roofshape.js';
+import { terrainGrid } from '../terrain.js';
 
 export { MODEL_VERSION, ModelVersionError } from './migrate.js';
 
@@ -138,8 +139,24 @@ export function terrainHeights(z) {
   return z.polygon.map((p) => p[2] ?? (z.elevation || 0));
 }
 
-/** Bodenhöhe eines Außenbereichs an einer Stelle (Gelände interpoliert, sonst elevation) */
-export function outdoorHeightAt(z, pos) {
+const grids = new WeakMap();
+/** Höhenraster des Grundstücks (site.terrain) oder null; einmal je Modell-Objekt berechnet */
+export function terrainOf(model) {
+  const spec = model?.site?.terrain;
+  if (!spec) return null;
+  if (!grids.has(spec)) grids.set(spec, terrainGrid(spec));
+  return grids.get(spec);
+}
+
+/** Folgt der Außenbereich dem Höhenraster (`follow: terrain`)? */
+export const followsTerrain = (z, terrain) => !!terrain && z.follow === 'terrain';
+
+/**
+ * Bodenhöhe eines Außenbereichs an einer Stelle: auf dem Höhenraster (follow: terrain), Gelände je Eckpunkt
+ * interpoliert, sonst elevation
+ */
+export function outdoorHeightAt(z, pos, terrain = null) {
+  if (followsTerrain(z, terrain)) return terrain.height(pos);
   const hs = terrainHeights(z);
   return hs ? heightAt(z.polygon, hs, pos) : z.elevation || 0;
 }
@@ -203,6 +220,7 @@ export function cleanHa(ha) {
  */
 export function toScene(model) {
   const spaces = spacesOf(model);
+  const terrain = terrainOf(model);
   const floors = [];
   for (const b of model.buildings || []) {
     for (const f of b.floors) {
@@ -257,15 +275,17 @@ export function toScene(model) {
       elevation: 0,
       ceiling: 3,
       rooms: model.outdoor.map((z) => ({
-        id: z.id, name: z.name, polygon: z.polygon, floor: z.surface || 'lawn', edge: z.edge, extend: !!z.extend, elevation: z.elevation || 0, area: z.ha_area,
-        heights: terrainHeights(z),
+        id: z.id, name: z.name, polygon: z.polygon.map((p) => [p[0], p[1]]), floor: z.surface || 'lawn', edge: z.edge, extend: !!z.extend,
+        elevation: z.elevation || 0, area: z.ha_area,
+        follow: followsTerrain(z, terrain),
+        heights: followsTerrain(z, terrain) ? null : terrainHeights(z),
       })),
       walls: [],
       windows: [],
       doors: [],
     });
   }
-  const house = { name: model.site.name, north_deg: model.site.north_deg || 0, ground: model.site.ground?.surface || 'lawn', floors };
+  const house = { name: model.site.name, north_deg: model.site.north_deg || 0, ground: model.site.ground?.surface || 'lawn', floors, terrain };
 
   const items = [], devices = [];
   for (const o of model.objects || []) {
@@ -275,7 +295,9 @@ export function toScene(model) {
     const floor = sp ? sp.floorKey : OUTDOOR_FLOOR;
     const room = sp ? o.space : OPEN_GROUND;
     // Außenbereiche liegen auf der Außen-Etage (Höhe 0): ihre eigene Höhe kommt zu den Objekthöhen dazu
-    const base = sp?.kind === 'outdoor' ? outdoorHeightAt(sp.room, o.pos) : sp?.kind === 'roof' ? roofHeightAt(sp.room, o.pos) : 0;
+    // freies Gelände: auf dem Höhenraster, falls vorhanden
+    const base = sp?.kind === 'outdoor' ? outdoorHeightAt(sp.room, o.pos, terrain) : sp?.kind === 'roof' ? roofHeightAt(sp.room, o.pos)
+      : !sp && terrain && o.pos ? terrain.height(o.pos) : 0;
     // ha: Kopie, die der Editor bearbeitet (writeBack schreibt sie zurück)
     const common = { id: o.id, name: o.name, floor, room, pos: o.pos, rot: o.rot, ...(o.params || {}), src: o, base, ha: o.ha ? structuredClone(o.ha) : undefined, state: o.state };
     if (hasCapability(o.model, 'light')) {

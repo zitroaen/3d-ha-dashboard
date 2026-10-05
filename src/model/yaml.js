@@ -33,7 +33,8 @@ function block(v, indent) {
     return v.map((x) => {
       if (isScalar(x)) return `\n${pad}- ${scalar(x)}`;
       const one = flow(x);
-      if (one.length + indent + 2 <= INLINE_MAX) return `\n${pad}- ${one}`;
+      // Zahlenzeilen (z. B. eine Zeile des Höhenrasters) bleiben einzeilig
+      if (one.length + indent + 2 <= INLINE_MAX || isNumeric(x)) return `\n${pad}- ${one}`;
       if (Array.isArray(x)) return `\n${pad}-${block(x, indent + 2)}`;
       // Map als Listeneintrag: erster Schlüssel hinter "- ", weitere eingerückt
       const body = block(x, indent + 2);
@@ -46,13 +47,15 @@ function block(v, indent) {
     const key = `\n${pad}${scalar(k)}:`;
     if (isScalar(x)) return `${key} ${scalar(x)}`;
     const one = flow(x);
-    // Zahlenlisten (Koordinaten, Polygone) immer einzeilig; sonst einzeilig, wenn kurz genug
-    if (one.length + indent + k.length + 2 <= INLINE_MAX || isNumeric(x)) return `${key} ${one}`;
+    // Zahlenlisten (Koordinaten, Polygone) immer einzeilig – außer Tabellen mit langen Zeilen (Höhenraster): eine
+    // Zeile je Tabellenzeile; sonst einzeilig, wenn kurz genug
+    if (one.length + indent + k.length + 2 <= INLINE_MAX || (isNumeric(x) && !isTable(x))) return `${key} ${one}`;
     return key + block(x, indent + 2);
   }).join('');
 }
 
-const isNumeric = (v) => Array.isArray(v) && v.every((x) => typeof x === 'number' || isNumeric(x));
+const isNumeric = (v) => Array.isArray(v) && v.every((x) => typeof x === 'number' || x === null || isNumeric(x));
+const isTable = (v) => v.some((x) => Array.isArray(x) && x.length > 3);
 
 /**
  * @param value   Modell (oder beliebige JSON-Daten)

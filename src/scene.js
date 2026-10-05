@@ -5,8 +5,9 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { FloorModel, createSharedMaterials } from './house.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
-import { pointInPoly, heightAt, nearestTerrain } from './geometry.js';
+import { pointInPoly, heightAt } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
+import { makeGround, terrainGroundGeometry } from './ground.js';
 import { SkyEnvironment } from './environment.js';
 
 const NO_WEATHER = { cloud: 0, rain: 0, snow: 0, fog: 0 };
@@ -162,6 +163,8 @@ export class HouseScene {
       }
       return texCache.get(path);
     };
+    // Boden (Höhenraster oder eben): die Etagen brauchen ihn für die Kanten der Außenbereiche
+    this.shared.ground = makeGround(this.house);
     this._buildFloors();
     this.setFurnishing(furnishing);
     this._buildEnvironment();
@@ -276,6 +279,8 @@ export class HouseScene {
   /** Bodenhöhe eines Objekts in einem Außenbereich (Gelände) relativ zur Etage; in Räumen 0 */
   baseAt(floorKey, roomId, pos) {
     const fm = this.floorModel(floorKey);
+    const terrain = this.shared.ground?.terrain;
+    if (roomId === 'aussen' && terrain) return terrain.height(pos); // freies Gelände auf dem Höhenraster
     if (fm?.floor.roof) {
       // Dach: Oberseite des Dachteils (flach: seine Lage, Steildach: Höhe der Dachfläche)
       const r = fm.rooms.get(roomId)?.room;
@@ -284,19 +289,20 @@ export class HouseScene {
     }
     const r = fm?.floor.outdoor && fm.rooms.get(roomId)?.room;
     if (!r) return 0;
+    if (r.follow && terrain) return terrain.height(pos);
     return r.heights ? heightAt(r.polygon, r.heights, pos) : r.elevation || 0;
   }
 
   /**
-   * Bodenfläche: eben auf GROUND_Y – oder, wenn es Gelände gibt, ein Gitter, das dem Gelände folgt (ein Hang setzt
-   * sich seitlich und darunter fort), knapp unter den Geländeflächen und nie höher als GROUND_Y. Fein (0,5 m) um
-   * das Grundstück, grob nach außen.
+   * Bodenfläche: mit Höhenraster das Raster selbst (ground.js). Sonst eben auf GROUND_Y – oder, wenn Außenbereiche
+   * Gelände haben, ein Gitter, das ihm folgt (ein Hang setzt sich seitlich und darunter fort), unter den
+   * Geländeflächen und nie höher als GROUND_Y. Fein (0,5 m) um das Grundstück, grob nach außen.
    */
   _groundGeometry(cx, cz) {
+    const ground = this.shared.ground;
+    if (ground.terrain) return terrainGroundGeometry(ground, cx, cz);
     const R = 80;
-    const areas = this.floors.flatMap((f) => f.floor.rooms.filter((r) => r.heights).map((r) => ({ polygon: r.polygon, heights: r.heights, extend: r.extend })));
-    // Flächen ohne Gelände (Gebäude, ebene Außenbereiche): darunter bleibt der Boden unten, auch neben ansteigendem Hang
-    const flat = this.floors.flatMap((f) => f.floor.rooms.filter((r) => !r.heights).map((r) => r.polygon));
+    const areas = ground.areas;
     const axis = (c, lo, hi) => {
       const out = [c - R];
       for (let v = Math.floor(lo - 14); v <= hi + 14; v += 0.5) out.push(v);
@@ -311,10 +317,7 @@ export class HouseScene {
     for (const z of zs) {
       for (const x of xs) {
         // Tiefer liegendes Gelände setzt sich nach außen fort, höheres nur mit `extend` (sonst Erdkante)
-        const t = areas.length ? nearestTerrain(areas, [x, z]) : null;
-        let y = t == null ? GROUND_Y : t.area.extend && !t.inside ? t.h - 0.012 : Math.min(GROUND_Y, t.h - 0.012);
-        if (y > GROUND_Y && flat.some((poly) => pointInPoly([x, z], poly))) y = GROUND_Y;
-        pos.push(x, y, z);
+        pos.push(x, ground.at([x, z]), z);
         uv.push(x, z);
       }
     }
@@ -430,7 +433,9 @@ export class HouseScene {
       const y0 = fm.group.position.y;
       const below = this.floors.filter((o) => o !== fm && !o.floor.outdoor && o.floor.building === fm.floor.building && o.group.position.y < y0);
       const top = below.length ? Math.max(...below.map((o) => o.group.position.y + o.H)) : null;
-      const depth = top != null && y0 - top > 0.01 ? y0 - top : 0.14;
+      // unterste Etage: Sockel bis auf den Boden darunter (am Hang auf der Talseite höher)
+      const groundMin = Math.min(...outline.map((p) => this.shared.ground.at(p)));
+      const depth = top != null && y0 - top > 0.01 ? y0 - top : Math.max(0.14, y0 - groundMin + 0.02);
       const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), slabMat);
       slab.rotation.x = -Math.PI / 2;
       slab.position.y = y0 - depth - 0.001;

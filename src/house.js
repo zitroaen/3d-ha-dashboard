@@ -2,18 +2,19 @@
 // Türen. Auch die Außenbereiche sind eine solche Etage (ohne Wände).
 // Enthält bewusst keine Einrichtung und keine Geräte (siehe furnishing.js) – das Haus ändert sich nie.
 import * as THREE from 'three';
-import { Builder, pointInPoly } from './geometry.js';
+import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
 import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
 import { buildPitchedRoof, ceilingFn, ceilingProfile } from './roof.js';
+import { GROUND_Y } from './ground.js';
+import { clipTerrain } from './terrain.js';
 
 const DOOR_HEIGHT = 2.05;
 // Jeder Raumboden liegt minimal höher als der vorige: Raumpolygone überlappen in den Türöffnungen,
 // ohne Versatz flackern die Böden dort (Z-Fighting).
 const FLOOR_STEP = 0.0008;
-/** Höhe der Bodenfläche außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen */
-export const GROUND_Y = -0.12;
+export { GROUND_Y } from './ground.js';
 // Weiche Oberflächen: ihre Kante ist Erde; Beläge (Platten, Kies, Stein …) zeigen ihren Belag auch an der Kante
 const SOFT = new Set(['lawn', 'soil']);
 
@@ -87,22 +88,17 @@ export class FloorModel {
       const fb = (floors[kind] ??= new Builder());
       const uvStart = fb.uv.length;
       const hs = r.room.heights; // Gelände: Höhe je Eckpunkt
-      if (hs) fb.polyT(r.room.polygon, hs, r.idx, r.order * FLOOR_STEP);
+      const ground = this.shared.ground;
+      // Bereich auf dem Höhenraster: dieselben Dreiecke wie der Boden, auf den Umriss beschnitten
+      const frags = r.room.follow && ground?.terrain ? this._terrainFrags(r.room.polygon) : null;
+      if (frags) fb.terrain(frags, r.idx);
+      else if (hs) fb.polyT(r.room.polygon, hs, r.idx, r.order * FLOOR_STEP);
       else fb.polyH(r.room.polygon, y, r.idx);
-      if (floor.outdoor) {
-        // Liegt ein Außenbereich über dem Boden (Hügel, Hochbeet, Mauer, Stufe): Kante bis zum Boden – Erde wie beim
-        // Geländemodell oder `edge` (z. B. Naturstein). Tiefer liegendes Gelände setzt der Boden selbst fort
-        // (scene._groundGeometry). Kanten zu höheren Nachbarn verschwinden in deren Kante.
+      if (floor.outdoor && !frags) {
+        // Kanten zum Boden bzw. Nachbarbereich daneben (Hügel, Hochbeet, Mauer, Stufe; mit Höhenraster auch zum
+        // höheren Hang hin) – Erde wie beim Geländemodell oder `edge` (z. B. Naturstein)
         const ek = this.shared.mat[r.room.edge] ? r.room.edge : SOFT.has(kind) ? 'soil' : kind;
-        const sk = (floors[ek] ??= new Builder());
-        const poly = r.room.polygon, h = hs || poly.map(() => y);
-        for (let i = 0; i < poly.length; i++) {
-          const j = (i + 1) % poly.length;
-          if (!(h[i] > GROUND_Y + 0.1 || h[j] > GROUND_Y + 0.1)) continue;
-          // `extend`: außen setzt der Boden das Gelände fort – Kante nur zu Nachbarbereichen (Stufe, Mauer)
-          if (r.room.extend && !this._neighborAt(poly, i, j, r.idx)) continue;
-          sk.skirt(poly[i], GROUND_Y, Math.max(h[i], GROUND_Y), poly[j], GROUND_Y, Math.max(h[j], GROUND_Y), r.idx);
-        }
+        this._outdoorEdges(r, (floors[ek] ??= new Builder()), y);
       }
       // floor_rot: Verlegerichtung des Bodens in Grad (z. B. 45 für diagonal verlegtes Würfelparkett)
       if (r.room.floor_rot) {
@@ -114,7 +110,8 @@ export class FloorModel {
         }
       }
       const hit = new Builder();
-      if (r.room.heights) hit.polyT(r.room.polygon, r.room.heights, r.idx, 0.01);
+      if (frags) hit.terrain(frags, r.idx, 0.01);
+      else if (r.room.heights) hit.polyT(r.room.polygon, r.room.heights, r.idx, 0.01);
       else hit.polyH(r.room.polygon, (r.room.elevation || 0) + 0.01, r.idx);
       const mesh = new THREE.Mesh(hit.geometry(), this.shared.hitMaterial); // Material unsichtbar, Mesh raycastbar
       mesh.userData.roomId = r.room.id;
@@ -214,6 +211,78 @@ export class FloorModel {
     add(B.doorDark, S.mat.doorDark, { cast: true });
     add(B.metal, S.mat.metal);
     add(B.glass, S.mat.glass, { receive: false, order: 2 });
+  }
+
+  /** Rasterdreiecke im Umriss eines Bereichs (follow: terrain) */
+  _terrainFrags(poly) {
+    const g = this.shared.ground, xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
+    return clipTerrain(g.terrain.triangles(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)), g.piecesOf(poly));
+  }
+
+  /** Höhe neben einem Außenbereich: Nachbarbereich, Gebäude (keine Kante) oder Boden */
+  _outsideAt(p, self) {
+    for (const o of this.rooms.values()) {
+      if (o === self || !pointInPoly(p, o.room.polygon)) continue;
+      const rm = o.room, g = this.shared.ground;
+      if (rm.follow && g?.terrain) return { h: g.terrain.height(p), kind: 'follow' };
+      return { h: rm.heights ? heightAt(rm.polygon, rm.heights, p) : rm.elevation || 0, kind: 'area' };
+    }
+    const g = this.shared.ground;
+    if (g?.footprints?.some((f) => pointInPoly(p, f))) return { h: null, kind: 'building' };
+    return { h: g ? g.at(p) : GROUND_Y, kind: 'ground' };
+  }
+
+  /**
+   * Kanten eines Außenbereichs entlang seines Umrisses: nach unten bis auf das, was daneben liegt (Boden oder
+   * Nachbarbereich). Mit Höhenraster auch nach oben, wo der Hang daneben höher ist (Stützmauer). Ohne Raster wie
+   * bisher erst ab 10 cm über dem Boden; `extend` nur zu Nachbarbereichen.
+   */
+  _outdoorEdges(r, sk, y) {
+    const poly = r.room.polygon, hs = r.room.heights, terrain = !!this.shared.ground?.terrain;
+    const step = terrain ? this.shared.ground.terrain.cell / 2 : 2;
+    for (let i = 0; i < poly.length; i++) {
+      const j = (i + 1) % poly.length, a = poly[i], b = poly[j];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len < 1e-4) continue;
+      let n = [-(b[1] - a[1]) / len, (b[0] - a[0]) / len];
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (pointInPoly([mid[0] + n[0] * 0.03, mid[1] + n[1] * 0.03], poly)) n = [-n[0], -n[1]];
+      if (!terrain && r.room.extend && !this._neighborAt(poly, i, j, r.idx)) continue;
+      const inner = (t) => (hs ? hs[i] + (hs[j] - hs[i]) * t : y);
+      const P = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      const out = (t) => this._outsideAt([P(t)[0] + n[0] * 0.03, P(t)[1] + n[1] * 0.03], r);
+      const k = Math.max(1, Math.ceil(len / step));
+      const S = [];
+      for (let m = 0; m <= k; m++) {
+        const t = m / k, o = out(t);
+        S.push({ t, p: P(t), i: inner(t), o: o.h, kind: o.kind });
+      }
+      // ohne Raster: Kante nur, wenn der Bereich irgendwo deutlich über dem Boden liegt (wie bisher)
+      if (!terrain && !S.some((x) => x.o != null && x.i > x.o + 0.1)) continue;
+      for (let m = 0; m + 1 < S.length; m++) {
+        const A = S[m], B = S[m + 1];
+        if (A.o == null || B.o == null) continue; // Gebäude daneben: dessen Wand
+        const up = terrain && A.kind !== 'area' && B.kind !== 'area'; // Stützmauer zum Hang
+        const dA = A.i - A.o, dB = B.i - B.o;
+        const emit = (p, q, lo0, hi0, lo1, hi1) => {
+          if (hi0 - lo0 > 0.005 || hi1 - lo1 > 0.005) sk.skirt(p, lo0, hi0, q, lo1, hi1, r.idx);
+        };
+        if (dA >= 0 && dB >= 0) emit(A.p, B.p, A.o, A.i, B.o, B.i);
+        else if (dA <= 0 && dB <= 0) { if (up) emit(A.p, B.p, A.i, A.o, B.i, B.o); }
+        else {
+          // Vorzeichenwechsel: am Schnittpunkt teilen
+          const u = dA / (dA - dB), M = [A.p[0] + (B.p[0] - A.p[0]) * u, A.p[1] + (B.p[1] - A.p[1]) * u];
+          const hm = A.i + (B.i - A.i) * u;
+          if (dA > 0) {
+            emit(A.p, M, A.o, A.i, hm, hm);
+            if (up) emit(M, B.p, hm, hm, B.i, B.o);
+          } else {
+            if (up) emit(A.p, M, A.i, A.o, hm, hm);
+            emit(M, B.p, hm, hm, B.o, B.i);
+          }
+        }
+      }
+    }
   }
 
   /** Steildach-Teil der Dach-Etage: Flächen, Untersicht, Blende, Giebel, Gauben, Schornsteine; Antippen auf der Fläche */
