@@ -58,7 +58,7 @@ export function buildPitchedRoof(room, idx, b, yb) {
         if (A.y < yb) A = m;
         else B = m;
       }
-      b.walls.skirt(A.p, yb, A.y, B.p, yb, B.y, 0);
+      (b.facade || b.walls).skirt(A.p, yb, A.y, B.p, yb, B.y, 0);
     }
   }
 
@@ -88,13 +88,13 @@ function dormer(d, part, s, off, idx, b) {
 
   // Front (mit Giebeldreieck) und Wangen
   const fl = L(-w / 2, 0), fr = L(w / 2, 0);
-  b.walls.skirt(fl, h0 - 0.05, h0 + fh, fr, h0 - 0.05, h0 + fh, idx);
-  if (type === 'gable') b.walls.triUV(P3(fl, h0 + fh), P3(fr, h0 + fh), P3(L(0, 0), yRidge), [0, 0], [w, 0], [w / 2, yRidge - h0 - fh], idx);
-  if (type === 'gable') b.walls.triUV(P3(fl, h0 + fh), P3(L(0, 0), yRidge), P3(fr, h0 + fh), [0, 0], [w / 2, yRidge - h0 - fh], [w, 0], idx);
+  (b.facade || b.walls).skirt(fl, h0 - 0.05, h0 + fh, fr, h0 - 0.05, h0 + fh, idx);
+  if (type === 'gable') (b.facade || b.walls).triUV(P3(fl, h0 + fh), P3(fr, h0 + fh), P3(L(0, 0), yRidge), [0, 0], [w, 0], [w / 2, yRidge - h0 - fh], idx);
+  if (type === 'gable') (b.facade || b.walls).triUV(P3(fl, h0 + fh), P3(L(0, 0), yRidge), P3(fr, h0 + fh), [0, 0], [w / 2, yRidge - h0 - fh], [w, 0], idx);
   for (const x of [-w / 2, w / 2]) {
     const a = P3(L(x, 0), h0 - 0.05), c = P3(L(x, 0), h0 + fh), z = P3(L(x, sEnd), main(sEnd));
-    b.walls.triUV(a, c, z, [0, 0], [0, fh], [sEnd, fh], idx);
-    b.walls.triUV(a, z, c, [0, 0], [sEnd, fh], [0, fh], idx);
+    (b.facade || b.walls).triUV(a, c, z, [0, 0], [0, fh], [sEnd, fh], idx);
+    (b.facade || b.walls).triUV(a, z, c, [0, 0], [sEnd, fh], [0, fh], idx);
   }
   // Fenster
   if (d.window !== false) {

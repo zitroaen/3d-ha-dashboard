@@ -197,6 +197,56 @@ export function roofTileTexture(seed = 29) {
   return toTexture(c, meters);
 }
 
+// Holzfassade (Stülpschalung): waagrechte Bretter 0,15 m mit Schattenfuge, hell – Farbe aus dem Material
+// (Schwedenrot, Grau …); 1,2 m kachelbar
+export function sidingTexture(seed = 37) {
+  const size = 512, meters = 1.2;
+  const px = size / meters;
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const r = rng(seed);
+  const h = 0.15 * px;
+  for (let row = 0; row * h < size; row++) {
+    const y = row * h, l = 0.9 + (r() - 0.5) * 0.08;
+    const grad = g.createLinearGradient(0, y, 0, y + h);
+    grad.addColorStop(0, `rgb(${150 * l | 0},${150 * l | 0},${150 * l | 0})`);
+    grad.addColorStop(0.2, `rgb(${225 * l | 0},${225 * l | 0},${225 * l | 0})`);
+    grad.addColorStop(1, `rgb(${240 * l | 0},${240 * l | 0},${240 * l | 0})`);
+    g.fillStyle = grad;
+    g.fillRect(0, y, size, h);
+    // Maserung
+    for (let k = 0; k < 40; k++) {
+      g.fillStyle = `rgba(0,0,0,${r() * 0.05})`;
+      g.fillRect(r() * size, y + 3 + r() * (h - 6), 20 + r() * 80, 1);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillRect(0, y, size, 2);
+  }
+  return toTexture(c, meters);
+}
+
+// Ziegelmauerwerk: Läuferverband 24 × 7,1 cm, helle Fugen, Steine leicht unterschiedlich – Farbe aus dem Material;
+// 1,2 m kachelbar (5 Steine, 15 Schichten)
+export function brickTexture(seed = 41) {
+  const size = 512, meters = 1.2;
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const r = rng(seed);
+  const cols = 5, rows = 15, w = size / cols, h = size / rows, j = 3;
+  g.fillStyle = '#d8d4cc';
+  g.fillRect(0, 0, size, size);
+  for (let row = 0; row < rows; row++) {
+    const off = (row % 2) * w / 2;
+    for (let col = -1; col <= cols; col++) {
+      const l = 170 + (r() - 0.5) * 60;
+      g.fillStyle = `rgb(${l | 0},${l * 0.97 | 0},${l * 0.95 | 0})`;
+      const x = col * w + off;
+      for (const ox of [0, size]) g.fillRect(x - ox + j / 2, row * h + j / 2, w - j, h - j);
+    }
+  }
+  return toTexture(c, meters);
+}
+
 // Naturstein-Trockenmauer (auch Blockstufen): Lagen unregelmäßiger Sandsteinblöcke, dunkle Fugen; 1,2 m kachelbar
 export function stoneTexture(seed = 23) {
   const size = 512, meters = 1.2;

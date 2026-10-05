@@ -223,10 +223,13 @@ export function toScene(model) {
   const terrain = terrainOf(model);
   const floors = [];
   for (const b of model.buildings || []) {
+    const lowest = Math.min(...b.floors.map((f) => f.level ?? 0));
     for (const f of b.floors) {
       floors.push({
         id: floorKey(b, f),
         building: b.id,
+        facade: b.facade,
+        lowest: (f.level ?? 0) === lowest,
         name: f.name,
         buildingName: b.name,
         level: f.level,
@@ -257,10 +260,11 @@ export function toScene(model) {
       }
       floors.push({
         id: `${b.id}/${ROOF_FLOOR}`, building: b.id, name: parts[0].name, buildingName: b.name, roof: true, roofThickness: parts[0].thickness,
+        facade: b.facade,
         level: parts[0].level, elevation: parts[0].elevation, ceiling: 2.5, topCeiling: H, buildingTop: (top.elevation || 0),
         rooms: parts.map((r) => ({
           id: r.id, name: `${r.name} ${b.name || ''}`.trim(), polygon: r.shape ? r.shape.ext : r.polygon, floor: r.surface, color: r.color,
-          elevation: r.offset, thickness: r.thickness, roof: r.pitched ? r : null,
+          elevation: r.offset, thickness: r.thickness, roof: r.pitched ? r : null, railing: r.pitched ? undefined : r.railing,
         })),
         walls: [], windows: [], doors: [],
       });
@@ -276,7 +280,7 @@ export function toScene(model) {
       ceiling: 3,
       rooms: model.outdoor.map((z) => ({
         id: z.id, name: z.name, polygon: z.polygon.map((p) => [p[0], p[1]]), floor: z.surface || 'lawn', edge: z.edge, extend: !!z.extend,
-        elevation: z.elevation || 0, area: z.ha_area,
+        elevation: z.elevation || 0, area: z.ha_area, railing: z.railing,
         follow: followsTerrain(z, terrain),
         heights: followsTerrain(z, terrain) ? null : terrainHeights(z),
       })),
