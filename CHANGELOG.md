@@ -8,6 +8,8 @@
   (`power_line`: Holzmasten mit durchhängenden Seilen). Zaun und Freileitung folgen dem Gelände; alle mit
   Katalog-Vorschau. Möglichst vorhandene Materialien (Leistungsbudget).
 - Demo-Haus: Spielwiese östlich der Garage, Lattenzaun, Freileitung am Feldweg.
+- Standardansicht: Die Kamerafahrt kommt auch an, wenn der Browser keine Bilder rechnet (verdeckter Tab, dunkles
+  Wand-Tablet) – vorher blieb die Kamera dann am Start stehen.
 
 ## 0.27.0
 
