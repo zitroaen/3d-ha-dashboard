@@ -176,12 +176,27 @@ const outdoor = [
   { id: 'beet_sued_2', name: 'Beet Süd rechts', polygon: rect(3.8, 10.5, 6.5, 11.3), surface: 'soil', elevation: -0.04 },
   { id: 'weg', name: 'Gartenweg', polygon: rect(2.7, 10.5, 3.8, 11.3), surface: 'paving' },
   ...northTerrace(),
-  // Garten als Südhang (Süden = +y): oben auf Terrassenhöhe, unten 1,5 m tiefer (Höhe je Eckpunkt)
-  {
-    id: 'garten', name: 'Garten', surface: 'lawn',
-    polygon: [[-4, 11.3, -0.05], [11.2, 11.3, -0.05], [11.2, 18, -1.5], [-4, 18, -1.5]],
-  },
+  // Garten am Südhang (Süden = +y), folgt dem Höhenraster
+  { id: 'garten', name: 'Garten', surface: 'lawn', follow: 'terrain', polygon: rect(-4, 11.3, 11.2, 18) },
 ];
+
+/**
+ * Gelände als Höhenraster (1-m-Raster, site.terrain): Nordhang hinter dem Haus (14 cm pro Meter), ebenes Grundstück
+ * um das Haus knapp unter dem Fußboden, Südhang im Garten (1,4 m auf 6,7 m) und leichte Wellen an den Rändern.
+ */
+function terrain() {
+  const X0 = -10, Y0 = -14, NX = 37, NY = 39;
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  const T = (x, y) => {
+    const base = y < 0 ? -y * 0.14 : y > 11.3 ? -0.12 - (y - 11.3) * 0.206 : -0.12;
+    const amp = 0.3 * clamp((x - 17) / 6) + 0.3 * clamp((-5 - x) / 5);
+    return r3(base + amp * Math.sin(x * 0.9 + 0.5) * Math.cos(y * 0.6));
+  };
+  return {
+    origin: [X0, Y0], cell: 1,
+    heights: Array.from({ length: NY }, (_, j) => Array.from({ length: NX }, (_, i) => T(X0 + i, Y0 + j))),
+  };
+}
 
 /**
  * Terrasse nördlich des Hauses, in den Hang gegraben: Großformatplatten auf Fußbodenhöhe, dahinter steigt der Rasen
@@ -189,7 +204,6 @@ const outdoor = [
  * an den Seiten in Stufen dem Gelände folgend; im Nordwesten führen Blockstufen hinauf.
  */
 function northTerrace() {
-  const slope = (y) => r3(-y * 0.14); // Höhe des Rasens bei y (Norden = -y)
   const T = 0.4; // Mauerstärke
   const N = -4.4, BED = -6.0; // Terrasse bis y = N, Hochbeet bis y = BED
   const STEPS = 1.4; // Treppe x 0 … 1.4
@@ -210,11 +224,10 @@ function northTerrace() {
     // Seitenmauern, abgetreppt (oben im Norden am höchsten)
     ...wallSegs(-T, 0, [[BED, -3.6, 0.95], [-3.6, -1.8, 0.62], [-1.8, 0, 0.36]]),
     ...wallSegs(10, 10 + T, [[N, -2.9, 0.9], [-2.9, -1.4, 0.62], [-1.4, 0, 0.36]]),
-    // Rasen am Nordhang rund um die Terrasse (U-Form), steigt nach Norden an; der Boden setzt ihn nach außen fort
+    // Rasen am Nordhang rund um die Terrasse (U-Form), folgt dem Höhenraster (steigt nach Norden an)
     {
-      id: 'garten_nord', name: 'Garten Nord', surface: 'lawn', extend: true, // der Hang läuft über den Rand hinaus weiter
-      polygon: [[-4, 0], [-T, 0], [-T, BED], [10 + T, BED], [10 + T, 0], [15.5, 0], [15.5, -11], [-4, -11]]
-        .map(([x, y]) => [x, y, slope(y)]),
+      id: 'garten_nord', name: 'Garten Nord', surface: 'lawn', follow: 'terrain',
+      polygon: [[-4, 0], [-T, 0], [-T, BED], [10 + T, BED], [10 + T, 0], [15.5, 0], [15.5, -11], [-4, -11]],
     },
   ];
 }
@@ -225,7 +238,7 @@ const prev = (prevText.trim() && yaml.load(prevText)) || {};
 const model = {
   schema: 'ha3d',
   version: 2,
-  site: { name: 'Demohaus', north_deg: 20, ground: { surface: 'lawn' } },
+  site: { name: 'Demohaus', north_deg: 20, ground: { surface: 'lawn' }, terrain: terrain() },
   buildings,
   outdoor,
   objects: prev.objects || [],

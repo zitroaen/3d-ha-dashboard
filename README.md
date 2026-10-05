@@ -27,7 +27,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Dachteile je Gebäude (Anbau, Dachterrasse, abgesetztes Pultdach). Dächer erscheinen ab der Ebene darüber (Knopf
   „Dach“ über der obersten) – samt Objekten darauf wie einem Balkonkraftwerk. Unter einem Steildach zeigen die Wände
   der obersten Etage Kniestock und Dachschräge.
-- **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände mit Höhen (z. B. Südhang); Trockenmauern,
+- **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände als Höhenraster (auch aus einem LiDAR-Scan,
+  `scripts/terrain-from-scan.mjs`), Bereiche folgen dem Hang; Trockenmauern,
   Hochbeete und Stufen; Bäume, Sträucher, Gräser, Blumen, Gartenmöbel und Gartenleuchten (Poller, Strahler,
   Lichterkette) aus dem Katalog.
 - **Wetter:** Wolken, Regen (nasse Flächen), Schnee (weiße Decke) und Nebel aus der HA-Wetter-Entity; Symbol und

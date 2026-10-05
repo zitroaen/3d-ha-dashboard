@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import * as yaml from 'js-yaml';
 import { ENGINE_ROOT } from './lib/config.mjs';
 import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.js';
-import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, activityOf, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
+import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, activityOf, terrainOf, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
+import { terrainGrid, clipTerrain } from '../src/terrain.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 import { roofShape, minusConvex } from '../src/roofshape.js';
@@ -63,18 +64,54 @@ check('Szene: Leuchte im Außenbereich liegt auf der Außen-Etage mit dessen Hö
 const free = toScene({ ...base(), objects: [{ id: 'x', model: 'box', pos: [1, 1] }] }).items[0];
 check('Szene: Objekt ohne Bereich steht auf freiem Gelände', free.floor === OUTDOOR_FLOOR && free.room === OPEN_GROUND);
 
-// --- Gelände: Höhe je Eckpunkt, Objekte stehen auf dem Hang
+// --- Gelände: Höhe je Eckpunkt (ältere Form), Objekte stehen auf dem Hang
 {
   const m = parseModel(demoText);
+  delete m.site.terrain;
+  m.outdoor.push({ id: 'hang', name: 'Hang', surface: 'lawn', polygon: [[-4, 30, -0.05], [11.2, 30, -0.05], [11.2, 36.7, -1.5], [-4, 36.7, -1.5]] });
+  m.objects.push({ id: 'hangbaum', model: 'tree', space: 'hang', pos: [3, 35] });
   const sc = toScene(m);
-  const garten = sc.house.floors.find((f) => f.id === OUTDOOR_FLOOR).rooms.find((r) => r.id === 'garten');
+  const hang = sc.house.floors.find((f) => f.id === OUTDOOR_FLOOR).rooms.find((r) => r.id === 'hang');
   const terr = sc.house.floors.find((f) => f.id === OUTDOOR_FLOOR).rooms.find((r) => r.id === 'terrasse');
-  check('Gelände: Höhen je Eckpunkt, ebene Bereiche ohne', garten.heights?.join() === '-0.05,-0.05,-1.5,-1.5' && terr.heights === null);
-  const z = m.outdoor.find((o) => o.id === 'garten');
-  const mid = outdoorHeightAt(z, [3, (11.3 + 18) / 2]);
-  check('Gelände: Höhe dazwischen linear', Math.abs(mid - (-0.05 - 1.5) / 2) < 1e-6 && Math.abs(outdoorHeightAt(z, [0, 18]) + 1.5) < 1e-6, String(mid));
-  const tree = sc.items.find((i) => i.id === 'apfelbaum');
+  check('Gelände: Höhen je Eckpunkt, ebene Bereiche ohne', hang.heights?.join() === '-0.05,-0.05,-1.5,-1.5' && terr.heights === null);
+  const z = m.outdoor.find((o) => o.id === 'hang');
+  const mid = outdoorHeightAt(z, [3, (30 + 36.7) / 2]);
+  check('Gelände: Höhe dazwischen linear', Math.abs(mid - (-0.05 - 1.5) / 2) < 1e-6 && Math.abs(outdoorHeightAt(z, [0, 36.7]) + 1.5) < 1e-6, String(mid));
+  const tree = sc.items.find((i) => i.id === 'hangbaum');
   check('Gelände: Objekt bekommt die Hanghöhe als base', Math.abs(tree.base - outdoorHeightAt(z, tree.pos)) < 1e-9 && tree.base < -0.5, String(tree.base));
+}
+
+// --- Höhenraster (site.terrain): Dreiecke mit fester Diagonale, Lücken gefüllt, Rand fortgesetzt
+{
+  const g = terrainGrid({ origin: [0, 0], cell: 1, heights: [[0, 1, 2], [1, 2, 3], [2, null, 4]] });
+  check('Raster: Höhe an Rasterpunkten und linear dazwischen', g.height([1, 1]) === 2 && Math.abs(g.height([0.5, 0.25]) - 0.75) < 1e-9 && g.height([2, 0]) === 2);
+  check('Raster: Lücke aus den Nachbarn gefüllt', Math.abs(g.H(1, 2) - (2 + 4 + 2) / 3) < 1e-9, String(g.H(1, 2)));
+  check('Raster: außerhalb setzt sich der Rand fort', g.height([-5, 0]) === 0 && g.height([9, 1]) === 3);
+  const tris = g.triangles();
+  const frags = clipTerrain(tris, [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5]]]);
+  const area = frags.reduce((a, f) => a + Math.abs(f.reduce((s, v, i) => {
+    const q = f[(i + 1) % f.length].p;
+    return s + (v.p[0] * q[1] - q[0] * v.p[1]) / 2;
+  }, 0)), 0);
+  check('Raster: Zuschnitt auf einen Bereich deckt genau seine Fläche, Höhen auf dem Raster',
+    Math.abs(area - 1) < 1e-9 && frags.every((f) => f.every((v) => Math.abs(v.h - g.height(v.p)) < 1e-9)), String(area));
+  const rest = clipTerrain(tris, null, [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5]]]);
+  const restArea = rest.reduce((a, f) => a + Math.abs(f.reduce((s, v, i) => {
+    const q = f[(i + 1) % f.length].p;
+    return s + (v.p[0] * q[1] - q[0] * v.p[1]) / 2;
+  }, 0)), 0);
+  check('Raster: Aussparung lässt den Rest übrig', Math.abs(restArea - 3) < 1e-9, String(restArea));
+
+  // Demo-Haus: Garten folgt dem Raster, Objekte (auch auf freiem Gelände) stehen darauf
+  const m = parseModel(demoText);
+  const sc = toScene(m);
+  const terrain = terrainOf(m);
+  const garten = sc.house.floors.find((f) => f.id === OUTDOOR_FLOOR).rooms.find((r) => r.id === 'garten');
+  const tree = sc.items.find((i) => i.id === 'apfelbaum');
+  check('Demo: Garten folgt dem Höhenraster, Baum steht auf dem Hang',
+    garten.follow && !garten.heights && Math.abs(tree.base - terrain.height(tree.pos)) < 1e-9 && tree.base < -0.3, String(tree.base));
+  const free = toScene({ ...m, objects: [{ id: 'x', model: 'box', pos: [-8, -12] }] }).items[0];
+  check('Demo: Objekt ohne Bereich steht auf dem Raster', Math.abs(free.base - terrain.height([-8, -12])) < 1e-9 && free.base > 1, String(free.base));
 }
 
 // --- Zurückschreiben (Editor) und Rollen
@@ -197,6 +234,25 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   check('Haus: Hauptdach (nicht der Anbau) schneidet die Wände des Obergeschosses (Kniestock)', og?.roofCut?.length === 1 && roof.rooms[0].roof.shape.type === 'half_hip');
   check('Gartenhaus: abgesetztes Pultdach (zwei Pultflächen, nördliche höher)',
     sc.house.floors.find((f) => f.id === 'gartenhaus/__dach')?.rooms.map((r) => r.roof?.eaves).join() === '2,2.9');
+}
+
+// Werkzeug: Höhenraster aus einem Scan (OBJ, Y nach oben), eingepasst mit Drehung, Versatz und Fußbodenhöhe
+{
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, writeFileSync: wf, readFileSync: rf } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'ha3d-scan-'));
+  const lines = [];
+  for (let z = 0; z < 4; z++) for (let x = 0; x < 5; x++) lines.push(`v ${x} ${1 + 0.1 * z} ${z}`);
+  for (let z = 0; z < 3; z++) for (let x = 0; x < 4; x++) {
+    const a = z * 5 + x + 1;
+    lines.push(`f ${a}/1 ${a + 1}/1 ${a + 6}/1 ${a + 5}/1`);
+  }
+  wf(join(dir, 'scan.obj'), lines.join('\n'));
+  execFileSync('node', [join(ENGINE_ROOT, 'scripts/terrain-from-scan.mjs'), join(dir, 'scan.obj'), '--cell', '1', '--floor', '1', '--rotate', '90', '--offset', '10,0', '--out', join(dir, 't.json')]);
+  const t = JSON.parse(rf(join(dir, 't.json'), 'utf8'));
+  check('Scan -> Höhenraster: gedreht, verschoben, Fußboden = 0',
+    t.origin.join() === '7,0' && t.heights.length === 5 && t.heights.every((r) => r.join() === '0.3,0.2,0.1,0'), JSON.stringify(t));
 }
 
 if (failed) {
