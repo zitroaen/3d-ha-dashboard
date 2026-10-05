@@ -764,9 +764,18 @@ export class HouseScene {
       this.renderer.shadowMap.needsUpdate = true;
       this.requestRender();
     };
+    this._animFallback(anim, duration);
     if (duration) requestAnimationFrame(step);
     else step(t0);
     return true;
+  }
+
+  /**
+   * Kamerafahrt sicher beenden, auch wenn keine Bilder kommen (verdeckter Tab, Wand-Tablet mit dunklem Bildschirm,
+   * stark belastete Grafik): requestAnimationFrame kann dann lange ausbleiben – die Fahrt soll trotzdem ankommen.
+   */
+  _animFallback(anim, duration) {
+    if (duration) setTimeout(() => this._anim === anim && anim.finish(), duration + 250);
   }
 
   /** Startansicht ohne gespeicherte Standardansicht: Erdgeschoss, Blick wie beim Laden, Bildausschnitt eingepasst */
@@ -814,6 +823,7 @@ export class HouseScene {
       this._anim = null;
       this.resize(); // Bildausschnitt für die neue Blickrichtung neu einpassen
     };
+    this._animFallback(anim, duration);
     if (duration) requestAnimationFrame(step);
     else step(t0);
   }

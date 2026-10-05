@@ -280,6 +280,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   und passt den Bildausschnitt bewusst nicht neu ein (sonst verschöbe `_fitFrustum` die Ansicht); ohne Standard
   `resetView()` (Startansicht). Kompass: zweites Tippen binnen 350 ms = Standardansicht. Inaktivität: `pointerdown`/
   `wheel`/`keydown` im Shadow-DOM starten den Zeitgeber neu; im Editor und bei offenen Fenstern wird verschoben.
+- Kamerafahrten (`setView`, `faceNorth`) enden spätestens nach Dauer + 250 ms per Zeitgeber (`_animFallback`):
+  ohne Bildtakt (verdeckter Tab, dunkles Wand-Tablet, überlastete CI-Grafik) blieb die Kamera sonst am Start stehen –
+  Ursache des wackligen Standardansicht-Tests, der jetzt ohne `requestAnimationFrame` prüft.
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).
