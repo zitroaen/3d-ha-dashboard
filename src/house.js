@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
-import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture, flagstoneTexture } from './textures.js';
+import { parquetTexture, plankTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture, flagstoneTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
 import { buildPitchedRoof, ceilingFn, ceilingProfile, windowUnderRoof } from './roof.js';
 import { GROUND_Y } from './ground.js';
@@ -575,6 +575,8 @@ export function makeFloorAO(walls, pxPerMeter = 48) {
 /** Materialien und Texturen, einmal pro Szene. */
 export function createSharedMaterials() {
   const parquet = parquetTexture();
+  const planks = plankTexture();
+  planks.repeat.set(1 / planks.userData.metersPerRepeat, 1 / planks.userData.metersPerRepeat);
   parquet.repeat.set(1 / parquet.userData.metersPerRepeat, 1 / parquet.userData.metersPerRepeat);
   const tiles = tileTexture();
   tiles.repeat.set(1 / tiles.userData.metersPerRepeat, 1 / tiles.userData.metersPerRepeat);
@@ -620,6 +622,7 @@ export function createSharedMaterials() {
     parquet: withRoomLight(new THREE.MeshStandardMaterial({ map: parquet, normalMap: relief(parquet, 3), normalScale: N(0.35), roughness: 0.5, metalness: 0 }), { floorAO: true }),
     tiles: withRoomLight(new THREE.MeshStandardMaterial({ map: tiles, normalMap: relief(tiles, 6), normalScale: N(0.6), roughness: 0.3, metalness: 0 }), { floorAO: true }),
     // Würfelparkett: 35-cm-Quadrate aus je 4 Eichenstäben, Richtung wechselt
+    planks: withRoomLight(new THREE.MeshStandardMaterial({ map: planks, normalMap: relief(planks, 3), normalScale: N(0.35), roughness: 0.5, metalness: 0 }), { floorAO: true }),
     parquet_cube: lit({ map: cubes, normalMap: relief(cubes, 3), normalScale: N(0.35), roughness: 0.4, metalness: 0 }, { floorAO: true }),
     concrete: lit({ color: 0x9a968f, normalMap: plaster, normalScale: N(0.5), roughness: 0.9 }, { floorAO: true }),
     // Flächen im Freien: nass bei Regen, weiß bei Schnee (weather)

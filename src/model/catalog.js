@@ -97,7 +97,7 @@ export const DEFAULT_LIGHT_HEIGHT = { ceiling: 2.35, pendant: 2.0, floor: 0.15, 
 export const MODEL_LIGHT_HEIGHT = { floor_spots: 1.5, string_lights: 2.4, bollard: 0.55, ball: 0.15, spike_spot: 0.15, floor_column: 0.95, chandelier_crystal: 1.9 };
 
 /** Bodenbeläge und Oberflächen (`surface`) */
-export const SURFACES = ['parquet', 'parquet_cube', 'tiles', 'concrete', 'lawn', 'paving', 'gravel', 'soil', 'wood', 'water', 'slabs', 'stone', 'roof', 'roof_tiles', 'flagstone'];
+export const SURFACES = ['parquet', 'planks', 'parquet_cube', 'tiles', 'concrete', 'lawn', 'paving', 'gravel', 'soil', 'wood', 'water', 'slabs', 'stone', 'roof', 'roof_tiles', 'flagstone'];
 
 /** Montagearten von Leuchten (`light.mount`) */
 export const LIGHT_MOUNTS = ['ceiling', 'pendant', 'floor', 'table', 'wall', 'spot'];

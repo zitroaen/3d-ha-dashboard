@@ -25,7 +25,7 @@
       "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 },
       "minItems": 3
     },
-    "surface": { "enum": ["parquet", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water", "slabs", "stone", "roof", "roof_tiles", "flagstone"] },
+    "surface": { "enum": ["parquet", "planks", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water", "slabs", "stone", "roof", "roof_tiles", "flagstone"] },
     "entityId": { "type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$" },
     "entityList": {
       "oneOf": [
