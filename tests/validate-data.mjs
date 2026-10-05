@@ -7,7 +7,8 @@ import Ajv from 'ajv/dist/2020.js';
 import { DATA_DIR, ENGINE_ROOT } from './lib/config.mjs';
 import { pointInPoly } from '../src/geometry.js';
 import { CATALOG, hasCapability } from '../src/model/catalog.js';
-import { parseModel, spacesOf, roleEntities } from '../src/model/model.js';
+import { parseModel, spacesOf, roleEntities, roofParts, toScene } from '../src/model/model.js';
+import { ceilingFn, windowUnderRoof } from '../src/roof.js';
 import { FURNITURE, LAMPS } from '../src/models.js';
 
 const errors = [], warnings = [];
@@ -78,6 +79,40 @@ for (const o of model.objects || []) {
   }
   const tex = o.params?.texture;
   if (tex && !existsSync(join(DATA_DIR, tex))) errors.push(`Objekt ${o.id}: Textur ${tex} fehlt im Datenordner`);
+}
+
+// Steildächer: Fenster über der Dachfläche (Kniestock) und Wände der obersten Etage ohne Dach darüber
+{
+  const scene = toScene(model);
+  const fmt = (p) => `[${p.map((v) => Math.round(v * 100) / 100).join(', ')}]`;
+  for (const f of scene.house.floors) {
+    if (!f.roofCut) continue;
+    const H = f.ceiling ?? 2.5, C = ceilingFn(f.roofCut, H);
+    for (const w of f.windows) {
+      const fit = windowUnderRoof(w, C, f.roofCut);
+      if (fit.dormer) continue; // unter einer Gaube: deren Fenster ersetzt es
+      if (fit.omit) warnings.push(`${f.id}: Fenster ${fmt(w.rect)} liegt über der Dachfläche (Wand dort ${fit.wallTop.toFixed(2)} m hoch) – wird weggelassen; Gaube anlegen?`);
+      else if (fit.top != null) warnings.push(`${f.id}: Fenster ${fmt(w.rect)} liegt über der Dachfläche (Wand dort ${fit.wallTop.toFixed(2)} m hoch) – wird auf ${fit.top} m gekürzt; Gaube anlegen?`);
+    }
+    // Wände unter keinem Dachteil (weder Steildach noch flach): ragen bis zur Etagenhöhe aus dem Dach
+    const b = model.buildings.find((x) => f.id.startsWith(`${x.id}/`));
+    const flat = roofParts(b).filter((r) => !r.pitched).map((r) => r.polygon);
+    const covered = (p) => f.roofCut.some((r) => r.shape.contains(p)) || flat.some((poly) => pointInPoly(p, poly));
+    for (const wall of f.walls) {
+      const out = [];
+      for (let i = 0; i < wall.length; i++) {
+        const a = wall[i], c = wall[(i + 1) % wall.length], n = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) / 0.25));
+        for (let k = 0; k <= n; k++) {
+          const p = [a[0] + ((c[0] - a[0]) * k) / n, a[1] + ((c[1] - a[1]) * k) / n];
+          if (!covered(p)) out.push(p);
+        }
+      }
+      if (out.length) {
+        const xs = out.map((p) => p[0]), ys = out.map((p) => p[1]);
+        warnings.push(`${f.id}: Wand bei ${fmt([Math.min(...xs), Math.min(...ys)])}–${fmt([Math.max(...xs), Math.max(...ys)])} liegt unter keinem Dachteil und ragt bis zur Etagenhöhe (${H} m) – Dachteil ergänzen oder polygon erweitern`);
+      }
+    }
+  }
 }
 
 // Luftbild: Datei vorhanden, nur mit Höhenraster wirksam

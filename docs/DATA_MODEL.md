@@ -158,7 +158,10 @@ ergibt auf konvexen Umrissen genau Sattel-, Walm-, Krüppelwalm- und Pultdach.
 Etage unter der Dachfläche – Kniestock, Giebelwände und Innenwände zeigen die Dachschräge (höchstens bis zur
 Etagenhöhe, z. B. Kehlbalkenlage). Darüber zeichnet das Dach die Giebelwände bis zum First. Deckenleuchten unter der
 Schräge hängen an der Schräge. Dachteile über einer tieferen Etage (Anbau) schneiden nichts; ihre Giebelwände
-beginnen an der Traufe.
+beginnen an der Traufe. Fenster in diesen Wänden, die über die Dachfläche ragen würden, werden auf die verbleibende Wandhöhe gekürzt (5 cm
+darunter) oder – bei weniger als 30 cm über der Brüstung – weggelassen (die Öffnung wird Wand); unter einer Gaube
+entfallen sie ebenfalls (die Gaube hat ihr Fenster). `npm run validate` meldet solche Fenster („Gaube anlegen?“) und
+Wände der obersten Etage, über denen kein Dachteil liegt (sie ragen bis zur Etagenhöhe).
 
 **Gauben** (`roof.dormers[]`): stehen auf der Dachfläche an `pos`, die Front zeigt zur Traufe.
 
@@ -731,6 +734,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.26.0, abwärtskompatibel, ohne neue Felder):** Fenster unter Dachschrägen werden gekürzt
+  bzw. weggelassen; Prüfung warnt dazu und bei Wänden der obersten Etage ohne Dach darüber.
 - **Version 2, Ergänzung (0.25.0, abwärtskompatibel):** `site.attribution` (Quellenangaben, im Info-Menü);
   Werkzeuge `scripts/fit-footprint.mjs` (Einpassung an LoD2 -> `site.georef`) und `scripts/roof-from-lod2.mjs`;
   Magicplan-Import mit `stretch`, `merge`, `clip`, `split` mit `into`/`wall` und `room_ids` als `{ id, name, ha_area }`.

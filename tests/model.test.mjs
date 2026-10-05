@@ -509,6 +509,39 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
     lines.length === 2 && /type: gable, pitch: 35(\.0)?, ridge: x, eaves: 5\.6/.test(lines[0]) && /type: flat, eaves: 3/.test(lines[1]), out);
 }
 
+// Fenster unter Steildächern: kürzen/weglassen, Prüfung warnt; Wände ohne Dach darüber
+{
+  const { mkdtempSync, writeFileSync: wf } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { spawnSync } = await import('node:child_process');
+  const dir = mkdtempSync(join(tmpdir(), 'ha3d-kniestock-'));
+  // 10 × 8, Satteldach First entlang x, Traufe 1 m (Kniestock): Fenster an der Traufseite (y = 0) passt nicht,
+  // am Giebel (x = 0) in der Mitte passt es; Anbau-Wand bei x 10 … 12 hat kein Dach
+  wf(join(dir, 'model.yaml'), [
+    'schema: ha3d', 'version: 2', 'site: { name: Test }', 'buildings:',
+    '  - id: haus', '    name: Haus',
+    '    roof: { type: gable, ridge: x, pitch: 40, eaves: 1, polygon: [[0, 0], [10, 0], [10, 8], [0, 8]] }',
+    '    floors:',
+    '      - id: dg', '        name: DG', '        level: 0', '        height: 2.5',
+    '        rooms: [{ id: raum, name: Raum, polygon: [[0.3, 0.3], [9.7, 0.3], [9.7, 7.7], [0.3, 7.7]] }]',
+    '        walls: [{ polygon: [[0, 0], [10, 0], [10, 0.3], [0, 0.3]] }, { polygon: [[10, 2], [12, 2], [12, 2.3], [10, 2.3]] }]',
+    '        windows:',
+    '          - { rect: [4, 0, 5, 0.3], sill: 0.9, top: 2.1, room: raum }',
+    '          - { rect: [0, 3.5, 0.3, 4.5], sill: 0.9, top: 2.1, room: raum }',
+    'objects: []', '',
+  ].join('\n'));
+  const r = spawnSync('node', [join(ENGINE_ROOT, 'tests/validate-data.mjs'), '--data', dir], { encoding: 'utf8' });
+  const out = r.stdout + r.stderr;
+  check('Prüfung: Fenster über der Dachfläche (Gaube anlegen?) und Wand ohne Dach mit Lage',
+    /Fenster \[4, 0, 5, 0\.3\] liegt über der Dachfläche.*weggelassen; Gaube anlegen\?/.test(out) && !/Fenster \[0, 3\.5/.test(out)
+      && /Wand bei \[10(\.\d+)?, 2\]–\[12, 2\.3\] liegt unter keinem Dachteil/.test(out), out);
+  const { windowUnderRoof, ceilingFn: cf } = await import('../src/roof.js');
+  const C = (p) => 1 + p[0] * 0.5; // Schräge: 1 m bei x = 0, 2 m bei x = 2
+  const shortWin = windowUnderRoof({ rect: [1.6, 0, 2.4, 0.3], sill: 0.9, top: 2.1 }, C);
+  check('Fenster unter der Schräge: gekürzt auf die niedrigste Stelle minus 5 cm, ohne Dach unverändert',
+    shortWin.top === 1.75 && !windowUnderRoof({ rect: [0, 0, 1, 0.3] }, null).top && typeof cf === 'function', JSON.stringify(shortWin));
+}
+
 // Magicplan-Import: Etagen drehen, Raum-IDs eindeutig, Räume teilen (Python, ohne PDF)
 {
   const { spawnSync } = await import('node:child_process');

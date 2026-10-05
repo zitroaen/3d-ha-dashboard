@@ -250,7 +250,7 @@ export function toScene(model) {
     if (parts.length) {
       const top = topFloor(b), H = top.height ?? 2.5;
       // Steildächer schneiden die Wände der obersten Etage (Kniestock, Giebel): Unterseite = Traufe + Dachfläche
-      const cut = parts.filter((r) => r.pitched && r.overTop).map((r) => ({ shape: r.shape, eaves: r.eaves }));
+      const cut = parts.filter((r) => r.pitched && r.overTop).map((r) => ({ shape: r.shape, eaves: r.eaves, dormers: r.dormers || [] }));
       if (cut.length) floors.find((f) => f.id === floorKey(b, top)).roofCut = cut;
       // Aussparung (Dachterrasse): Brüstung bis auf den flachen Teil darin
       for (const r of parts) {
