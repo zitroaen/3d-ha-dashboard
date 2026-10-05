@@ -1067,8 +1067,8 @@ class Ha3dDashboard extends HTMLElement {
         if (!showsBadge(e, light)) continue;
         const info = this._live(roleEntities(e, 'info')), power = this._live(roleEntities(e, 'power'));
         const on = power.some((id) => isOn(states[id]));
-        // Tore/Rollläden: Zustandstext (Offen, Zu, Öffnet …) statt An/Aus
-        const covers = power.length && power.every((id) => id.startsWith('cover.'));
+        // Tore/Rollläden und Saugroboter: Zustandstext (Offen, Zu, Öffnet …, Saugt, Station) statt An/Aus
+        const covers = power.length && power.every((id) => /^(cover|vacuum)\./.test(id));
         const text = info.length ? info.map((id) => stateText(states[id])).join(' · ')
           : covers ? stateText(states[power[0]]) : power.length ? (on ? 'An' : 'Aus') : null;
         if (text != null) want.set(`${type}:${e.id}`, { ref: { type, id: e.id }, text, on, name: e.name || e.id });

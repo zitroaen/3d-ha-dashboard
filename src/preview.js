@@ -2,7 +2,7 @@
 // Textur rechnen und als Bild-URL zwischenspeichern. Eigene kleine Szene mit einfachem Licht – unabhängig vom Haus,
 // kein zweiter WebGL-Kontext.
 import * as THREE from 'three';
-import { PartCollector, PALETTE, FURNITURE, LAMPS, defaultLamp } from './models.js';
+import { PartCollector, FURNITURE, LAMPS, defaultLamp, paletteParams } from './models.js';
 import { CATALOG, hasCapability, DEFAULT_MOUNT, DEFAULT_LIGHT_HEIGHT, MODEL_LIGHT_HEIGHT } from './model/catalog.js';
 
 const SIZE = 128;
@@ -24,7 +24,7 @@ function setup() {
     if (!mats.has(k)) {
       mats.set(k, kind === 'glow'
         ? new THREE.MeshBasicMaterial({ color: 0xffe2a8 })
-        : new THREE.MeshStandardMaterial({ ...(PALETTE[key] || { color: 0x9a9a9a, roughness: 0.8 }) }));
+        : new THREE.MeshStandardMaterial(paletteParams(key) || { color: 0x9a9a9a, roughness: 0.8 }));
     }
     return mats.get(k);
   };

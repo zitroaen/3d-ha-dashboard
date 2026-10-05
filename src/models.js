@@ -62,7 +62,12 @@ export const PALETTE = {
   door_grey: { color: 0x8c9095, roughness: 0.45, metalness: 0.2 },
   pv_cell: { color: 0x1b2a44, roughness: 0.18, metalness: 0.35 },
   alu: { color: 0xc4c7ca, roughness: 0.35, metalness: 0.7 },
+  // Innenausstattung
+  glass_cab: { color: 0xc9dde4, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false },
 };
+
+/** Farbe als Material-Schlüssel: Palette-Name oder '#rrggbb' (eigene Farbe, z. B. aus params.color) */
+export const paletteParams = (key) => (PALETTE[key] ? { ...PALETTE[key] } : /^#[0-9a-f]{6}$/i.test(key) ? { color: key, roughness: 0.6 } : null);
 
 // Geteilte Geometrie/Materialien der Energiefluss-Lichtpunkte
 const PULSE = {};
@@ -216,7 +221,7 @@ export class PartCollector {
       merged.computeVertexNormals();
       for (const g of geos) g.dispose();
       const mesh = new THREE.Mesh(merged, materialFor(key, kind));
-      mesh.castShadow = kind === 'lit';
+      mesh.castShadow = kind === 'lit' && !mesh.material.transparent; // Glas wirft keinen Schatten
       mesh.receiveShadow = kind === 'lit';
       meshes.push(mesh);
     }
@@ -233,9 +238,9 @@ export const FURNITURE = {
   /** Allgemeiner Quader für Geräte ohne eigenes Modell (Waschmaschine, Wärmepumpe …): size, params.color. */
   box(P, it) {
     const [W, D, H] = it.size || [0.6, 0.6, 0.85];
-    const c = it.color || 'white';
-    P.rbox(c, W, H, D, Math.min(0.03, W / 6, D / 6), 0, 0, 0);
-    P.box('black_matte', W * 0.6, 0.02, 0.005, 0, H * 0.82, D / 2 + 0.002); // Bedienblende
+    const c = it.color || 'white', y = it.elevation ?? 0; // elevation: z. B. Gerät auf einem Möbel
+    P.rbox(c, W, H, D, Math.min(0.03, W / 6, D / 6), 0, y, 0);
+    if (it.panel !== false) P.box('black_matte', W * 0.6, 0.02, 0.005, 0, y + H * 0.82, D / 2 + 0.002); // Bedienblende
   },
 
   /** Kleiner Punkt für Sensoren, Taster und Anzeigen: Kugel mit Durchmesser size[0]. */
@@ -766,6 +771,186 @@ export const FURNITURE = {
     P.endAnim();
   },
 
+  /** Esstisch: Platte mit Zarge, Beine aus Holz (params.legs = wood) oder schwarzem Metall (metal). */
+  dining_table(P, it) {
+    const [W, D, H] = it.size || [1.8, 0.9, 0.75];
+    const c = it.color || 'oak_light';
+    P.box(c, W, 0.04, D, 0, H - 0.04, 0);
+    P.box(c, W - 0.16, 0.08, D - 0.16, 0, H - 0.12, 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      if (it.legs === 'metal') P.box('black_matte', 0.05, H - 0.04, 0.05, sx * (W / 2 - 0.1), 0, sz * (D / 2 - 0.08));
+      else P.box(c, 0.07, H - 0.04, 0.07, sx * (W / 2 - 0.09), 0, sz * (D / 2 - 0.09));
+    }
+  },
+
+  /**
+   * Schrank/Vitrine: style modern (glatter weißer Korpus) oder antique (Füße, geschwungene Front unten, Aufsatz mit
+   * Gesims); params.glass = Glastüren mit Geschirr dahinter; params.color.
+   */
+  cabinet(P, it) {
+    const [W, D, H] = it.size || [1.0, 0.45, 1.9];
+    const antique = it.style === 'antique', c = it.color || (antique ? 'wood_dark' : 'white');
+    const shelves = (y0, y1, d, z) => {
+      for (let k = 1; k < 4; k++) {
+        const y = y0 + ((y1 - y0) * k) / 4;
+        P.box(c, W - 0.08, 0.02, d - 0.04, 0, y, z);
+        if (it.glass) for (let i = 0; i < 4; i++) P.cyl('white', 0.07, 0.06, 0.05, -W / 2 + 0.16 + i * ((W - 0.32) / 3), y + 0.02, z, { seg: 10 });
+      }
+    };
+    if (!antique) {
+      P.box(c, W, H, D, 0, 0, 0);
+      if (it.glass) {
+        P.box('black_matte', W - 0.06, H - 0.12, 0.005, 0, 0.08, D / 2 - 0.004); // dunkler Innenraum
+        shelves(0.08, H - 0.04, D, 0.02);
+        P.box('glass_cab', W - 0.06, H - 0.12, 0.006, 0, 0.08, D / 2 + 0.004);
+      }
+      P.box('black_matte', 0.004, H - 0.12, 0.006, 0, 0.08, D / 2 + 0.005); // Türfuge
+      for (const sx of [-1, 1]) P.box('alu', 0.015, 0.18, 0.02, sx * 0.05, H * 0.5, D / 2 + 0.012);
+      return;
+    }
+    // antik: Unterschrank mit geschwungener Front auf Füßen, Aufsatz mit Gesims
+    const foot = 0.1, base = H * 0.42;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.cyl(c, 0.035, 0.05, foot, sx * (W / 2 - 0.06), 0, sz * (D / 2 - 0.06), { seg: 10 });
+    const arc = [];
+    for (let k = 0; k <= 12; k++) {
+      const t = k / 12, x = -W / 2 + W * t;
+      arc.push([x, D / 2 + 0.05 * Math.sin(Math.PI * t)]); // Front leicht gebaucht
+    }
+    P.slab(c, [[-W / 2, -D / 2], [W / 2, -D / 2], ...arc.reverse()], base - foot, foot);
+    P.slab(c, [[-W / 2 - 0.03, -D / 2], [W / 2 + 0.03, -D / 2], ...arc.map(([x, z]) => [x * 1.03, z + 0.03])], 0.03, base);
+    const d2 = D * 0.75, z2 = -D / 2 + d2 / 2;
+    P.box(c, W - 0.06, H - base - 0.12, d2, 0, base + 0.03, z2);
+    if (it.glass) {
+      P.box('black_matte', W - 0.14, H - base - 0.24, 0.005, 0, base + 0.09, z2 + d2 / 2 - 0.003);
+      shelves(base + 0.09, H - 0.15, d2, z2);
+      P.box('glass_cab', W - 0.14, H - base - 0.24, 0.006, 0, base + 0.09, z2 + d2 / 2 + 0.004);
+    }
+    P.box(c, W + 0.06, 0.06, d2 + 0.08, 0, H - 0.09, z2 + 0.02); // Gesims
+    P.box(c, W + 0.1, 0.03, d2 + 0.11, 0, H - 0.03, z2 + 0.03);
+    for (const sx of [-1, 1]) P.sphere('brass', 0.015, sx * 0.06, base * 0.6, D / 2 + 0.06, { seg: 8 });
+  },
+
+  /** Eckschrank: Rückwände an zwei Wänden (−x und −z), gerundete Front zur Raummitte; params.glass, params.color. */
+  corner_cabinet(P, it) {
+    const [W, D, H] = it.size || [0.7, 0.7, 1.9];
+    const c = it.color || 'white';
+    const arc = [];
+    for (let k = 0; k <= 12; k++) {
+      const a = (k / 12) * (Math.PI / 2);
+      arc.push([-W / 2 + W * Math.cos(a), -D / 2 + D * Math.sin(a)]);
+    }
+    const front = arc.map(([x, z]) => [x, z]);
+    P.slab(c, [[-W / 2, -D / 2], ...front], 0.08, 0);
+    P.slab(c, [[-W / 2, -D / 2], ...front], 0.04, H - 0.04);
+    // Rückwände
+    P.box(c, W, H, 0.02, 0, 0, -D / 2 + 0.01);
+    P.box(c, 0.02, H, D, -W / 2 + 0.01, 0, 0);
+    for (let k = 1; k < 4; k++) {
+      const y = 0.08 + ((H - 0.12) * k) / 4;
+      P.slab(c, [[-W / 2, -D / 2], ...front.map(([x, z]) => [-W / 2 + (x + W / 2) * 0.96, -D / 2 + (z + D / 2) * 0.96])], 0.02, y);
+      if (it.glass) P.cyl('white', 0.06, 0.05, 0.05, -W / 2 + W * 0.3, y + 0.02, -D / 2 + D * 0.3, { seg: 10 });
+    }
+    // Front: gebogene Tür (Glas oder Holz) aus schmalen Streifen
+    for (let k = 0; k < 12; k++) {
+      const [x0, z0] = front[k], [x1, z1] = front[k + 1];
+      const len = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0);
+      P.box(it.glass ? 'glass_cab' : c, len + 0.002, H - 0.12, 0.02, (x0 + x1) / 2, 0.08, (z0 + z1) / 2, { rotY: -a });
+    }
+  },
+
+  /** Konsolentisch (weiß): Platte, Fächer mit Trennwänden, unten Körbe. */
+  console(P, it) {
+    const [W, D, H] = it.size || [1.2, 0.35, 0.8];
+    const c = it.color || 'white';
+    P.box(c, W, 0.03, D, 0, H - 0.03, 0);
+    for (const sx of [-1, 1]) P.box(c, 0.03, H - 0.03, D, sx * (W / 2 - 0.015), 0, 0);
+    P.box(c, W - 0.06, 0.02, D, 0, H - 0.22, 0); // Fächer oben
+    P.box(c, W - 0.06, 0.02, D, 0, 0.08, 0); // Boden
+    const n = Math.max(2, Math.round(W / 0.4));
+    for (let i = 1; i < n; i++) P.box(c, 0.02, 0.17, D, -W / 2 + (W * i) / n, H - 0.2, 0);
+    for (let i = 0; i < n; i++) {
+      const x = -W / 2 + (W * (i + 0.5)) / n;
+      P.rbox('pine', W / n - 0.07, 0.22, D - 0.06, 0.02, x, 0.1, 0);
+    }
+  },
+
+  /** Kühlschrank: params.glass = Getränkekühlschrank mit Glastür und Flaschen; params.color (weiß/steel). */
+  fridge(P, it) {
+    const [W, D, H] = it.size || [0.6, 0.65, 1.85];
+    const c = it.color || (it.glass ? 'black_matte' : 'white');
+    P.rbox(c, W, H, D, 0.02, 0, 0, 0);
+    if (it.glass) {
+      P.box('slate', W - 0.08, H - 0.2, 0.005, 0, 0.12, D / 2 - 0.004);
+      for (let r = 0; r < 5; r++) {
+        const y = 0.16 + r * ((H - 0.3) / 5);
+        P.box('alu', W - 0.1, 0.01, D - 0.1, 0, y, 0);
+        for (let i = 0; i < 5; i++) P.cyl(i % 2 ? 'barrel_green' : 'teak', 0.032, 0.032, 0.24, -W / 2 + 0.1 + i * ((W - 0.2) / 4), y + 0.01, D / 2 - 0.12, { seg: 8 });
+      }
+      P.box('glass_cab', W - 0.08, H - 0.2, 0.006, 0, 0.12, D / 2 + 0.004);
+    } else {
+      P.box('black_matte', W - 0.02, 0.006, 0.004, 0, H * 0.62, D / 2 + 0.003); // Fuge zwischen Kühl- und Gefrierteil
+    }
+    P.box('alu', 0.02, 0.4, 0.03, W / 2 - 0.06, H * 0.62 + 0.08, D / 2 + 0.02); // Griff
+  },
+
+  /**
+   * Saugroboter mit Absaugstation (Gerät, Zustand aus vacuum.*): Station hinter dem Roboter (−z, an der Wand). Animation:
+   * fährt Runden vor der Station, solange er saugt; danach steht er wieder in der Station.
+   */
+  robot_vacuum(P, it) {
+    const c = it.color || 'white';
+    P.rbox(c, 0.36, 0.42, 0.22, 0.04, 0, 0, -0.33); // Station
+    P.box('black_matte', 0.3, 0.02, 0.2, 0, 0, -0.18); // Rampe
+    P.box('black_matte', 0.1, 0.02, 0.005, 0, 0.32, -0.219);
+    P.beginAnim({ type: 'spin', axis: 'y', speed: 0.12, home: true }, [0, 0, 0.55]);
+    P.cyl(c, 0.17, 0.17, 0.08, 0, 0.01, 0, { seg: 24 });
+    P.cyl('black_matte', 0.05, 0.05, 0.02, 0, 0.09, -0.04, { seg: 12 }); // Laserturm
+    P.box('black_matte', 0.2, 0.03, 0.02, 0, 0.03, 0.165); // Stoßfänger
+    P.endAnim();
+  },
+
+  /** Kindertisch mit zwei Stühlchen; params.color (Platte), Rest Buche. */
+  kids_table(P, it) {
+    const [W, D, H] = it.size || [0.8, 0.55, 0.5];
+    const c = it.color || 'white';
+    P.box(c, W, 0.025, D, 0, H - 0.025, 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.box('oak_light', 0.04, H - 0.025, 0.04, sx * (W / 2 - 0.05), 0, sz * (D / 2 - 0.05));
+    for (const sz of [-1, 1]) {
+      const z = sz * (D / 2 + 0.2), sh = H * 0.56;
+      P.box('oak_light', 0.3, 0.02, 0.28, 0, sh, z);
+      for (const sx of [-1, 1]) for (const k of [-1, 1]) P.box('oak_light', 0.03, sh, 0.03, sx * 0.12, 0, z + k * 0.11);
+      P.box('oak_light', 0.3, 0.22, 0.02, 0, sh + 0.04, z + sz * 0.13);
+    }
+  },
+
+  /** Mitwachsender Hochstuhl (Buche): schräge Seitenwangen, Sitz- und Fußbrett, Rückenlehne. */
+  high_chair(P, it) {
+    const [W, D, H] = it.size || [0.46, 0.55, 0.8];
+    const c = it.color || 'oak_light';
+    for (const sx of [-1, 1]) {
+      P.rod(c, [sx * W / 2, 0, D / 2], [sx * W / 2, H, -D / 2 + 0.1], 0.025, { seg: 4 });
+      P.box(c, 0.03, 0.03, D, sx * W / 2, 0, 0);
+    }
+    P.box(c, W - 0.02, 0.02, 0.3, 0, H * 0.55, -0.02);
+    P.box(c, W - 0.02, 0.02, 0.24, 0, H * 0.2, 0.08);
+    P.box(c, W - 0.02, 0.12, 0.02, 0, H * 0.75, -D / 2 + 0.16);
+    P.box(c, W - 0.02, 0.06, 0.02, 0, H * 0.92, -D / 2 + 0.12);
+  },
+
+  /** Wanduhr: rundes Zifferblatt mit Rahmen und Zeigern; elevation = Mitte der Uhr (Standard 1,9 m). */
+  wall_clock(P, it) {
+    const r = (it.size?.[0] ?? 0.35) / 2, y = (it.elevation ?? 1.9) - r;
+    const rot = new THREE.Euler(Math.PI / 2, 0, 0);
+    P.cyl(it.color || 'black_matte', r, r, 0.04, 0, y + r, 0.02, { rot, seg: 32 });
+    P.cyl('white', r * 0.9, r * 0.9, 0.005, 0, y + r, 0.042, { rot, seg: 32 });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      P.box('black_matte', 0.008, i % 3 ? 0.02 : 0.04, 0.004, Math.sin(a) * r * 0.75, y + r + Math.cos(a) * r * 0.75 - 0.01, 0.046);
+    }
+    P.box('black_matte', 0.012, r * 0.5, 0.004, 0, y + r, 0.048);
+    P.box('black_matte', 0.008, r * 0.75, 0.004, r * 0.25, y + r - r * 0.2, 0.05, { rotY: 0 });
+  },
+
   /** Plattenheizkörper (Rippen). Später ein Gerät, das beim Heizen glüht. */
   radiator(P, it) {
     const [W, D, H] = it.size || [1.2, 0.1, 0.55];
@@ -896,6 +1081,88 @@ export const LAMPS = {
     for (let i = 0; i < n; i++) {
       const x = -L / 2 + ((i + 0.5) / n) * L;
       P.sphere('bulb', 0.045, x, y(x) - 0.08, 0, { kind: 'glow', seg: 8 });
+    }
+  },
+
+  /** Kristall-Kronleuchter: Korb aus Kristallsträngen an einer Kette; die Kristalle funkeln, wenn er leuchtet. */
+  chandelier_crystal(P, l, { ceiling, roomIdx, lampIdx }) {
+    const h = l.height, r = l.radius ?? 0.28, rings = 5, per = 14;
+    P.idx = roomIdx;
+    // Kette aus Gliedern (abwechselnd gedreht)
+    for (let y = h + 0.22, k = 0; y < ceiling - 0.04; y += 0.06, k++) {
+      P.add(new THREE.TorusGeometry(0.018, 0.004, 4, 8), 'brass', 'lit', new THREE.Matrix4().makeRotationY(k % 2 ? Math.PI / 2 : 0).setPosition(0, y, 0));
+    }
+    P.cyl('brass', 0.05, 0.05, 0.04, 0, ceiling - 0.04, 0, { seg: 12 });
+    for (const [y, rr] of [[h + 0.18, r * 0.75], [h - 0.12, r]]) P.add(new THREE.TorusGeometry(rr, 0.008, 4, 28), 'brass', 'lit', new THREE.Matrix4().makeRotationX(Math.PI / 2).setPosition(0, y, 0));
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      P.rod('brass', [Math.cos(a) * r * 0.75, h + 0.18, Math.sin(a) * r * 0.75], [0, h + 0.3, 0], 0.005, { seg: 4 });
+    }
+    P.idx = lampIdx;
+    for (let k = 0; k < rings; k++) {
+      // Korbform: oben schmaler, unten in einer Spitze zusammenlaufend
+      const t = k / (rings - 1), y = h + 0.16 - t * 0.42, rr = r * (0.8 + 0.25 * Math.sin(Math.PI * t * 0.8)) * (1 - t * t * 0.7);
+      for (let i = 0; i < per; i++) {
+        const a = ((i + (k % 2) * 0.5) / per) * Math.PI * 2;
+        P.add(new THREE.OctahedronGeometry(0.018), 'shade', 'glow', new THREE.Matrix4().makeScale(1, 1.6, 1).setPosition(Math.cos(a) * rr, y, Math.sin(a) * rr));
+      }
+    }
+    P.add(new THREE.OctahedronGeometry(0.04), 'shade', 'glow', new THREE.Matrix4().makeScale(1, 2, 1).setPosition(0, h - 0.34, 0));
+    P.sphere('bulb', 0.05, 0, h, 0, { kind: 'glow', seg: 10 });
+  },
+
+  /** Pendelleuchte mit Stoffschirm als Zylinder (Trommel); params.color = Stofffarbe. */
+  pendant_drum(P, l, { ceiling, roomIdx, lampIdx }) {
+    const h = l.height, r = l.radius ?? 0.25, sh = r * 0.8;
+    P.idx = roomIdx;
+    P.rod('black_matte', [0, h + sh / 2, 0], [0, ceiling, 0], 0.004, { seg: 4 });
+    P.cyl('white', 0.05, 0.05, 0.02, 0, ceiling - 0.02, 0, { seg: 12 });
+    P.idx = lampIdx;
+    // Stofffarbe aus params.color (light.color ist die Lichtfarbe)
+    const fabric = l.params?.color;
+    P.add(new THREE.CylinderGeometry(r, r, sh, 32, 1, true), fabric ? `shade${fabric}` : 'shade', 'glow', new THREE.Matrix4().setPosition(0, h, 0));
+    P.cyl('bulb', r * 0.95, r * 0.95, 0.004, 0, h - sh / 2 + 0.01, 0, { kind: 'glow', seg: 24 });
+  },
+
+  /** Stehleuchte: hohe Plissee-Säule auf drei schlanken Beinen; h = Mitte der Säule. */
+  floor_column(P, l, { roomIdx, lampIdx }) {
+    const h = l.height, r = l.radius ?? 0.16, ch = l.column ?? 1.1, y0 = h - ch / 2;
+    P.idx = roomIdx;
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.3;
+      P.rod('black_matte', [Math.cos(a) * r * 1.4, 0, Math.sin(a) * r * 1.4], [Math.cos(a) * r * 0.6, y0 + 0.02, Math.sin(a) * r * 0.6], 0.008, { seg: 4 });
+    }
+    // Plissee: Mantel mit abwechselnd vor- und zurückspringenden Falten
+    const g = new THREE.CylinderGeometry(r, r, ch, 48, 1, true);
+    const pos = g.attributes.position;
+    for (let k = 0; k < pos.count; k++) {
+      const x = pos.getX(k), z = pos.getZ(k), a = Math.atan2(z, x);
+      const f = 1 + 0.05 * Math.cos(a * 24);
+      pos.setXYZ(k, x * f, pos.getY(k), z * f);
+    }
+    P.idx = lampIdx;
+    P.add(g, 'shade', 'glow', new THREE.Matrix4().setPosition(0, h, 0));
+    P.cyl('shade', r, r, 0.004, 0, h + ch / 2 - 0.004, 0, { kind: 'glow', seg: 24 });
+  },
+
+  /**
+   * Papierlampe (Kugel aus Reispapier mit Ringen): pendant an der Decke, floor auf einem kleinen Fuß, table mit Sockel;
+   * h = Mitte der Kugel, params.radius.
+   */
+  paper_lantern(P, l, { ceiling, roomIdx, lampIdx }) {
+    const h = l.height, mount = l.kind, r = l.radius ?? (mount === 'floor' ? 0.3 : mount === 'table' ? 0.16 : 0.25);
+    P.idx = roomIdx;
+    if (mount === 'floor' || mount === 'table') {
+      P.cyl('white', r * 0.35, r * 0.4, 0.02, 0, 0, 0, { seg: 16 });
+      if (h - r > 0.02) P.rod('white', [0, 0, 0], [0, h - r, 0], 0.008, { seg: 4 });
+    } else {
+      P.rod('white', [0, h + r, 0], [0, ceiling, 0], 0.004, { seg: 4 });
+    }
+    P.idx = lampIdx;
+    P.add(new THREE.SphereGeometry(r, 20, 14), 'shade', 'glow', new THREE.Matrix4().makeScale(1, 0.92, 1).setPosition(0, h, 0));
+    for (let k = 1; k < 6; k++) {
+      const y = -r * 0.9 + (k / 6) * r * 1.8, rr = Math.sqrt(Math.max(0, r * r - y * y));
+      P.add(new THREE.TorusGeometry(rr * 1.005, 0.0025, 3, 28), 'shade', 'glow', new THREE.Matrix4().makeRotationX(Math.PI / 2).setPosition(0, h + y * 0.92, 0));
     }
   },
 

@@ -91,6 +91,40 @@ function sectionsOf(p, h, n) {
   return sec;
 }
 
+/**
+ * Meshes gleichen Materials aus mehreren Gruppen (gleiche Sichtbarkeit) zu einem Mesh in der ersten Gruppe
+ * zusammenfassen. y = Höhe der Gruppe in der Welt (Unterschiede werden in die Geometrie übernommen).
+ */
+function mergeByMaterial(entries, filter) {
+  const host = entries[0];
+  const buckets = new Map();
+  for (const e of entries) {
+    for (const m of e.group.children) {
+      if (!m.isMesh || !filter(m)) continue;
+      const g = m.geometry;
+      const key = [m.material.uuid, m.castShadow, m.receiveShadow, m.renderOrder, !!g.index, Object.keys(g.attributes).sort().join()].join('|');
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push([e, m]);
+    }
+  }
+  for (const list of buckets.values()) {
+    if (list.length < 2) continue;
+    const geos = list.map(([e, m]) => m.geometry.clone().applyMatrix4(m.matrix).translate(0, e.y - host.y, 0));
+    const merged = mergeGeometries(geos, false);
+    for (const g of geos) g.dispose();
+    if (!merged) continue;
+    const first = list[0][1];
+    const mesh = new THREE.Mesh(merged, first.material);
+    Object.assign(mesh, { castShadow: first.castShadow, receiveShadow: first.receiveShadow, renderOrder: first.renderOrder });
+    mesh.userData = { ...first.userData };
+    for (const [e, m] of list) {
+      e.group.remove(m);
+      m.geometry.dispose();
+    }
+    host.group.add(mesh);
+  }
+}
+
 const QUALITY = {
   high: { shadowMap: 2048, shadowRadius: 5, maxPixelRatio: 2 },
   low: { shadowMap: 1024, shadowRadius: 3, maxPixelRatio: 1.25 },
@@ -203,39 +237,29 @@ export class HouseScene {
    * Treffer-Flächen (Antippen) bleiben je Etage.
    */
   _mergeLevels() {
-    const levels = new Map();
-    for (const fm of this.floors) {
-      const l = fm.floor.level ?? 0;
-      levels.set(l, [...(levels.get(l) || []), fm]);
-    }
-    for (const fms of levels.values()) {
+    for (const fms of this._byLevel(this.floors).values()) {
       if (fms.length < 2) continue;
-      const host = fms[0];
-      const buckets = new Map();
-      for (const fm of fms) {
-        for (const m of fm.group.children) {
-          if (!m.isMesh || m.material === this.shared.hitMaterial) continue;
-          const g = m.geometry;
-          const key = [m.material.uuid, m.castShadow, m.receiveShadow, m.renderOrder, !!g.index, Object.keys(g.attributes).sort().join()].join('|');
-          if (!buckets.has(key)) buckets.set(key, []);
-          buckets.get(key).push([fm, m]);
-        }
-      }
-      for (const list of buckets.values()) {
-        if (list.length < 2) continue;
-        const geos = list.map(([fm, m]) => m.geometry.clone().translate(0, fm.group.position.y - host.group.position.y, 0));
-        const merged = mergeGeometries(geos, false);
-        for (const g of geos) g.dispose();
-        if (!merged) continue;
-        const first = list[0][1];
-        const mesh = new THREE.Mesh(merged, first.material);
-        Object.assign(mesh, { castShadow: first.castShadow, receiveShadow: first.receiveShadow, renderOrder: first.renderOrder });
-        for (const [fm, m] of list) {
-          fm.group.remove(m);
-          m.geometry.dispose();
-        }
-        host.group.add(mesh);
-      }
+      mergeByMaterial(fms.map((fm) => ({ group: fm.group, y: fm.group.position.y })), (m) => m.material !== this.shared.hitMaterial);
+    }
+  }
+
+  /** Etagen nach Ebene gruppiert (Map Ebene -> Liste, Reihenfolge wie this.floors) */
+  _byLevel(list, level = (x) => x.floor.level ?? 0) {
+    const out = new Map();
+    for (const x of list) {
+      const l = level(x);
+      if (!out.has(l)) out.set(l, []);
+      out.get(l).push(x);
+    }
+    return out;
+  }
+
+  /** Einrichtung: statische Teile aller Etagen einer Ebene je Material zusammenfassen (wie das Bauwerk) */
+  _mergeFurnishing() {
+    const layers = this.furnishing.map((layer, i) => ({ layer, fm: this.floors[i] }));
+    for (const list of this._byLevel(layers, (x) => x.fm.floor.level ?? 0).values()) {
+      if (list.length < 2) continue;
+      mergeByMaterial(list.map(({ layer, fm }) => ({ group: layer.group, y: fm.group.position.y })), (m) => m.userData.mergeable);
     }
   }
 
@@ -401,6 +425,7 @@ export class HouseScene {
       }
       return layer;
     });
+    this._mergeFurnishing();
     this._updateLights();
     this._syncAnims();
     this.renderer.shadowMap.needsUpdate = true;
@@ -761,6 +786,11 @@ export class HouseScene {
         this._pose(a);
       }
       if (a.spec.type === 'flow') a.node.visible = on && act;
+      // zurück in die Ausgangslage, sobald es ruht (Saugroboter fährt in die Station)
+      if (a.spec.home && !(on && act) && a.angle) {
+        a.angle = 0;
+        a.node.quaternion.copy(a.node.userData.baseQuaternion);
+      }
     }
   }
 

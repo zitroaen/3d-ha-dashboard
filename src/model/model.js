@@ -238,6 +238,7 @@ export function toScene(model) {
         ha_floor: f.ha_floor,
         rooms: f.rooms.map((r) => ({
           id: r.id, name: r.name, polygon: r.polygon, floor: r.surface || 'parquet', floor_rot: r.surface_rot, ceiling: r.height, area: r.ha_area,
+          zones: r.zones, beams: r.beams,
         })),
         walls: f.walls.map((w) => w.polygon),
         windows: f.windows || [],
@@ -310,6 +311,7 @@ export function toScene(model) {
         ...common,
         type: 'light',
         model: o.model,
+        params: o.params,
         kind: l.mount || DEFAULT_MOUNT[o.model] || 'ceiling',
         height: l.height ?? 2.2,
         range: l.range ?? 3,

@@ -247,6 +247,40 @@ export function brickTexture(seed = 41) {
   return toTexture(c, meters);
 }
 
+// Polygonalplatten (Naturstein in Bruchstücken): helle, unregelmäßige Platten mit dunklen Einsprengseln und Fugen,
+// innen wie außen; 1,6 m kachelbar (Zellen um Zufallspunkte, Abstand über den Kachelrand hinweg)
+export function flagstoneTexture(seed = 53) {
+  const size = 512, meters = 1.6;
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const r = rng(seed);
+  const pts = Array.from({ length: 34 }, () => ({ x: r() * size, y: r() * size, l: 0.82 + r() * 0.16, t: r() }));
+  const img = g.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let d1 = Infinity, d2 = Infinity, best = pts[0];
+      for (const p of pts) {
+        let dx = Math.abs(x - p.x), dy = Math.abs(y - p.y);
+        dx = Math.min(dx, size - dx);
+        dy = Math.min(dy, size - dy);
+        const d = dx * dx + dy * dy;
+        if (d < d1) { d2 = d1; d1 = d; best = p; } else if (d < d2) d2 = d;
+      }
+      const edge = Math.sqrt(d2) - Math.sqrt(d1); // Abstand zur Fuge
+      const k = (y * size + x) * 4;
+      let v = edge < 4 ? 0.38 + edge * 0.08 : best.l;
+      if (edge >= 4 && ((x * 7 + y * 13 + Math.floor(best.t * 97)) % 53 === 0 || r() < 0.004)) v *= 0.45; // Einsprengsel
+      const warm = 0.96 + best.t * 0.06;
+      img.data[k] = 222 * v * warm;
+      img.data[k + 1] = 214 * v;
+      img.data[k + 2] = 198 * v / warm;
+      img.data[k + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return toTexture(c, meters);
+}
+
 // Naturstein-Trockenmauer (auch Blockstufen): Lagen unregelmäßiger Sandsteinblöcke, dunkle Fugen; 1,2 m kachelbar
 export function stoneTexture(seed = 23) {
   const size = 512, meters = 1.2;
