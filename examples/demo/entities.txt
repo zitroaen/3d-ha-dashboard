@@ -7,12 +7,14 @@ light.demo_fernsehkugel | Fernsehkugel
 light.demo_lichterkette | Lichterkette Fenster
 switch.demo_steckdose_tv | Steckdose TV
 binary_sensor.demo_bewegung_wohnzimmer | Bewegung Wohnzimmer
+vacuum.demo_saugroboter | Saugroboter
 media_player.demo_wohnzimmer | Lautsprecher Wohnzimmer
 ## Küche
 light.demo_kueche | Deckenlicht Küche
 light.demo_spot_1 | Spot Küche 1
 light.demo_spot_2 | Spot Küche 2
 switch.demo_kaffeemaschine | Kaffeemaschine
+light.demo_esstisch | Kristallleuchter Essplatz
 ## Schlafzimmer
 light.demo_schlafen | Deckenlicht Schlafzimmer
 light.demo_nachttisch | Nachttischlampe
@@ -29,9 +31,12 @@ light.demo_pollerleuchte | Pollerleuchte
 light.demo_ohne_bereich | Lampe ohne Bereich
 ## Studio
 light.demo_studio | Deckenlicht Studio
+light.demo_studio_stehlampe | Plissee-Leuchte Studio
 ## Garage
 light.demo_garage | Deckenlicht Garage
 switch.demo_waschmaschine | Waschmaschine
 sensor.demo_waschmaschine_restzeit | Waschmaschine Restzeit
 cover.demo_garagentor | Garagentor
 sensor.demo_balkonkraftwerk_leistung | Balkonkraftwerk Leistung
+## Gartenhaus
+light.demo_gartenhaus | Papierlampe Gartenhaus

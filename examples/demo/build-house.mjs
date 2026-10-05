@@ -48,7 +48,8 @@ const walls = [
 const rect = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => [r3(x), r3(y)]);
 const rooms = [
   { id: 'wohnen', name: 'Wohnzimmer', polygon: rect(EXT, EXT, 6 - INT / 2, 8 - EXT), surface: 'parquet_cube', surface_rot: 45 },
-  { id: 'kueche', name: 'Küche', polygon: rect(6 + INT / 2, EXT, 10 - EXT, 3.5 - INT / 2), surface: 'tiles' },
+  // Küche mit Essplatz: dort Polygonalplatten aus Naturstein (Belag-Zone statt eigenem Raum)
+  { id: 'kueche', name: 'Küche', polygon: rect(6 + INT / 2, EXT, 10 - EXT, 3.5 - INT / 2), surface: 'tiles', zones: [{ polygon: rect(6 + INT / 2, 1.2, 8.3, 3.5 - INT / 2), surface: 'flagstone' }] },
   { id: 'schlafen', name: 'Schlafzimmer', polygon: rect(6 + INT / 2, 3.5 + INT / 2, 8 - INT / 2, 8 - EXT), surface: 'parquet' },
   { id: 'bad', name: 'Bad', polygon: rect(8 + INT / 2, 3.5 + INT / 2, 10 - EXT, 8 - EXT), surface: 'tiles' },
 ];
@@ -158,7 +159,7 @@ function gardenHouse() {
     facade: { type: 'wood_siding', plinth: { height: 0.25, material: 'stone' } },
     floors: [{
       id: 'eg', name: 'Gartenhaus', level: 0, elevation: 0, height: 2.2,
-      rooms: [{ id: 'gartenhaus', name: 'Gartenhaus', polygon: rect(X0 + T, Y0 + T, X1 - T, Y1 - T), surface: 'parquet' }],
+      rooms: [{ id: 'gartenhaus', name: 'Gartenhaus', polygon: rect(X0 + T, Y0 + T, X1 - T, Y1 - T), surface: 'parquet', beams: { dir: 'y', spacing: 0.7, size: [0.1, 0.14] } }],
       walls: ws.map((polygon) => ({ polygon })),
       windows: [{ rect: [17.6, Y1 - T, 18.6, Y1].map(r3), room: 'gartenhaus', sill: 0.9, top: 1.8 }],
       doors: [{ hinge: [r3(X0 + T / 2), 7.8], end: [r3(X0 + T / 2), 8.7], swing: -1, jamb: [-T / 2, T / 2].map(r3), type: 'exterior', leaf: 'solid', rooms: ['gartenhaus'], height: 1.95 }],

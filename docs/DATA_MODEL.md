@@ -181,6 +181,8 @@ beginnen an der Traufe.
 | `surface_rot` | nein | 0 | Verlegerichtung des Bodens in Grad |
 | `height` | nein | Etage | abweichende Raumhöhe |
 | `ha_area` | nein | nach Name | `area_id` des HA-Bereichs (sonst über Name oder ID gefunden) |
+| `zones` | nein | | Belag-Zonen: Teilflächen mit anderem Boden, `[{ polygon, surface, surface_rot?, color? }]` – z. B. Naturstein im Essbereich, ohne den Raum zu teilen |
+| `beams` | nein | | Deckenbalken: `{ dir (x, y oder Grad), spacing (0.8), size ([Breite, Höhe], [0.12, 0.16]), color }` – unter der Decke, unter einer Dachschräge an der Schräge |
 
 **Wand** (`walls[]`): `{ polygon }` – ein Wandstück als Grundriss-Polygon, Öffnungen (Fenster, Türen) ausgespart.
 Höhe = Etagenhöhe.
@@ -406,6 +408,7 @@ die keine Leuchte sind (Leuchten zeigen ihren Zustand durch ihr Licht). Keine An
 | `stone` | Naturstein (Trockenmauer, Blockstufen) |
 | `roof` | Flachdach (dunkle Dachbahn) |
 | `roof_tiles` | Dachziegel (Falzziegel, Farbe über `color` des Dachs) |
+| `flagstone` | Polygonalplatten aus Naturstein (hell, dunkle Einsprengsel), innen wie außen (Natursteinweg) |
 
 ## Katalog
 
@@ -416,7 +419,8 @@ Standard `[B, T, H]` in Metern. Parameter gehören nach `params`. Farben (`param
 `rug_navy`, `curtain_green`, `curtain_grey`, `teal`, `book_brown`, `book_mix`, `frame_dark`, `canvas_art`, `screen`,
 `glass_fire`, `bin_clear`, `toy_red`, `toy_yellow`, `toy_blue`; Garten: `bark`, `birch_bark`, `leaf_green`, `leaf_dark`,
 `leaf_light`, `leaf_silver`, `conifer`, `flower_red`, `flower_yellow`, `flower_violet`, `flower_white`, `flower_pink`, `grass_straw`,
-`grass_green`, `alu_dark`, `sling_grey`, `table_top`, `pine`, `barrel_green`.
+`grass_green`, `alu_dark`, `sling_grey`, `table_top`, `pine`, `barrel_green`; Innenausstattung: `glass_cab` (Glas). Statt eines Palettennamens geht auch eine eigene
+Farbe `#rrggbb`.
 
 Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` prüft, dass beide übereinstimmen).
 
@@ -427,13 +431,18 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `barrel` | Möbel | | 0.6 × 0.6 × 0.9 | `color` (Regentonne) |
 | `bench` | Möbel | | 1.6 × 0.62 × 0.85 | `color` (Auflage; Gartenbank) |
 | `bookshelf` | Möbel | | 2.0 × 0.3 × 2.0 | |
-| `box` | Gerät | | 0.6 × 0.6 × 0.85 | `color` |
+| `box` | Gerät | | 0.6 × 0.6 × 0.85 | `color`, `panel` (`false` = ohne Bedienblende) – allgemeiner Quader; `elevation` stellt ihn z. B. auf ein Möbel |
+| `cabinet` | Möbel | | 1.0 × 0.45 × 1.9 | `glass` (Glastüren mit Geschirr), `style` (`modern`: glatter Korpus; `antique`: Füße, geschwungene Front, Aufsatz mit Gesims), `color` – Schrank/Vitrine |
 | `ceiling_fan` | Gerät | | 1.2 | `color` (Flügel) – Animation: Flügel drehen sich, Tempo aus `percentage`; hängt an der Decke des Raums |
 | `chair` | Möbel | | | `guitar` |
 | `chest_table` | Möbel | | 0.8 × 0.6 × 0.48 | |
+| `console` | Möbel | | 1.2 × 0.35 × 0.8 | `color` (Standard weiß) – Konsolentisch mit Fächern und Körben |
+| `corner_cabinet` | Möbel | | 0.7 × 0.7 × 1.9 | `glass`, `color` – Eckschrank, Rückwände an −x und −z, gerundete Front |
 | `curtain` | Möbel | | | `color` |
+| `dining_table` | Möbel | | 1.8 × 0.9 × 0.75 | `color` (Holz), `legs` (`wood` oder `metal`) – Esstisch |
 | `floor_fan` | Gerät | | 0.42 × 0.42 × 1.15 | `color` (Rotor) – Animation: Rotor dreht sich, Tempo aus `percentage` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
+| `fridge` | Gerät | | 0.6 × 0.65 × 1.85 | `glass` (Getränkekühlschrank mit Glastür und Flaschen), `color` |
 | `garage_door` | Gerät | | 3.0 × 0.2 × 2.1 | `color`, `sections` (Lamellen, Standard 5) – Sektionaltor innen hinter einer Wandöffnung, Ursprung an der Innenkante; Schienen, Deckenantrieb; Animation: die Lamellen fahren die Schienen hoch unter die Decke, solange offen (`cover`: open/opening); Sturz bis zur Decke |
 | `garden_chair` | Möbel | | | `color` (Bespannung; Gartenstuhl) |
 | `garden_table` | Möbel | | 1.6 × 0.9 × 0.74 | `color` (Platte; Gartentisch) |
@@ -441,10 +450,13 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `grass` | Pflanze | | 0.6 × 0.6 × 0.7 | `color` (Ziergras: `grass_straw`, `grass_green`) |
 | `grill` | Möbel | | 1.3 × 0.55 × 1.15 | (Gasgrill) |
 | `hearth` | Möbel | | | |
+| `high_chair` | Möbel | | 0.46 × 0.55 × 0.8 | `color` (Standard Buche) – mitwachsender Hochstuhl |
+| `kids_table` | Möbel | | 0.8 × 0.55 × 0.5 | `color` (Platte) – Kindertisch mit zwei Stühlchen |
 | `marker` | Gerät | | 0.12 | `color` |
 | `picnic_table` | Möbel | | 0.9 × 0.9 × 0.5 | `color` (Kinder-Picknicktisch) |
 | `picture` | Möbel | | | `frame`, `mat`, `color`, `texture` |
 | `radiator` | Möbel | | | |
+| `robot_vacuum` | Gerät | | 0.36 × 0.75 × 0.42 | `color` – Saugroboter mit Absaugstation (Station hinten, −z an die Wand); Animation: fährt Runden, solange er saugt (`vacuum`: cleaning), danach wieder in der Station |
 | `rug` | Möbel | | 2.0 × 3.0 | `color` |
 | `shrub` | Pflanze | | 1.2 × 1.0 × 1.0 | `color` |
 | `sideboard` | Möbel | | 1.2 × 0.45 × 0.6 | |
@@ -456,12 +468,17 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `toy_storage` | Möbel | | | `columns` |
 | `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round`, `conifer`, `column`, `birch`), `color`, `stakes` (Dreibock aus Baumpfählen) |
 | `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
+| `wall_clock` | Möbel | | 0.35 | `color` (Rahmen) – Wanduhr, `elevation` = Mitte (Standard 1,9 m) |
 | `ball` | Leuchte | `light` | | `radius` |
 | `bollard` | Leuchte | `light` | | (Pollerleuchte, Licht unter dem Schirm) |
 | `chandelier_candles` | Leuchte | `light` | | `arms` |
+| `chandelier_crystal` | Leuchte | `light` | | `radius` (0.28) – Kristallkorb an einer Kette, die Kristalle leuchten mit |
 | `chandelier_tulip` | Leuchte | `light` | | `arms` |
 | `disc` | Leuchte | `light` | | |
+| `floor_column` | Leuchte | `light` | | `radius` (0.16), `column` (Säulenhöhe 1.1) – hohe Plissee-Säule auf drei Beinen, `light.height` = Mitte der Säule |
 | `floor_spots` | Leuchte | `light` | | |
+| `paper_lantern` | Leuchte | `light` | | `radius` – Papierkugel; Montage `pendant` (Standard), `floor` oder `table` |
+| `pendant_drum` | Leuchte | `light` | | `color` (Stoff), `radius` (0.25) – Pendelleuchte mit Stoffschirm-Zylinder |
 | `sconce` | Leuchte | `light` | | |
 | `spike_spot` | Leuchte | `light` | | (Erdspießstrahler im Beet) |
 | `string_lights` | Leuchte | `light` | | `length` (8), `sag` (0.4), `bulbs` (12), `poles` (true) – Lichterkette entlang der x-Achse, `light.height` = Höhe der Enden |
@@ -646,6 +663,10 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.20.0, abwärtskompatibel):** Katalog `dining_table`, `cabinet`, `corner_cabinet`, `console`,
+  `fridge`, `robot_vacuum`, `kids_table`, `high_chair`, `wall_clock`, `chandelier_crystal`, `pendant_drum`,
+  `floor_column`, `paper_lantern`; `box` mit `params.panel` und `elevation`; Oberfläche `flagstone`;
+  `rooms[].zones` (Belag-Zonen), `rooms[].beams` (Deckenbalken); Farben auch als `#rrggbb`.
 - **Version 2, Ergänzung (0.19.0, abwärtskompatibel):** `buildings[].facade` (Putz, Holzschalung, Ziegel, Naturstein;
   Farbe, Eckbretter, Sockel), `railing` an Außenbereichen und flachen Dachteilen.
 - **Version 2, Ergänzung (0.18.0, abwärtskompatibel):** `site.terrain` (Höhenraster) und `outdoor[].follow:

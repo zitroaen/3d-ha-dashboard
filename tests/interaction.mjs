@@ -237,7 +237,7 @@ try {
   await page.mouse.click(pt.x, pt.y);
   await settle(page, () => window.mockHass.calls.some((c) => c.domain));
   const studio = await page.evaluate(() => window.mockHass.calls.filter((c) => c.domain).map((c) => `${c.domain}.${c.service}:${[].concat(c.data.entity_id)}`));
-  ok(studio.join() === 'light.turn_on:light.demo_studio', 'Raum im Obergeschoss antippen schaltet dessen Licht über HA',
+  ok(studio.join() === 'light.turn_on:light.demo_studio,light.demo_studio_stehlampe', 'Raum im Obergeschoss antippen schaltet dessen Leuchten über HA',
     `Studio: ${studio} (angetippt bei ${JSON.stringify(pt)}, Ebene ${await page.evaluate(() => window.panel.view.level)})`);
   await clickShadow('.levels button[data-level="0"]');
   const eg = await page.evaluate(() => window.panel.view.floors.filter((f) => f.group.visible).map((f) => f.floor.id).sort());
@@ -480,6 +480,27 @@ try {
     mh.states = { ...mh.states, 'fan.demo_ventilator': { entity_id: 'fan.demo_ventilator', state: 'off', attributes: {} } };
     window.panel.hass = mh;
   });
+
+  // ---------------- Saugroboter: fährt, solange er saugt, danach zurück in die Station ----------------
+  await page.evaluate(() => {
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'on' });
+    const mh = window.mockHass;
+    mh.states = { ...mh.states, 'vacuum.demo_saugroboter': { entity_id: 'vacuum.demo_saugroboter', state: 'cleaning', attributes: {} } };
+    window.panel.hass = mh;
+  });
+  await settle(page, () => (window.panel.view._anims.find((a) => a.id === 'saugroboter')?.angle || 0) > 0);
+  const robot = await page.evaluate(() => {
+    const v = window.panel.view, a = () => v._anims.find((x) => x.id === 'saugroboter');
+    const r = { moving: a()?.angle > 0, badge: [...window.panel.shadowRoot.querySelectorAll('.badge')].find((b) => b.ref.id === 'saugroboter')?.textContent };
+    const mh = window.mockHass;
+    mh.states = { ...mh.states, 'vacuum.demo_saugroboter': { entity_id: 'vacuum.demo_saugroboter', state: 'docked', attributes: {} } };
+    window.panel.hass = mh;
+    r.home = a()?.angle === 0;
+    window.panel._applyPrefs({ ...window.panel.prefs, animations: 'off' });
+    return r;
+  });
+  ok(robot.moving && robot.home && robot.badge === 'Saugt', 'Saugroboter: fährt, solange vacuum.* saugt, angedockt wieder in der Station',
+    `Saugroboter: ${JSON.stringify(robot)}`);
 
   // ---------------- Garagentor und Balkonkraftwerk ----------------
   const door = await page.evaluate(async () => {

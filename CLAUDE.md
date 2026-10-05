@@ -253,6 +253,14 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   zusammentreffen (auch an Fensterlaibungen). Giebel- und Gaubenwände im Dach nutzen dieselbe Fassade. Geländer
   (`src/railing.js`) aus Quadern in vorhandenen Materialien (pvc mit Farbe, Glas) – keine eigenen Zeichenaufrufe je
   Geländer, durch `_mergeLevels` mit den Fenstern der Ebene zusammengefasst.
+- Innenausstattung (0.20.0): neue Modelle wie bisher prozedural in `src/models.js`; möglichst vorhandene
+  Palettenmaterialien (jedes neue Material kostet je Ebene einen Zeichenaufruf), Farben auch `#rrggbb`
+  (`paletteParams`). Leuchten behalten `params` (Stofffarbe), weil `color` die Lichtfarbe ist. Saugroboter: `spin` um
+  einen Punkt vor der Station mit `home: true` (ruhend zurück in die Ausgangslage). `rooms[].zones` 2 mm über dem Boden
+  (Orthokamera: lineare Tiefe, kein Flackern), `rooms[].beams` als Quader unter der Decke bzw. Schräge; draußen nimmt
+  ein Belag seine Wetter-Variante (`<name>_out`, z. B. `flagstone_out`). Einrichtung je Ebene zusammengefasst
+  (`scene._mergeFurnishing`, nur Meshes mit `userData.mergeable`; Treffer, Animationen und Einzelaufbau im Editor
+  bleiben je Etage).
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).
