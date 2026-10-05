@@ -4,12 +4,12 @@
 import * as THREE from 'three';
 import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
-import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture } from './textures.js';
+import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture, flagstoneTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
 import { buildPitchedRoof, ceilingFn, ceilingProfile } from './roof.js';
 import { GROUND_Y } from './ground.js';
 import { clipTerrain } from './terrain.js';
-import { buildRailing } from './railing.js';
+import { buildRailing, beam } from './railing.js';
 
 const DOOR_HEIGHT = 2.05;
 // Jeder Raumboden liegt minimal höher als der vorige: Raumpolygone überlappen in den Türöffnungen,
@@ -18,6 +18,16 @@ const FLOOR_STEP = 0.0008;
 export { GROUND_Y } from './ground.js';
 // Weiche Oberflächen: ihre Kante ist Erde; Beläge (Platten, Kies, Stein …) zeigen ihren Belag auch an der Kante
 const SOFT = new Set(['lawn', 'soil']);
+
+/** UV-Koordinaten ab Index start um deg Grad drehen (Verlegerichtung) */
+function rotateUV(uv, start, deg) {
+  const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+  for (let i = start; i < uv.length; i += 2) {
+    const u = uv[i], v = uv[i + 1];
+    uv[i] = c * u - s * v;
+    uv[i + 1] = s * u + c * v;
+  }
+}
 
 export class FloorModel {
   /**
@@ -85,7 +95,7 @@ export class FloorModel {
         this._pitchedRoof(r, floors, walls, B);
         continue;
       }
-      const kind = this.shared.surface(r.room.floor, r.room.color);
+      const kind = this.shared.surface(this._surfaceName(r.room.floor), r.room.color);
       const fb = (floors[kind] ??= new Builder());
       const uvStart = fb.uv.length;
       const hs = r.room.heights; // Gelände: Höhe je Eckpunkt
@@ -101,6 +111,16 @@ export class FloorModel {
         const ek = this.shared.mat[r.room.edge] ? r.room.edge : SOFT.has(kind) ? 'soil' : kind;
         this._outdoorEdges(r, (floors[ek] ??= new Builder()), y);
       }
+      // Belag-Zonen: Teilflächen mit anderem Boden (z. B. Naturstein im Essbereich), 2 mm darüber
+      for (const z of r.room.zones || []) {
+        if (!z.polygon || z.polygon.length < 3) continue;
+        const zb = (floors[this.shared.surface(this._surfaceName(z.surface || r.room.floor), z.color)] ??= new Builder());
+        const start = zb.uv.length;
+        zb.polyH(z.polygon, y + 0.002, r.idx);
+        if (z.surface_rot) rotateUV(zb.uv, start, z.surface_rot);
+      }
+      // Deckenbalken
+      if (r.room.beams) this._beams(r, (floors[this.shared.surface('board', r.room.beams.color || '#5b3e27')] ??= new Builder()));
       // Geländer an den Kanten (Terrasse, Balkon, Dachterrasse)
       if (r.room.railing) {
         const baseAt = frags ? (p) => ground.terrain.height(p) : hs ? (p) => heightAt(r.room.polygon, hs, p) : () => r.room.elevation || 0;
@@ -108,14 +128,7 @@ export class FloorModel {
           (role, color) => (role === 'glass' ? B.glass : role === 'metal' ? B.metal : color ? (floors[this.shared.surface('pvc', color)] ??= new Builder()) : B.pvc), r.idx);
       }
       // floor_rot: Verlegerichtung des Bodens in Grad (z. B. 45 für diagonal verlegtes Würfelparkett)
-      if (r.room.floor_rot) {
-        const a = (r.room.floor_rot * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
-        for (let i = uvStart; i < fb.uv.length; i += 2) {
-          const u = fb.uv[i], v = fb.uv[i + 1];
-          fb.uv[i] = c * u - s * v;
-          fb.uv[i + 1] = s * u + c * v;
-        }
-      }
+      if (r.room.floor_rot) rotateUV(fb.uv, uvStart, r.room.floor_rot);
       const hit = new Builder();
       if (frags) hit.terrain(frags, r.idx, 0.01);
       else if (r.room.heights) hit.polyT(r.room.polygon, r.room.heights, r.idx, 0.01);
@@ -249,6 +262,43 @@ export class FloorModel {
     add(B.doorDark, S.mat.doorDark, { cast: true });
     add(B.metal, S.mat.metal);
     add(B.glass, S.mat.glass, { receive: false, order: 2 });
+  }
+
+  /** Oberfläche draußen (Außenbereiche, Dach): Variante mit Regen/Schnee, falls es eine gibt (flagstone_out) */
+  _surfaceName(name) {
+    const out = this.floor.outdoor || this.floor.roof;
+    return out && this.shared.mat[`${name}_out`] ? `${name}_out` : name;
+  }
+
+  /**
+   * Deckenbalken (rooms[].beams): parallel zu `dir` (x, y oder Grad) im Abstand `spacing`, Querschnitt `size`
+   * [Breite, Höhe], unter der Decke (unter einer Dachschräge an deren Höhe).
+   */
+  _beams(r, b) {
+    const spec = r.room.beams, poly = r.room.polygon;
+    const a = spec.dir === 'y' ? 90 : spec.dir === 'x' || spec.dir == null ? 0 : Number(spec.dir);
+    const d = [Math.cos((a * Math.PI) / 180), Math.sin((a * Math.PI) / 180)], n = [-d[1], d[0]];
+    const [w, h] = spec.size || [0.12, 0.16], step = spec.spacing ?? 0.8;
+    const ns = poly.map((p) => p[0] * n[0] + p[1] * n[1]);
+    const ceil = r.room.ceiling ?? this.H;
+    for (let s = Math.min(...ns) + step / 2; s < Math.max(...ns) - w / 2; s += step) {
+      // Schnitt der Linie mit dem Umriss: kleinstes und größtes t entlang d
+      const ts = [];
+      for (let i = 0; i < poly.length; i++) {
+        const p = poly[i], q = poly[(i + 1) % poly.length];
+        const sp = p[0] * n[0] + p[1] * n[1], sq = q[0] * n[0] + q[1] * n[1];
+        if ((sp - s) * (sq - s) > 0 || sp === sq) continue;
+        const u = (s - sp) / (sq - sp), x = p[0] + (q[0] - p[0]) * u, y = p[1] + (q[1] - p[1]) * u;
+        ts.push(x * d[0] + y * d[1]);
+      }
+      if (ts.length < 2) continue;
+      const t0 = Math.min(...ts), t1 = Math.max(...ts);
+      const P = (t) => [n[0] * s + d[0] * t, n[1] * s + d[1] * t];
+      const A = P(t0), B = P(t1);
+      const top = (p) => Math.min(ceil, this.ceilingAt ? this.ceilingAt(p) : ceil);
+      const ya = top(A), yb = top(B);
+      beam(b, A, B, w, ya - h, ya, yb - h, yb, r.idx);
+    }
   }
 
   /** Rasterdreiecke im Umriss eines Bereichs (follow: terrain) */
@@ -546,6 +596,8 @@ export function createSharedMaterials() {
   roofTex.repeat.set(1 / 0.7, 1 / 0.7);
   const tilesRoof = roofTileTexture();
   tilesRoof.repeat.set(1 / 1.2, 1 / 1.2);
+  const flag = flagstoneTexture();
+  flag.repeat.set(1 / 1.6, 1 / 1.6);
   const siding = sidingTexture();
   siding.repeat.set(1 / 1.2, 1 / 1.2);
   const bricks = brickTexture();
@@ -578,6 +630,9 @@ export function createSharedMaterials() {
     slabs: lit({ map: slabs, normalMap: relief(slabs, 8), normalScale: N(0.7), roughness: 0.75 }, { weather: true }),
     stone: lit({ map: stone, normalMap: relief(stone, 10), normalScale: N(1.2), roughness: 0.95 }, { weather: true }),
     wood: lit({ color: 0x8a6440, roughness: 0.7 }, { weather: true }),
+    // Polygonalplatten: innen (Bodenverdeckung an Wänden) und außen (Regen, Schnee) – gleiche Textur
+    flagstone: lit({ map: flag, normalMap: relief(flag, 7), normalScale: N(0.8), roughness: 0.7 }, { floorAO: true }),
+    flagstone_out: lit({ map: flag, normalMap: relief(flag, 7), normalScale: N(0.8), roughness: 0.8 }, { weather: true }),
     water: lit({ color: 0x2f5468, roughness: 0.15, metalness: 0.1 }),
     pvc: lit({ color: 0xf1f0eb, roughness: 0.45 }),
     board: lit({ color: 0xb48650, roughness: 0.5 }),

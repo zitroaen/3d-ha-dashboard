@@ -11,7 +11,7 @@ const STYLES = {
 };
 
 /** Quader entlang a→b (Plan) mit Breite w, unten ya0/yb0, oben ya1/yb1 (Höhen dürfen an a und b verschieden sein) */
-function beam(B, a, b, w, ya0, ya1, yb0, yb1, idx) {
+export function beam(B, a, b, w, ya0, ya1, yb0, yb1, idx) {
   const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const n = [(-(b[1] - a[1]) / l) * (w / 2), ((b[0] - a[0]) / l) * (w / 2)];
   const A1 = [a[0] + n[0], a[1] + n[1]], A2 = [a[0] - n[0], a[1] - n[1]], B1 = [b[0] + n[0], b[1] + n[1]], B2 = [b[0] - n[0], b[1] - n[1]];

@@ -25,7 +25,7 @@
       "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 },
       "minItems": 3
     },
-    "surface": { "enum": ["parquet", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water", "slabs", "stone", "roof", "roof_tiles"] },
+    "surface": { "enum": ["parquet", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water", "slabs", "stone", "roof", "roof_tiles", "flagstone"] },
     "entityId": { "type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$" },
     "entityList": {
       "oneOf": [
@@ -189,7 +189,31 @@
         "surface": { "$ref": "#/$defs/surface" },
         "surface_rot": { "type": "number" },
         "height": { "type": "number", "exclusiveMinimum": 0 },
-        "ha_area": { "type": "string" }
+        "ha_area": { "type": "string" },
+        "zones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["polygon", "surface"],
+            "properties": {
+              "polygon": { "$ref": "#/$defs/polygon" },
+              "surface": { "$ref": "#/$defs/surface" },
+              "surface_rot": { "type": "number" },
+              "color": { "type": "string" }
+            }
+          }
+        },
+        "beams": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dir": { "oneOf": [{ "type": "number" }, { "enum": ["x", "y"] }] },
+            "spacing": { "type": "number", "exclusiveMinimum": 0 },
+            "size": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2 },
+            "color": { "type": "string" }
+          }
+        }
       }
     },
     "wall": {

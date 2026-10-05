@@ -1,5 +1,23 @@
 # Änderungen
 
+## 0.20.0
+
+- **Neue Möbel und Geräte:** Esstisch (Holz- oder Metallbeine), Schrank/Vitrine (modern weiß oder antik mit Füßen,
+  geschwungener Front und Aufsatz, auf Wunsch mit Glastüren), Eckschrank mit gerundeter Front, Konsolentisch mit
+  Fächern und Körben, Kühlschrank (auch Getränkekühlschrank mit Glastür), Saugroboter mit Absaugstation (fährt Runden,
+  solange `vacuum.*` saugt, Schild „Saugt“/„Station“), Kindertisch mit Stühlchen, Hochstuhl, Wanduhr.
+- **Neue Leuchten:** Kristallkronleuchter an der Kette, Pendelleuchte mit Stoffschirm (Farbe wählbar), Plissee-Säule
+  auf drei Beinen, Papierlampe (Decke, Boden, Tisch).
+- **Böden und Räume:** Polygonalplatten aus Naturstein (`flagstone`, innen und außen); Belag-Zonen
+  (`rooms[].zones`) – zwei Böden in einem Raum; Deckenbalken (`rooms[].beams`, folgen der Dachschräge).
+- `box`: `params.panel: false` (ohne Bedienblende), `elevation` stellt Geräte auf Möbel. Farben überall auch als
+  `#rrggbb`.
+- **Schneller:** Die Einrichtung aller Etagen einer Ebene wird je Material zusammengefasst (–13 Zeichenaufrufe je
+  Ebene im Demo-Haus).
+- **Demo-Haus:** Essplatz mit Natursteinboden, Kristallleuchter, Getränkekühlschrank, Konsole mit Kaffeemaschine,
+  Wanduhr; Saugroboter und Kindertisch im Wohnzimmer; Plissee- und Pendelleuchte im Studio; Gartenhaus mit
+  Deckenbalken, antiker Vitrine, Eckschrank und Papierlampe.
+
 ## 0.19.0
 
 - **Fassaden:** `buildings[].facade` – Putz in beliebiger Farbe, Holzschalung (z. B. Schwedenrot mit weißen

@@ -3,7 +3,7 @@
 // Bezug zum Haus nur über Raum-IDs und Plan-Koordinaten.
 import * as THREE from 'three';
 import { Builder, heightAt } from './geometry.js';
-import { PartCollector, PALETTE, FURNITURE, LAMPS } from './models.js';
+import { PartCollector, FURNITURE, LAMPS, paletteParams } from './models.js';
 import { withRoomLight, lampMaterial } from './roomlight.js';
 import { normalFromCanvas, weaveCanvas } from './textures.js';
 
@@ -12,9 +12,11 @@ const FABRIC = /^(fabric|cushion|rug|curtain)/;
 
 // Leuchtende Teile: Farbe im ausgeschalteten Zustand
 const GLOW_OFF = { shade: 0x8f897d, bulb: 0x7d786f, disc: 0x1f1e1c };
+// Leuchtende Teile mit eigener Farbe: Schlüssel wie "shade#4a6b8a" (Stoffschirm in dieser Farbe)
+const glowOff = (key) => GLOW_OFF[key] ?? (/#[0-9a-f]{6}$/i.test(key) ? Number.parseInt(key.slice(-6), 16) : 0x777777);
 
 // Kein Kontaktschatten: liegt flach am Boden oder hängt an der Wand
-const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door']);
+const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door', 'wall_clock']);
 
 /** Weicher Kontaktschatten (Alpha-Verlauf, Rechteck mit runden Ecken), einmal pro Szene */
 function contactTexture() {
@@ -112,25 +114,30 @@ export class FurnishingLayer {
       }
     }
 
-    for (const m of P.build((key, kind) => this._material(key, kind))) this.group.add(m);
+    // zusammenfassbar über Etagen derselben Ebene (scene._mergeFurnishing): statische Teile, Kontaktschatten, Lichtschein
+    const mergeable = (m) => {
+      m.userData.mergeable = true;
+      return m;
+    };
+    for (const m of P.build((key, kind) => this._material(key, kind))) this.group.add(mergeable(m));
     // bewegliche Teile (Ventilatorflügel …): eigene kleine Gruppen, die die Szene im Takt dreht
     this.animated = P.buildAnims((key, kind) => this._material(key, kind));
     for (const a of this.animated) this.group.add(a.node);
     if (!wpools.empty) {
       const m = new THREE.Mesh(wpools.geometry('lampIdx'), shared.mat.windowPool);
       m.renderOrder = 3;
-      this.group.add(m);
+      this.group.add(mergeable(m));
     }
     if (!contact.empty) {
       shared.contactMat ??= new THREE.MeshBasicMaterial({ map: contactTexture(), transparent: true, depthWrite: false, opacity: 0.55, color: 0x000000 });
       const m = new THREE.Mesh(contact.geometry(), shared.contactMat);
       m.renderOrder = 2;
-      this.group.add(m);
+      this.group.add(mergeable(m));
     }
     if (!pools.empty) {
       const m = new THREE.Mesh(pools.geometry('lampIdx'), shared.mat.pool);
       m.renderOrder = 3;
-      this.group.add(m);
+      this.group.add(mergeable(m));
     }
     for (const w of this.warnings) console.warn('ha-3d-dashboard:', w);
   }
@@ -225,12 +232,12 @@ export class FurnishingLayer {
     const cache = (this.shared.furnitureMats ??= new Map());
     const k = `${kind}:${key}`;
     if (!cache.has(k)) {
-      if (kind === 'glow') cache.set(k, lampMaterial({ strength: 1.6, offColor: GLOW_OFF[key] ?? 0x777777 }));
+      if (kind === 'glow') cache.set(k, lampMaterial({ strength: 1.6, offColor: glowOff(key) }));
       else if (key.startsWith('tex:')) {
         // Bildtextur aus dem Datenordner (z. B. tex:textures/gemaelde.jpg)
         cache.set(k, withRoomLight(new THREE.MeshStandardMaterial({ map: this.shared.loadTexture(key.slice(4)), roughness: 0.85 })));
       } else {
-        const params = { ...(PALETTE[key] || { color: 0xff00ff }) };
+        const params = paletteParams(key) || { color: 0xff00ff };
         if (FABRIC.test(key)) {
           this.shared.weave ??= (() => {
             const t = normalFromCanvas(weaveCanvas(), 1, 2.5, 128);

@@ -253,6 +253,18 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   check('Geländer: zwei Pfosten, Handlauf und eine Glasscheibe an der gewählten Kante', calls.glass === 1 && calls.frame === 12, JSON.stringify(calls));
 }
 
+// Innenausstattung: Belag-Zonen, Deckenbalken, eigene Farben
+{
+  const sc = toScene(parseModel(demoText));
+  const room = (f, id) => sc.house.floors.find((x) => x.id === f).rooms.find((r) => r.id === id);
+  check('Raum: Belag-Zone (Naturstein im Essbereich) und Deckenbalken kommen in der Szene an',
+    room('haus/eg', 'kueche').zones?.[0]?.surface === 'flagstone' && room('gartenhaus/eg', 'gartenhaus').beams?.dir === 'y');
+  const { paletteParams } = await import('../src/models.js');
+  check('Farben: Palettenname oder #rrggbb', paletteParams('#8fc1d6')?.color === '#8fc1d6' && paletteParams('white')?.color === 0xeeece6 && paletteParams('quatsch') === null);
+  const lamp = sc.devices.find((d) => d.id === 'studio_pendel');
+  check('Leuchte: params bleiben neben der Lichtfarbe erhalten (Stoffschirm)', lamp.params?.color === '#3f5f73');
+}
+
 // Werkzeug: Höhenraster aus einem Scan (OBJ, Y nach oben), eingepasst mit Drehung, Versatz und Fußbodenhöhe
 {
   const { execFileSync } = await import('node:child_process');

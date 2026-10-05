@@ -65,7 +65,11 @@ buildings:
             polygon: [[0.3, 0.3], [5.94, 0.3], [5.94, 7.7], [0.3, 7.7]]
             surface: parquet_cube
             surface_rot: 45
-          - { id: kueche, name: Küche, polygon: [[6.06, 0.3], [9.7, 0.3], [9.7, 3.44], [6.06, 3.44]], surface: tiles }
+          - id: kueche
+            name: Küche
+            polygon: [[6.06, 0.3], [9.7, 0.3], [9.7, 3.44], [6.06, 3.44]]
+            surface: tiles
+            zones: [{ polygon: [[6.06, 1.2], [8.3, 1.2], [8.3, 3.44], [6.06, 3.44]], surface: flagstone }]
           - id: schlafen
             name: Schlafzimmer
             polygon: [[6.06, 3.56], [7.94, 3.56], [7.94, 7.7], [6.06, 7.7]]
@@ -233,6 +237,7 @@ buildings:
             name: Gartenhaus
             polygon: [[16.62, 7.12], [19.38, 7.12], [19.38, 9.28], [16.62, 9.28]]
             surface: parquet
+            beams: { dir: "y", spacing: 0.7, size: [0.1, 0.14] }
         walls:
           - { polygon: [[16.5, 7], [19.5, 7], [19.5, 7.12], [16.5, 7.12]] }
           - { polygon: [[16.5, 9.28], [17.6, 9.28], [17.6, 9.4], [16.5, 9.4]] }
@@ -420,7 +425,7 @@ objects:
   - { id: regal, model: bookshelf, space: wohnen, pos: [4.8, 7.54], rot: 180, size: [2, 0.3, 2] }
   - { id: fluegel, model: grand_piano, space: wohnen, pos: [4.4, 6], rot: 180, size: [1.48, 1.6] }
   - { id: spielzeug, model: toy_storage, space: wohnen, pos: [1, 6.6], rot: 0 }
-  - { id: stuhl, model: chair, space: kueche, pos: [7.5, 2.4], rot: 0 }
+  - { id: stuhl, model: chair, space: kueche, pos: [7.2, 2.95], rot: 180 }
   - id: eg_wohnen_stehlampe
     name: Stehlampe
     model: floor_spots
@@ -698,3 +703,78 @@ objects:
     params: { cable_to: [1.95, 1.2], drop: 2.3, peak: 800 }
     state: "on"
     ha: { entities: { info: sensor.demo_balkonkraftwerk_leistung } }
+  - { id: esstisch, name: Esstisch, model: dining_table, space: kueche, pos: [7.2, 2.35], size: [1.4, 0.8, 0.75] }
+  - { id: hochstuhl, name: Hochstuhl, model: high_chair, space: kueche, pos: [8.15, 2.35], rot: 270 }
+  - id: kronleuchter_essplatz
+    name: Kristallleuchter
+    model: chandelier_crystal
+    space: kueche
+    pos: [7.2, 2.35]
+    light: { height: 1.75, range: 3 }
+    ha: { entities: { power: light.demo_esstisch } }
+  - id: getraenkekuehlschrank
+    name: Getränkekühlschrank
+    model: fridge
+    space: kueche
+    pos: [9.36, 2.95]
+    rot: 270
+    size: [0.6, 0.6, 1.4]
+    params: { glass: true }
+  - { id: konsole, name: Konsole, model: console, space: kueche, pos: [6.24, 0.85], rot: 270, size: [0.9, 0.35, 0.8] }
+  - id: kaffeemaschine
+    name: Kaffeemaschine
+    model: box
+    space: kueche
+    pos: [6.26, 0.75]
+    rot: 270
+    size: [0.24, 0.3, 0.34]
+    elevation: 0.8
+    params: { color: black_matte, panel: false }
+    ha: { entities: { power: switch.demo_kaffeemaschine }, tap: toggle }
+  - { id: wanduhr, name: Wanduhr, model: wall_clock, space: kueche, pos: [6.55, 0.32], elevation: 1.9 }
+  - id: saugroboter
+    name: Saugroboter
+    model: robot_vacuum
+    space: wohnen
+    pos: [5.3, 0.66]
+    ha: { entities: { power: vacuum.demo_saugroboter }, tap: more-info }
+  - id: kindertisch_innen
+    name: Kindertisch
+    model: kids_table
+    space: wohnen
+    pos: [1.25, 5.55]
+    params: { color: "#8fc1d6" }
+  - id: studio_stehlampe
+    name: Plissee-Leuchte
+    model: floor_column
+    space: studio
+    pos: [1, 6.9]
+    ha: { entities: { power: light.demo_studio_stehlampe } }
+    light: { height: 0.95, range: 2.5 }
+  - id: studio_pendel
+    name: Pendelleuchte
+    model: pendant_drum
+    space: studio
+    pos: [3, 2.2]
+    params: { color: "#3f5f73" }
+    light: { height: 1.9, range: 3 }
+  - id: vitrine
+    name: Vitrine
+    model: cabinet
+    space: gartenhaus
+    pos: [18.75, 7.35]
+    size: [0.9, 0.45, 1.95]
+    params: { style: antique, glass: true }
+  - id: eckschrank
+    name: Eckschrank
+    model: corner_cabinet
+    space: gartenhaus
+    pos: [16.97, 7.47]
+    params: { glass: true }
+  - id: papierlampe
+    name: Papierlampe
+    model: paper_lantern
+    space: gartenhaus
+    pos: [18, 8.4]
+    light: { height: 1.75, range: 2.5 }
+    ha: { entities: { power: light.demo_gartenhaus } }

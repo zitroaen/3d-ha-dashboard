@@ -41,6 +41,8 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   Link-Check, Version.
 - **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten. Gerechnet wird nur,
   wenn sich etwas ändert.
+- **Einrichtung:** Möbel, Geräte und Leuchten aus dem Katalog – vom Sofa über Vitrine, Esstisch und Hochstuhl bis zu
+  Saugroboter (fährt, solange er saugt), Kristallkronleuchter und Papierlampe; Belag-Zonen und Deckenbalken.
 - **Katalog und Lager:** im Editor Modelle aus dem Katalog (mit Vorschaubildern) hinzufügen; Objekte einlagern (z. B.
   Weihnachtsdekoration) und später mit allen Verknüpfungen wieder aufstellen.
 - **Animationen:** Ventilatoren drehen sich, solange sie an sind (Tempo aus der Stufe), Sektional-Garagentore fahren hoch,
