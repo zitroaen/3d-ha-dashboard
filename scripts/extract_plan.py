@@ -14,9 +14,13 @@ Optionale Konfiguration (JSON), alles optional:
     {
       "building": { "id": "haus", "name": "Wohnhaus", "kind": "house" },
       "floors": { "Erdgeschoss": { "id": "eg", "level": 0, "elevation": 0, "rotate": 0, "offset": [0, 0],
-                                   "room_ids": { "Bad": "bad_eg" },               # nur in dieser Etage
-                                   "split": [{ "room": "kueche", "line": [[3.2, 0], [3.2, 4]], "surface": "flagstone" }] } },
-      "room_ids": { "Badezimmer": "bad" },              # Magicplan-Name -> Raum-ID (sonst aus dem Namen)
+                                   "stretch": { "axis": "y", "from": 4.0, "src": 9.80, "dst": 9.95 },
+                                   "room_ids": { "Bad": "bad_eg", "Zimmer": { "id": "kind", "name": "Kinderzimmer", "ha_area": "kinderzimmer" } },
+                                   "merge": [{ "rooms": ["wohnen", "essen"], "id": "wohnen", "name": "Wohnen/Essen" }],
+                                   "split": [{ "room": "kueche", "line": [[3.2, 0], [3.2, 4]], "surface": "flagstone" },
+                                             { "room": "bad", "line": [[2, 5], [2, 3]], "into": { "id": "wc", "name": "WC" }, "wall": 0.1 }],
+                                   "clip": { "polygon": [[0, 0], [10, 0], [10, 8], [0, 8]], "wall": 0.24 } } },
+      "room_ids": { "Badezimmer": "bad" },              # Magicplan-Name -> Raum-ID oder { id, name, ha_area }
       "surface": { "bad": "tiles" },                    # Raum-ID -> Bodenbelag (sonst nach Raumname geraten)
       "front_door_rooms": ["diele"]                     # Außentüren dieser Räume massiv (sonst verglast)
     }
@@ -25,8 +29,12 @@ Etage mit eigener Ausrichtung ab: "rotate" (90, 180, 270 Grad im Uhrzeigersinn, 
 sie vor dem Versatz; die Lage zueinander ("offset": [dx, dy] je Etage, in Grundstückskoordinaten), Ebene ("level",
 sonst Reihenfolge im Report) und Höhe ("elevation") bitte in der Konfiguration setzen. Raum-IDs müssen im ganzen
 Modell eindeutig sein: "room_ids" gibt es global und je Etage; kommt eine ID trotzdem in einer früheren Etage vor,
-bekommt sie das Etagenkürzel vorangestellt (og_bad). "split" teilt einen Raum an einer Linie (Plan-Koordinaten wie in
-der Debug-Grafik, nach Drehung und Versatz): die Seite links der Linie wird eine Belag-Zone mit "surface".
+bekommt sie das Etagenkürzel vorangestellt (og_bad). Reihenfolge je Etage: drehen, verschieben, "stretch" (Messfehler
+ausgleichen: alles jenseits der Linie "from" auf der Achse wird so gestreckt, dass "src" auf "dst" landet), Raum-IDs
+eindeutig machen, "merge" (Räume samt Wand dazwischen zusammenlegen, z. B. Durchgang ohne Tür), "split" (Raum an einer
+Linie teilen – Plan-Koordinaten wie in der Debug-Grafik: die Seite links der Linie wird eine Belag-Zone mit "surface",
+mit "into" ein eigener Raum, mit "wall" eine Raumteiler-Wand), "clip" (Etage auf ein konvexes Polygon beschneiden und
+dort mit Wänden schließen, z. B. wenn eine obere Etage über den Umriss darunter hinausragt).
 
 Benötigt: pip install pymupdf
 """
@@ -293,7 +301,10 @@ def extract_floor(doc, fid, cfg, conf):
     seen = {}
     ceil_seen = Counter()
     for name, poly in rooms_pt:
-        rid = room_ids.get(name) or slug(name)
+        # room_ids: Magicplan-Name -> ID oder { id, name, ha_area }
+        entry = room_ids.get(name)
+        info = entry if isinstance(entry, dict) else {"id": entry} if entry else {}
+        rid = info.get("id") or slug(name)
         seen[rid] = seen.get(rid, 0) + 1
         if seen[rid] > 1:
             rid = f"{rid}_{seen[rid]}"
@@ -304,8 +315,9 @@ def extract_floor(doc, fid, cfg, conf):
         h = hs[ceil_seen[name]] if ceil_seen[name] < len(hs) else floor_ceiling
         ceil_seen[name] += 1
         material = floor_material.get(rid) or ("tiles" if TILED.search(name) else "parquet")
-        rooms.append({"id": rid, "name": name, "polygon": [list(p) for p in pm],
-                      "floor": material, "ceiling": None if abs(h - floor_ceiling) < 0.005 else h})
+        rooms.append({"id": rid, "name": info.get("name", name), "polygon": [list(p) for p in pm],
+                      "floor": material, "ceiling": None if abs(h - floor_ceiling) < 0.005 else h,
+                      **({"ha_area": info["ha_area"]} if info.get("ha_area") else {})})
 
     def room_at(p):
         return next((r["id"] for r in rooms if point_in_poly(p, r["polygon"])), None)
@@ -391,6 +403,8 @@ def to_v2_floor(f):
             room["height"] = r["ceiling"]
         if r.get("zones"):
             room["zones"] = r["zones"]
+        if r.get("ha_area"):
+            room["ha_area"] = r["ha_area"]
         rooms.append(room)
     doors = []
     for d in f["doors"]:
@@ -421,7 +435,7 @@ def main():
         sys.exit("Keine Etagenseite gefunden (Überschrift '▼<Etage>' mit 'RÄUME:' darunter) – ist das ein Magicplan-Report?")
     floors = []
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from plan_transform import rotate_floor, translate_floor, unique_room_ids, split_rooms
+    from plan_transform import rotate_floor, translate_floor, unique_room_ids, stretch_floor, merge_rooms, split_rooms_ext, clip_floor
     for level, cfg in enumerate(detected):
         fc = floor_conf.get(cfg["name"], {})
         fid = fc.get("id") or FLOOR_IDS.get(cfg["name"].lower()) or slug(cfg["name"])
@@ -430,10 +444,15 @@ def main():
         f = extract_floor(doc, fid, cfg, conf)
         f["ceiling"] = cfg["ceiling"]
         translate_floor(rotate_floor(f, fc.get("rotate", 0)), fc.get("offset", [0, 0]))
+        stretch_floor(f, fc.get("stretch"))
         floors.append(f)
     unique_room_ids(floors)
+    # Räume zusammenlegen, teilen, Etage beschneiden (Plan-Koordinaten nach Drehung, Versatz und Streckung)
     for f, cfg in zip(floors, detected):
-        split_rooms(f, floor_conf.get(cfg["name"], {}).get("split"))
+        fc = floor_conf.get(cfg["name"], {})
+        merge_rooms(f, fc.get("merge"))
+        split_rooms_ext(f, fc.get("split"))
+        clip_floor(f, fc.get("clip"))
     house = {"floors": floors}
     from house_fixes import fix_house  # Fensterbänder zusammenfassen, Wandstreifen entfernen
     fix_house(house)
