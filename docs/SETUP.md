@@ -46,7 +46,11 @@ npm run import-plan     # -> reference/building.json + data/plan_debug_<etage>.s
 Etagen, Räume, Wände, Fenster, Türen, Maßstab und Deckenhöhen werden automatisch erkannt. Der Import **ersetzt** das
 Gebäude gleicher ID in `data/model.yaml`; andere Gebäude, Außenbereiche und Objekte bleiben. In `plan.json` lässt sich
 nachsteuern: Gebäude-ID, -Name und -Art (`building`), Raum-IDs (`room_ids`), Bodenbeläge (`surface`), Räume mit
-massiver Haustür (`front_door_rooms`), Etagen-ID, -Ebene, -Höhe und -Versatz (`floors`). Weitere Gebäude (Garage,
+massiver Haustür (`front_door_rooms`), Etagen-ID, -Ebene, -Höhe, -Drehung und -Versatz (`floors`). Magicplan legt
+jede Etage mit eigenem Ursprung und eigener Ausrichtung ab: `floors.<Name>.rotate` (90/180/270, im Uhrzeigersinn) dreht
+sie vor dem `offset`. Raum-IDs je Etage: `floors.<Name>.room_ids`; doppelte IDs bekommen automatisch das Etagenkürzel
+(`og_bad`). `floors.<Name>.split: [{ room, line: [[x, y], [x, y]], surface }]` teilt einen Raum an einer Linie in zwei
+Böden (die Seite links der Linie, wie in der Debug-Grafik gesehen, wird eine Belag-Zone). Weitere Gebäude (Garage,
 Gartenhaus) als eigene PDFs mit eigener `building.id` importieren oder von Hand ergänzen. Danach die Debug-Grafik ansehen und mit dem Besitzer abgleichen.
 Mehrere Räume gleichen Namens werden durchnummeriert (`schlafzimmer_2`) – nach richtigen Namen fragen.
 

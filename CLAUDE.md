@@ -62,7 +62,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run test:perf` | Leistungsbudget: Zeichenaufrufe und Dreiecke pro Bild (Teil von `npm test`) |
 | `node scripts/logo.mjs` | Logo: `docs/logo.svg` und Markenbilder `custom_components/ha_3d_dashboard/brand/*.png` |
 | `npm run test:unit` | Modell: Migration, YAML, Szenen-Adapter, Zurückschreiben (Teil von `npm test`) |
-| `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude) |
+| `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude; Etagen drehen/verschieben, Raum-IDs, Räume teilen: `scripts/plan_transform.py`) |
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
 | `node scripts/terrain-from-scan.mjs scan.obj --cell 0.5 --rotate … --offset x,y --floor … --write` | Höhenraster `site.terrain` aus einem LiDAR-Scan (OBJ) |
 
@@ -261,6 +261,10 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   ein Belag seine Wetter-Variante (`<name>_out`, z. B. `flagstone_out`). Einrichtung je Ebene zusammengefasst
   (`scene._mergeFurnishing`, nur Meshes mit `userData.mergeable`; Treffer, Animationen und Einzelaufbau im Editor
   bleiben je Etage).
+- Magicplan-Import (0.21.0): Umformungen nach der Extraktion in `scripts/plan_transform.py` (ohne pymupdf,
+  getestet über `tests/plan_transform_test.py` aus `npm run test:unit`): erst im eigenen Ursprung extrahieren, dann
+  `rotate` (um die Umrandung der Außenwände, Ursprung bleibt links oben), dann `offset`; doppelte Raum-IDs bekommen
+  das Etagenkürzel (Türen/Fenster folgen); `split` macht aus der Seite links einer Linie eine Belag-Zone (`zones`).
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).

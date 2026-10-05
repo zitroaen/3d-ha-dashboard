@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.21.0
+
+- **Magicplan-Import:** Etagen drehen (`floors.<Name>.rotate`: 90/180/270, vor dem Versatz) – Magicplan legt jede
+  Etage mit eigenem Ursprung und eigener Ausrichtung ab. Raum-IDs je Etage (`floors.<Name>.room_ids`); kommt eine ID
+  schon in einer anderen Etage vor, bekommt sie automatisch das Etagenkürzel (`og_bad`), statt dass die Prüfung
+  scheitert. `floors.<Name>.split` teilt einen Raum an einer Linie in zwei Böden (Belag-Zone). Die Debug-Grafik zeigt
+  die Zonen.
+
 ## 0.20.0
 
 - **Neue Möbel und Geräte:** Esstisch (Holz- oder Metallbeine), Schrank/Vitrine (modern weiß oder antik mit Füßen,
