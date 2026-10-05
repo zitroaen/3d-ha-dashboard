@@ -709,11 +709,14 @@ Instanz speichern. Der Link-Check in den Tests und die lokale Vorschau nutzen ih
 Zusätzliche Screenshot-Ansichten für `npm test` der Instanz:
 
 ```json
-{ "wohnzimmer-abend": { "rooms": ["wohnzimmer"], "outdoor": true, "view": { "at": [3.0, 7.5], "zoom": 1.9, "az": 0 } } }
+{ "wohnzimmer-abend": { "rooms": ["wohnzimmer"], "outdoor": true, "view": { "at": [3.0, 7.5], "zoom": 1.9, "az": 0 } },
+  "hang-gesamt": { "rooms": [], "sun": { "azimuth": 215, "elevation": 38 }, "view": { "zoom": 0.9, "az": 40, "tilt": 25 } } }
 ```
 
-`rooms`: Bereichs-IDs oder `"all"`, `level`: Ebene (Standard 0), `sun`: `{ "azimuth": 215, "elevation": 38 }` (sonst Nacht), `view.at`: Plan-Punkt,
-`zoom`, `az`: Schwenk um die Hochachse in Grad.
+`rooms`: Bereichs-IDs oder `"all"`, `level`: Ebene (Standard 0), `sun`: `{ "azimuth": 215, "elevation": 38 }` (sonst Nacht), `view.at`: Plan-Punkt
+(Standard: Mitte der Ausgangslage), `zoom`, `az`: Schwenk um die Hochachse in Grad, `tilt`: Neigung der Kamera über dem
+Horizont in Grad (Standard wie die Startansicht, ~57°; z. B. 25 für eine flache Gesamtansicht von Haus und Hang).
+Eingebaut ist dazu die Ansicht `schraeg` (Ebene 0, Tag, 25°).
 
 ## Anhang: Panel-Konfiguration (`panel_custom` → `config`)
 
@@ -747,6 +750,7 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **0.29.0 (Werkzeuge):** `views.json` mit `view.tilt` (Kameraneigung) und ohne `view.at`; eingebaute Ansicht `schraeg`.
 - **Version 2, Ergänzung (0.28.0, abwärtskompatibel):** Katalog `swing`, `slide`, `climbing_frame`, `trampoline`,
   `sandbox`, `raised_bed`, `compost`, `fence` (Holz, Maschendraht, Stabgitter; Linie oder `path`), `power_line`
   (Masten und durchhängende Seile); lange Objekte (Zaun, Hecke, Freileitung) folgen dem Gelände.

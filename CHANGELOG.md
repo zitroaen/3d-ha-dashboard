@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.29.0
+
+- **Screenshot-Ansichten:** `views.json` kennt `view.tilt` (Neigung der Kamera über dem Horizont, z. B. 25° für eine
+  flache Schrägansicht von Haus und Hang); `view.at` ist optional. Neue eingebaute Ansicht `schraeg`.
+- Bedien-Test der Standardansicht robuster (wartet, bis die Kamera steht, bevor der Inaktivitäts-Zeitgeber startet;
+  gab auf langsamer CI-Grafik gelegentlich einen Fehlalarm).
+
 ## 0.28.0
 
 - **Garten-Katalog:** Schaukel (`swing`), Rutsche (`slide`), Spielturm mit Rutsche (`climbing_frame`), Trampolin mit
