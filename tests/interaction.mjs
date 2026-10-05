@@ -583,13 +583,27 @@ try {
     p.view._anim?.finish();
   });
   await steady(page);
+  // ohne Bilder (verdeckter Tab, dunkles Wand-Tablet, überlastete CI-Grafik): die Fahrt kommt trotzdem an
   await page.evaluate(() => {
     const p = window.panel;
+    window.__raf = window.requestAnimationFrame;
+    window.requestAnimationFrame = () => 0;
     p._applyPrefs({ ...p.prefs, homeAfter: '1' });
   });
   await settle(page, atHome, home);
   const backByIdle = await page.evaluate(atHome, home);
-  const idleState = await page.evaluate(() => ({ view: window.panel.view.getView(), timer: !!window.panel._idleTimer, menu: window.panel.menu?.isOpen }));
+  await page.evaluate(() => {
+    window.requestAnimationFrame = window.__raf;
+    window.panel.view.requestRender();
+  });
+  // zur Diagnose, falls es scheitert: aktuelle Ansicht und was den Zeitgeber aufhalten könnte
+  const idleState = await page.evaluate(() => {
+    const p = window.panel;
+    return {
+      view: p.view.getView(), homeAfter: p.prefs?.homeAfter, timer: !!p._idleTimer, editing: p.hasAttribute('editing'), menu: !!p.menu?.isOpen,
+      open: [...p.shadowRoot.querySelectorAll('.show')].map((e) => e.className), connected: p.isConnected,
+    };
+  });
   await page.evaluate(() => {
     const p = window.panel;
     p.menu.prefs = { ...p.menu.prefs, homeAfter: '0', homeView: null };
@@ -597,7 +611,7 @@ try {
     p.setLevel(0);
   });
   ok(home?.level === 1 && near(home.zoom, 1.7) && backByTap && backByIdle,
-    'Standardansicht: festlegen, Doppeltippen auf den Kompass und Inaktivität bringen Ebene, Blickwinkel und Zoom zurück',
+    'Standardansicht: festlegen, Doppeltippen auf den Kompass und Inaktivität bringen Ebene, Blickwinkel und Zoom zurück (auch ohne Bildtakt)',
     `Standardansicht: ${JSON.stringify(home)} Doppeltippen=${backByTap} Inaktivität=${backByIdle} jetzt=${JSON.stringify(idleState)}`);
 
   // ---------------- Leistungsanzeige ----------------
