@@ -42,7 +42,9 @@ try {
   };
   const clickShadow = async (sel) => {
     const r = await page.evaluate((sel) => {
-      const b = window.panel.shadowRoot.querySelector(sel).getBoundingClientRect();
+      const el = window.panel.shadowRoot.querySelector(sel);
+      el.scrollIntoView({ block: 'center' }); // z. B. Knöpfe weiter unten im Einstellungsmenü
+      const b = el.getBoundingClientRect();
       return { x: b.x + b.width / 2, y: b.y + b.height / 2, w: b.width, h: b.height };
     }, sel);
     if (Math.min(r.w, r.h) < 48) errors.push(`Touch-Ziel zu klein: ${sel} (${r.w}x${r.h})`);
@@ -538,6 +540,53 @@ try {
     && garage.pv === true && garage.pvSpeed === 0.5 && garage.badge === 'Offen' && garage.doorOff === 1 && !garage.roofAt0,
     'Garagentor: Antippen öffnet (cover.open_cover), Sektionaltor fährt hoch; 1. OG zeigt das Garagendach mit Energiefluss (400 W = halbes Tempo); Knopf „Dach“ zeigt das Steildach des Hauses',
     `Garage: Antippen=${JSON.stringify(door)} ${JSON.stringify(garage)}`);
+
+  // ---------------- Standardansicht: festlegen, Doppeltippen auf den Kompass, nach Inaktivität zurück ----------------
+  const home = await page.evaluate(() => {
+    const p = window.panel, v = p.view;
+    // eigene Ansicht einstellen: Ebene 1, gedreht und gezoomt
+    p.setLevel(1);
+    v._anim?.finish();
+    v.camera.position.applyAxisAngle(new v.camera.position.constructor(0, 1, 0), 0.8);
+    v.camera.zoom = 1.7;
+    v.camera.updateProjectionMatrix();
+    v.controls.update();
+    p._menuAction('home-set');
+    return p.prefs.homeView;
+  });
+  const near = (a, b) => Math.abs(a - b) < 0.02;
+  const atHome = (h) => {
+    const v = window.panel.view, g = v.getView();
+    return g.level === h.level && Math.abs(g.zoom - h.zoom) < 0.02 && g.offset.every((x, i) => Math.abs(x - h.offset[i]) < 0.05)
+      && g.target.every((x, i) => Math.abs(x - h.target[i]) < 0.05);
+  };
+  // woanders hinschauen, dann zweimal schnell auf den Kompass tippen
+  await page.evaluate(() => {
+    window.panel.setLevel(0);
+    window.panel.view.faceNorth(0);
+  });
+  await clickShadow('.compass');
+  await clickShadow('.compass');
+  await settle(page, atHome, home);
+  const backByTap = await page.evaluate(atHome, home);
+  // nach Inaktivität (hier 1 s) wieder zurück
+  await page.evaluate(() => {
+    const p = window.panel;
+    p.setLevel(0);
+    p.view.faceNorth(0);
+    p._applyPrefs({ ...p.prefs, homeAfter: '1' });
+  });
+  await settle(page, atHome, home);
+  const backByIdle = await page.evaluate(atHome, home);
+  await page.evaluate(() => {
+    const p = window.panel;
+    p.menu.prefs = { ...p.menu.prefs, homeAfter: '0', homeView: null };
+    p._applyPrefs(p.menu.prefs);
+    p.setLevel(0);
+  });
+  ok(home?.level === 1 && near(home.zoom, 1.7) && backByTap && backByIdle,
+    'Standardansicht: festlegen, Doppeltippen auf den Kompass und Inaktivität bringen Ebene, Blickwinkel und Zoom zurück',
+    `Standardansicht: ${JSON.stringify(home)} Doppeltippen=${backByTap} Inaktivität=${backByIdle}`);
 
   // ---------------- Leistungsanzeige ----------------
   await page.evaluate(() => window.panel._applyPrefs({ ...window.panel.prefs, fps: 'on' }));

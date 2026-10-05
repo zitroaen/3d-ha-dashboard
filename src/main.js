@@ -16,7 +16,7 @@ import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
 import { EntityPicker, areaForRoom } from './picker.js';
 import { ObjectSettings } from './objsettings.js';
-import { SettingsMenu } from './menu.js';
+import { SettingsMenu, savePrefs } from './menu.js';
 import { WEATHER_PRESETS, weatherParams, weatherKind, weatherLabel, pickWeatherEntity, temperatureText, weatherIcon } from './weather.js';
 
 const ICON = {"edit": "M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z", "move": "M13 6v5h5V7.75L22.25 12 18 16.25V13h-5v5h3.25L12 22.25 7.75 18H11v-5H6v3.25L1.75 12 6 7.75V11h5V6H7.75L12 1.75 16.25 6H13z", "align": "M3 2h2v20H3V2zm4 5h14v4H7V7zm0 6h9v4H7v-4z", "undo": "M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62A8 8 0 0 1 20.1 16l2.37-.78A10.5 10.5 0 0 0 12.5 8z", "save": "M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z", "export": "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z", "done": "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"};
@@ -133,7 +133,7 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
 .settings h3 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; opacity: 0.75; text-transform: uppercase; letter-spacing: .05em; }
 .settings label { display: block; margin: 8px 0 4px; font-size: 14px; }
 .settings .seg, .objcfg .seg, .catalog .seg { display: flex; gap: 4px; padding: 4px; border-radius: var(--r-btn); background: var(--g-well); }
-.settings .seg button, .objcfg .seg button, .catalog .seg button { flex: 1; min-height: 48px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.settings .seg button, .objcfg .seg button, .catalog .seg button { flex: 1; min-height: 48px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; padding: 0 4px; }
 .settings .seg.wrap { flex-wrap: wrap; } .settings .seg.wrap button { flex: 1 0 30%; }
 .settings .seg button.on, .objcfg .seg button.on, .catalog .seg button.on { background: var(--g-sel-bg); color: var(--g-sel-fg); font-weight: 600; }
 .settings .hint { margin: 6px 2px 0; font-size: 12px; opacity: 0.6; }
@@ -334,11 +334,23 @@ class Ha3dDashboard extends HTMLElement {
       const b = e.target.closest('button[data-level]');
       if (b) this.setLevel(Number(b.dataset.level));
     });
-    this.shadowRoot.querySelector('.compass').addEventListener('click', () => this.view?.faceNorth());
+    // Kompass: Tippen nordet ein, Doppeltippen fährt in die Standardansicht
+    this.shadowRoot.querySelector('.compass').addEventListener('click', () => {
+      const now = performance.now();
+      if (now - (this._compassTap || 0) < 350) {
+        this._compassTap = 0;
+        this.goHome();
+      } else {
+        this._compassTap = now;
+        this.view?.faceNorth();
+      }
+    });
+    // Inaktivität: jede Bedienung im Panel startet die Wartezeit neu
+    for (const ev of ['pointerdown', 'wheel', 'keydown']) this.shadowRoot.addEventListener(ev, () => this._armIdle(), { passive: true });
     // Zahnrad: Einstellungsmenü (Ansicht, Bearbeiten, Link-Check, Info)
     this.menu = new SettingsMenu(this.shadowRoot.querySelector('.settings'), {
       onPrefs: (prefs) => this._applyPrefs(prefs),
-      onAction: (act) => (act === 'edit' ? this.setEditing(true) : this._toggleLinks(true)),
+      onAction: (act) => this._menuAction(act),
     });
     this.prefs = this.menu.prefs;
     // Darstellung erst in connectedCallback setzen: Attribute im Konstruktor sind verboten, HA legt das Panel mit
@@ -374,10 +386,12 @@ class Ha3dDashboard extends HTMLElement {
     requestAnimationFrame(this._onResize); // nach dem Layout von HA noch einmal messen
     // Erst starten, wenn HA die Properties (panel) gesetzt hat und das Element Größe hat
     requestAnimationFrame(() => this.reloadData());
+    this._armIdle();
   }
 
   disconnectedCallback() {
     clearInterval(this._fpsTimer);
+    clearTimeout(this._idleTimer);
     document.removeEventListener('visibilitychange', this._onVisible);
     window.removeEventListener('resize', this._onResize);
     window.visualViewport?.removeEventListener('resize', this._onResize);
@@ -519,6 +533,42 @@ class Ha3dDashboard extends HTMLElement {
   }
 
   /** Ebene wechseln (Stockwerk); im Editiermodus wird die Auswahl aufgehoben */
+  /** Standardansicht einnehmen (Doppeltippen auf den Kompass, nach Inaktivität) */
+  goHome() {
+    const v = this.view;
+    if (!v) return;
+    if (this.editor?.sel) this.editor.select(null);
+    if (!this.prefs?.homeView || !v.setView(this.prefs.homeView)) v.resetView();
+    this._renderLevel();
+  }
+
+  _menuAction(act) {
+    if (act === 'edit') return this.setEditing(true);
+    if (act === 'links') return this._toggleLinks(true);
+    if (act === 'home-set' || act === 'home-reset') {
+      const homeView = act === 'home-set' && this.view ? this.view.getView() : null;
+      this.menu.prefs = { ...this.menu.prefs, homeView };
+      savePrefs(this.menu.prefs);
+      this._applyPrefs(this.menu.prefs);
+      this._toast(homeView ? 'Standardansicht gespeichert – Doppeltippen auf den Kompass bringt sie zurück' : 'Standardansicht zurückgesetzt');
+    }
+  }
+
+  /**
+   * Nach `homeAfter` Sekunden ohne Bedienung in die Standardansicht – nicht im Editor und nicht, solange ein Fenster
+   * (Einstellungen, Link-Check, Rückfrage …) offen ist; dann später erneut versuchen.
+   */
+  _armIdle() {
+    clearTimeout(this._idleTimer);
+    const s = Number(this.prefs?.homeAfter || 0);
+    if (!s || !this.isConnected) return;
+    this._idleTimer = setTimeout(() => {
+      const busy = this.hasAttribute('editing') || this.menu?.isOpen || this.shadowRoot.querySelector('.links.show, .confirm.show, .picker.show, .objcfg.show');
+      if (busy) return this._armIdle();
+      this.goHome();
+    }, s * 1000);
+  }
+
   setLevel(level) {
     if (!this.view || level === this.view.level) return;
     if (this.editor?.sel) this.editor.select(null);
@@ -1172,6 +1222,7 @@ class Ha3dDashboard extends HTMLElement {
   /** Ansichts-Einstellungen anwenden: Tageszeit (Sonne aus HA oder fest) und Qualität */
   _applyPrefs(prefs) {
     this.prefs = prefs;
+    this._armIdle();
     this._applyTheme();
     if (!this.view) return;
     this.view.setQuality?.(prefs.quality);

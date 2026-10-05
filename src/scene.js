@@ -698,6 +698,77 @@ export class HouseScene {
     return THREE.MathUtils.radToDeg(Math.atan2(((b.x - a.x) * w) / 2, ((b.y - a.y) * h) / 2));
   }
 
+  /** Aktuelle Ansicht (Standardansicht speichern): Ebene, Drehpunkt, Kamera relativ dazu, Zoom, Bildausschnitt */
+  getView() {
+    const r = (v) => Math.round(v * 1000) / 1000;
+    const c = this.controls, cam = this.camera;
+    return {
+      level: this.level,
+      target: c.target.toArray().map(r),
+      offset: new THREE.Vector3().subVectors(cam.position, c.target).toArray().map(r),
+      zoom: r(cam.zoom),
+      half: r(cam.top),
+    };
+  }
+
+  /**
+   * Ansicht einnehmen (Standardansicht): Ebene wechseln, Kamera sanft hinfahren (Drehung auf dem kürzesten Weg).
+   * Der Bildausschnitt wird nicht neu eingepasst – die Ansicht bleibt genau so, wie sie gespeichert wurde.
+   */
+  setView(v, duration = 800) {
+    if (!v?.target || !v?.offset) return false;
+    this._anim?.finish();
+    if (v.level != null && v.level !== this.level && this.levels.includes(v.level)) this.setLevel(v.level, { silent: true });
+    const c = this.controls, cam = this.camera;
+    const from = { target: c.target.clone(), sph: new THREE.Spherical().setFromVector3(new THREE.Vector3().subVectors(cam.position, c.target)), zoom: cam.zoom, half: cam.top };
+    const to = { target: new THREE.Vector3(...v.target), sph: new THREE.Spherical().setFromVector3(new THREE.Vector3(...v.offset)), zoom: v.zoom ?? 1, half: v.half ?? cam.top };
+    const dTheta = Math.atan2(Math.sin(to.sph.theta - from.sph.theta), Math.cos(to.sph.theta - from.sph.theta));
+    const t0 = performance.now();
+    const anim = { finish: () => step(Infinity) };
+    this._anim = anim;
+    const lerp = (a, b, e) => a + (b - a) * e;
+    const step = (now) => {
+      if (this._anim !== anim) return;
+      const k = duration ? Math.min(1, (now - t0) / duration) : 1;
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      c.target.lerpVectors(from.target, to.target, e);
+      const sph = new THREE.Spherical(lerp(from.sph.radius, to.sph.radius, e), lerp(from.sph.phi, to.sph.phi, e), from.sph.theta + dTheta * e);
+      cam.position.copy(c.target).add(new THREE.Vector3().setFromSpherical(sph));
+      cam.lookAt(c.target);
+      cam.zoom = lerp(from.zoom, to.zoom, e);
+      const half = lerp(from.half, to.half, e), aspect = (this.container.clientWidth || 1) / (this.container.clientHeight || 1);
+      Object.assign(cam, { top: half, bottom: -half, right: half * aspect, left: -half * aspect });
+      cam.updateProjectionMatrix();
+      c.update();
+      this.renderer.render(this.scene, this.camera);
+      this.onViewChange?.();
+      if (k < 1) return requestAnimationFrame(step);
+      this._anim = null;
+      this.renderer.shadowMap.needsUpdate = true;
+      this.requestRender();
+    };
+    if (duration) requestAnimationFrame(step);
+    else step(t0);
+    return true;
+  }
+
+  /** Startansicht ohne gespeicherte Standardansicht: Erdgeschoss, Blick wie beim Laden, Bildausschnitt eingepasst */
+  resetView() {
+    this._anim?.finish();
+    const l = this.levels.includes(0) ? 0 : this.levels[0];
+    if (l !== this.level) this.setLevel(l, { silent: true });
+    const c = this.controls, cam = this.camera;
+    const portrait = this.container.clientHeight > this.container.clientWidth * 1.2;
+    const az = THREE.MathUtils.degToRad(portrait ? 12 : 28), el = THREE.MathUtils.degToRad(57), dist = 40;
+    c.target.copy(this.center);
+    cam.position.set(this.center.x + dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el), this.center.z + dist * Math.cos(el) * Math.cos(az));
+    cam.zoom = 1;
+    cam.lookAt(c.target);
+    c.update();
+    this.renderer.shadowMap.needsUpdate = true;
+    this.resize();
+  }
+
   /** Ansicht einnorden: Kamera um den Drehpunkt schwenken, bis Norden oben ist. */
   faceNorth(duration = 600) {
     const c = this.controls;

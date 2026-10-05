@@ -1,8 +1,9 @@
-// Einstellungsmenü (Zahnrad oben rechts): Ansicht (Tageszeit, Qualität, Animationen, Leistungsanzeige), Haus (Bearbeiten, Link-Check), Info.
+// Einstellungsmenü (Zahnrad oben rechts): Ansicht (Tageszeit, Qualität, Animationen, Leistungsanzeige),
+// Haus (Bearbeiten, Link-Check), Standardansicht (festlegen, nach Inaktivität zurück), Info.
 // Ansichts-Einstellungen gelten pro Gerät (localStorage) – ein Wand-Tablet darf sparsam rechnen, der PC nicht.
 
 const PREFS_KEY = 'ha3d_view_prefs';
-export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto', weather: 'auto', theme: 'auto', animations: 'auto', fps: 'off' };
+export const DEFAULT_PREFS = { daytime: 'auto', quality: 'auto', weather: 'auto', theme: 'auto', animations: 'auto', fps: 'off', homeAfter: '0', homeView: null };
 
 /** Ansichts-Einstellungen dieses Geräts (ohne Speicher, z. B. privates Fenster: Standardwerte) */
 export function loadPrefs() {
@@ -24,6 +25,7 @@ const DAYTIME = [['auto', 'Automatisch'], ['day', 'Tag'], ['night', 'Nacht']];
 const QUALITY = [['auto', 'Automatisch'], ['high', 'Hoch'], ['low', 'Sparsam']];
 const ANIMATIONS = [['auto', 'Automatisch'], ['on', 'An'], ['off', 'Aus']];
 const FPS = [['off', 'Aus'], ['on', 'An']];
+const HOME_AFTER = [['0', 'Aus'], ['30', '30 s'], ['60', '1 min'], ['120', '2 min'], ['300', '5 min']];
 const WEATHER = [['auto', 'Automatisch'], ['clear', 'Klar'], ['cloudy', 'Bewölkt'], ['rain', 'Regen'], ['snow', 'Schnee'], ['fog', 'Nebel']];
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -104,6 +106,12 @@ export class SettingsMenu {
         <section><h3>Haus</h3>
           ${canEdit ? '<button class="item" data-act="edit"><b>Bearbeiten</b><small>Möbel und Leuchten verschieben, verknüpfen, Gesten einstellen</small></button>' : ''}
           <button class="item" data-act="links"><b>Verknüpfungen prüfen</b><small>Link-Check: welche Entities fehlen oder frei sind</small></button>
+        </section>
+        <section><h3>Standardansicht</h3>
+          <button class="item" data-act="home-set"><b>Aktuelle Ansicht als Standard</b><small>Ebene, Blickwinkel und Zoom merken – Doppeltippen auf den Kompass bringt sie zurück</small></button>
+          ${this.prefs.homeView ? '<button class="item" data-act="home-reset"><b>Standardansicht zurücksetzen</b><small>wieder die Startansicht (Erdgeschoss, ganzes Grundstück)</small></button>' : ''}
+          <label>Nach Inaktivität zurück</label>${seg('homeAfter', HOME_AFTER)}
+          <p class="hint">So lange ohne Berührung, dann fährt die Kamera in die Standardansicht (nicht im Editor) – z. B. für Wand-Tablets.</p>
         </section>
         <section><h3>Info</h3>
           <p class="about">Version ${esc(version)}<br>${esc(source)}</p>
