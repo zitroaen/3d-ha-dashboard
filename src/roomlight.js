@@ -46,6 +46,15 @@ export const lightUniforms = {
   // Wetter (scene.setWeather): Nässe 0..1 (dunkler, glänzend) und Schneedecke 0..1 (auf nach oben zeigenden Flächen)
   uWet: { value: 0 },
   uSnow: { value: 0 },
+  // Höhenraster (scene.js): Hangschattierung (r) und Geländehöhe (g) je Rasterpunkt; Lage xMin, zMin, Breite, Tiefe
+  uTerrain: { value: null },
+  uTerrainBox: { value: new THREE.Vector4(0, 0, 1, 1) },
+  uTerrainOn: { value: 0 },
+  // Luftbild auf dem Boden-Belag (site.terrain.texture): Plan (x, z) -> Bild (u, v), Mischung, Helligkeit
+  uAerial: { value: null },
+  uAerialU: { value: new THREE.Vector3() },
+  uAerialV: { value: new THREE.Vector3() },
+  uAerialK: { value: 0 },
 };
 
 const VERT_PARS = /* glsl */ `
@@ -64,6 +73,10 @@ uniform highp sampler2D uLights;
 uniform sampler2D uFloorAO;
 uniform vec4 uFloorAOBox;
 uniform float uWet, uSnow;
+uniform sampler2D uTerrain, uAerial;
+uniform vec4 uTerrainBox;
+uniform float uTerrainOn, uAerialK;
+uniform vec3 uAerialU, uAerialV;
 varying float vRoomIdx;
 varying vec3 vRoomWorld;
 varying float vUpN;
@@ -99,7 +112,9 @@ const BOUNCE = 0.07;
  * opts.floorAO: Boden-AO-Textur über die Etage legen
  * opts.wallAO: Wände zum Boden hin abdunkeln (Kontaktschatten)
  * opts.glow: Fläche leuchtet selbst in der Raumlichtfarbe (Glas), Faktor
- * opts.weather: Fläche im Freien – wird bei Regen nass (dunkler, glänzend) und bei Schnee weiß (nur Oberseiten)
+ * opts.weather: Fläche im Freien – wird bei Regen nass (dunkler, glänzend) und bei Schnee weiß (nur Oberseiten);
+ *   liegt sie auf dem Höhenraster, bekommt sie dessen Hangschattierung
+ * opts.aerial: Boden-Belag – das Luftbild liegt darauf (wo es Daten hat)
  */
 export function withRoomLight(material, opts = {}) {
   material.onBeforeCompile = (shader) => {
@@ -117,6 +132,25 @@ export function withRoomLight(material, opts = {}) {
     if (opts.wallAO != null) {
       colorMod += /* glsl */ `
       diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(0.0, 0.7, vRoomWorld.y - ${opts.wallAO.toFixed(3)}));`;
+    }
+    if (opts.aerial) {
+      colorMod += /* glsl */ `
+      vec3 aP = vec3(vRoomWorld.xz, 1.0);
+      vec2 aUv = vec2(dot(aP, uAerialU), dot(aP, uAerialV));
+      vec4 aC = texture2D(uAerial, aUv);
+      // am Bildrand weich in den Belag übergehen (5 % der Bildgröße)
+      vec2 aE = smoothstep(0.0, 0.05, aUv) * smoothstep(0.0, 0.05, 1.0 - aUv);
+      float aIn = aE.x * aE.y;
+      diffuseColor.rgb = mix(diffuseColor.rgb, aC.rgb, uAerialK * aC.a * aIn);`;
+    }
+    if (opts.weather || opts.aerial) {
+      // Hangschattierung nur auf Flächen, die auf dem Gelände liegen (nicht auf Dächern oder Mauerkronen darüber)
+      colorMod += /* glsl */ `
+      if (uTerrainOn > 0.5) {
+        vec4 tS = texture2D(uTerrain, (vRoomWorld.xz - uTerrainBox.xy) / uTerrainBox.zw);
+        float onT = (1.0 - smoothstep(0.12, 0.3, abs(vRoomWorld.y - tS.g))) * smoothstep(0.3, 0.6, vUpN);
+        diffuseColor.rgb *= 1.0 - tS.r * onT;
+      }`;
     }
     let roughMod = '';
     if (opts.weather) {
@@ -140,7 +174,7 @@ export function withRoomLight(material, opts = {}) {
         `#include <lights_fragment_end>\nreflectedLight.directDiffuse += roomIrradiance(normal, ${BOUNCE.toFixed(3)}) * diffuseColor.rgb;`
       );
   };
-  material.customProgramCacheKey = () => `roomlight2:${JSON.stringify(opts)}`;
+  material.customProgramCacheKey = () => `roomlight3:${JSON.stringify(opts)}`;
   material.userData.roomLightOpts = opts; // für Kopien mit anderer Farbe
   return material;
 }

@@ -7,7 +7,7 @@ import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, OUTDOOR_IDX, MAX_LAMPS, MAX_LAMPS_PER_ROOM } from './roomlight.js';
 import { pointInPoly, heightAt } from './geometry.js';
 import { makeFloorAO, GROUND_Y } from './house.js';
-import { makeGround, terrainGroundGeometry } from './ground.js';
+import { makeGround, terrainGroundGeometry, setupTerrainShading, loadAerial, aerialSpec } from './ground.js';
 import { SkyEnvironment } from './environment.js';
 
 const NO_WEATHER = { cloud: 0, rain: 0, snow: 0, fog: 0 };
@@ -199,6 +199,18 @@ export class HouseScene {
     };
     // Boden (Höhenraster oder eben): die Etagen brauchen ihn für die Kanten der Außenbereiche
     this.shared.ground = makeGround(this.house);
+    // Hangschattierung und Luftbild (site.terrain): Textur für die Materialien im Freien, kein eigener Zeichenaufruf
+    const terrain = this.shared.ground.terrain;
+    setupTerrainShading(terrain);
+    const aerial = aerialSpec(terrain);
+    if (aerial) {
+      const groundMat = this.shared.mat[this.house.ground] || this.shared.mat.lawn;
+      withRoomLight(groundMat, { ...(groundMat.userData.roomLightOpts || {}), aerial: true });
+      this.aerialReady = loadAerial(aerial, new URL(aerial.file, assetBase || location.href).href, () => {
+        this.renderer.shadowMap.needsUpdate = true;
+        this.requestRender();
+      });
+    }
     this._buildFloors();
     this.setFurnishing(furnishing);
     this._buildEnvironment();

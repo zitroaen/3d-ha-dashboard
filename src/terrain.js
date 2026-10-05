@@ -56,7 +56,68 @@ export function terrainGrid(spec) {
   };
 
   const extent = [ox, oy, ox + (nx - 1) * cell, oy + (ny - 1) * cell];
-  return { cell, origin: [ox, oy], nx, ny, H, height, normalAt, triangles, extent };
+  return { spec, cell, origin: [ox, oy], nx, ny, H, height, normalAt, triangles, extent };
+}
+
+/**
+ * Hangschattierung je Rasterpunkt (0 = keine, bis ~0,5 = deutlich dunkler), einmal berechnet: Umgebungsverdeckung
+ * aus dem Horizont in 8 Richtungen bis `radius` Meter (Mulden, Böschungsfüße) plus etwas Abdunklung steiler Flächen.
+ * Unabhängig vom Sonnenstand, damit Böschungen auch bei hoher Sonne erkennbar bleiben.
+ */
+export function terrainShade(grid, { radius = 8, strength = 1 } = {}) {
+  const { nx, ny, cell, H, normalAt } = grid;
+  const out = new Float32Array(nx * ny);
+  if (!(strength > 0)) return out;
+  const steps = Math.max(2, Math.min(24, Math.round(radius / cell)));
+  const dirs = Array.from({ length: 8 }, (_, k) => [Math.cos((k * Math.PI) / 4), Math.sin((k * Math.PI) / 4)]);
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const h0 = H(i, j);
+      let occ = 0;
+      for (const [dx, dy] of dirs) {
+        let best = 0;
+        for (let s = 1; s <= steps; s++) {
+          const a = Math.round(i + dx * s), b = Math.round(j + dy * s);
+          if (a < 0 || b < 0 || a >= nx || b >= ny) break;
+          const d = Math.hypot(a - i, b - j) * cell;
+          best = Math.max(best, (H(a, b) - h0) / d);
+        }
+        occ += best / Math.hypot(1, best); // sin(Horizontwinkel)
+      }
+      const up = normalAt(i, j)[1];
+      out[j * nx + i] = Math.min(0.55, strength * (0.85 * (occ / 8) + 1.2 * (1 - up)));
+    }
+  }
+  return out;
+}
+
+/**
+ * Lage eines Luftbilds im Plan (site.terrain.texture) -> Abbildung Plan -> Bild (u, v in 0..1, v nach unten).
+ * Entweder origin (Plan-Punkt der linken oberen Bildecke), size [Breite, Höhe] in Metern und rot (Grad, Richtung der
+ * Bildzeilen von +x nach +y) – oder affine [a, b, c, d, e, f] wie eine World-Datei: x = a·px + b·py + c,
+ * y = d·px + e·py + f (px, py = Pixelspalte und -zeile). Liefert { U, V } mit u = U·[x, y, 1], v = V·[x, y, 1] und
+ * die Umkehrung toPlan(u, v); null bei unbrauchbaren Angaben.
+ */
+export function aerialTransform(tex, imgW = 1, imgH = 1) {
+  let m00, m01, m10, m11, c, f;
+  if (Array.isArray(tex.affine) && tex.affine.length === 6) {
+    const [a, b, cc, d, e, ff] = tex.affine.map(Number);
+    [m00, m01, c, m10, m11, f] = [a * imgW, b * imgH, cc, d * imgW, e * imgH, ff];
+  } else {
+    const [ox, oy] = tex.origin || [0, 0];
+    const [w, h] = Array.isArray(tex.size) ? tex.size : [tex.size, tex.size];
+    if (!(w > 0) || !(h > 0)) return null;
+    const r = ((tex.rot || 0) * Math.PI) / 180, cs = Math.cos(r), sn = Math.sin(r);
+    [m00, m01, c, m10, m11, f] = [cs * w, -sn * h, ox, sn * w, cs * h, oy];
+  }
+  const det = m00 * m11 - m01 * m10;
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  const i00 = m11 / det, i01 = -m01 / det, i10 = -m10 / det, i11 = m00 / det;
+  return {
+    U: [i00, i01, -(i00 * c + i01 * f)],
+    V: [i10, i11, -(i10 * c + i11 * f)],
+    toPlan: (u, v) => [m00 * u + m01 * v + c, m10 * u + m11 * v + f],
+  };
 }
 
 /** Lücken (NaN) aus den Nachbarn füllen, bis keine mehr da sind; ganz leer -> 0 */

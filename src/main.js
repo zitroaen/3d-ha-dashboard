@@ -1390,7 +1390,11 @@ class Ha3dDashboard extends HTMLElement {
 
   // --- Test-Schnittstelle ---
   whenReady() {
-    return this._ready;
+    // samt Luftbild (wird nachgeladen)
+    return this._ready.then(async (p) => {
+      await p.view?.aerialReady;
+      return p;
+    });
   }
 }
 

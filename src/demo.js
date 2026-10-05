@@ -8,5 +8,7 @@ import { parseData } from './data.js';
 export function loadDemoData() {
   const data = parseData(demoText);
   for (const o of data.model.objects || []) delete o.ha;
+  // Das Luftbild liegt nur im Datenordner (examples/demo/textures), nicht im Bundle
+  if (data.model.site?.terrain) delete data.model.site.terrain.texture;
   return data;
 }

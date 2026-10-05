@@ -4,7 +4,8 @@
 // Flackern). Ohne Raster: eben auf GROUND_Y bzw. das alte Gitter, das Gelände-Bereiche nach außen fortsetzt.
 import * as THREE from 'three';
 import { pointInPoly, nearestTerrain } from './geometry.js';
-import { clipTerrain, convexPieces } from './terrain.js';
+import { clipTerrain, convexPieces, terrainShade, aerialTransform, ccw } from './terrain.js';
+import { lightUniforms } from './roomlight.js';
 
 /** Höhe der Bodenfläche außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen */
 export const GROUND_Y = -0.12;
@@ -115,4 +116,114 @@ export function terrainGroundGeometry(ground, cx, cz, R = 80) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('roomIdx', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3), 1));
   return g;
+}
+
+/**
+ * Hangschattierung des Höhenrasters als kleine Textur (r = Abdunklung, g = Geländehöhe; je Rasterpunkt ein Texel,
+ * linear gefiltert), einmal berechnet. Die Materialien im Freien lesen sie (roomlight.js), ohne eigene Geometrie.
+ */
+export function setupTerrainShading(terrain) {
+  const U = lightUniforms;
+  U.uTerrainOn.value = 0;
+  if (!terrain) return;
+  const shading = terrain.spec?.shading ?? 1;
+  const shade = terrainShade(terrain, { strength: Number(shading) || 0 });
+  const { nx, ny, cell, origin } = terrain;
+  const data = new Uint16Array(nx * ny * 4);
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const o = (j * nx + i) * 4;
+      data[o] = THREE.DataUtils.toHalfFloat(shade[j * nx + i]);
+      data[o + 1] = THREE.DataUtils.toHalfFloat(terrain.H(i, j));
+      data[o + 3] = THREE.DataUtils.toHalfFloat(1);
+    }
+  }
+  const tex = new THREE.DataTexture(data, nx, ny, THREE.RGBAFormat, THREE.HalfFloatType);
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  U.uTerrain.value?.dispose?.();
+  U.uTerrain.value = tex;
+  // Texelmitten auf den Rasterpunkten
+  U.uTerrainBox.value.set(origin[0] - cell / 2, origin[1] - cell / 2, nx * cell, ny * cell);
+  U.uTerrainOn.value = 1;
+}
+
+/** Größte Kantenlänge des Luftbilds auf der GPU (Speicher, Tablets) */
+export const AERIAL_MAX = 4096;
+
+/**
+ * Luftbild (site.terrain.texture) laden: auf höchstens AERIAL_MAX verkleinern, `exclude`-Polygone ausstanzen
+ * (durchsichtig -> dort bleibt der Belag) und als Textur des Boden-Belags setzen. Bis es geladen ist (oder wenn es
+ * fehlt), bleibt der prozedurale Boden.
+ */
+export function loadAerial(spec, url, onReady) {
+  const U = lightUniforms;
+  U.uAerialK.value = 0;
+  if (!spec?.file) return Promise.resolve();
+  let done;
+  const finished = new Promise((res) => (done = res));
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    const W = img.naturalWidth || img.width || 1, H = img.naturalHeight || img.height || 1;
+    const tr = aerialTransform(spec, W, H);
+    if (!tr) {
+      console.warn('ha-3d-dashboard: Luftbild: Lage (origin/size/rot oder affine) unbrauchbar');
+      return done();
+    }
+    const k = Math.min(1, AERIAL_MAX / Math.max(W, H));
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(W * k));
+    cv.height = Math.max(1, Math.round(H * k));
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    // Aussparungen: Plan -> Bildpunkte
+    const ex = (spec.exclude || []).filter((p) => Array.isArray(p) && p.length >= 3);
+    if (ex.length) {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      for (const poly of ex) {
+        ccw(poly).forEach(([x, y], i) => {
+          const u = tr.U[0] * x + tr.U[1] * y + tr.U[2], v = tr.V[0] * x + tr.V[1] * y + tr.V[2];
+          ctx[i ? 'lineTo' : 'moveTo'](u * cv.width, v * cv.height);
+        });
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false; // v läuft wie die Bildzeilen nach unten
+    tex.anisotropy = 4;
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    U.uAerial.value?.dispose?.();
+    U.uAerial.value = tex;
+    U.uAerialU.value.set(...tr.U);
+    U.uAerialV.value.set(...tr.V);
+    U.uAerialK.value = Math.max(0, Math.min(1, spec.strength ?? 0.85));
+    onReady?.();
+    done();
+  };
+  img.onerror = () => {
+    console.warn(`ha-3d-dashboard: Luftbild ${spec.file} nicht gefunden`);
+    done();
+  };
+  img.src = url;
+  return finished;
+}
+
+/**
+ * Luftbild-Angaben aus site.terrain.texture (Text = nur die Datei) oder null. Ohne Lage deckt das Bild genau den
+ * Rasterbereich ab (erster bis letzter Rasterpunkt) – so liefert es scripts/orthophoto-crop.mjs.
+ */
+export function aerialSpec(terrain) {
+  const t = terrain?.spec?.texture;
+  if (!t) return null;
+  const spec = typeof t === 'string' ? { file: t } : { ...t };
+  if (!spec.file) return null;
+  if (!spec.affine && spec.size == null) {
+    const [x0, y0, x1, y1] = terrain.extent;
+    Object.assign(spec, { origin: [x0, y0], size: [x1 - x0, y1 - y0], rot: 0 });
+  }
+  return spec;
 }
