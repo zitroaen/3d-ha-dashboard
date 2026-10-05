@@ -86,7 +86,19 @@ Wohnhaus, Garage, Gartenhaus, Carport … jeweils mit Etagen.
 | `name` | ja | | Anzeigename |
 | `kind` | nein | `house` | `house`, `garage`, `garden_house`, `carport`, `other` (nur Information) |
 | `floors` | ja | | Etagen, mindestens eine |
+| `facade` | nein | Putz (Wandfarbe) | Außenwände des Gebäudes, siehe unten |
 | `roof` | nein | Flachdach | Dach über der obersten Etage: ein Dachteil oder eine Liste davon, siehe unten; `false` = keins |
+
+**Fassade (`buildings[].facade`):** Material der Außenseiten aller Wände (auch Giebel und Gauben); innen bleibt die
+Wandfarbe.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `type` | nein | `plaster` | `plaster` (Putz), `wood_siding` (Holzschalung, waagrechte Bretter), `brick` (Ziegel), `stone` (Naturstein) |
+| `color` | nein | je Art | Farbe (`#rrggbb`), z. B. `#8e2f22` Schwedenrot (Standard bei `wood_siding`), `#ece5d8` Putz |
+| `corners` | nein | weiß bei `wood_siding` | Farbe der Eckbretter (an Hausecken und Fensterlaibungen); `false` = keine |
+| `plinth` | nein | | Sockel: `{ height (0.4), material (Oberfläche, z. B. stone), color }` – auf der untersten Etage bis auf das Gelände davor |
+
 
 **Dach:** Jedes Gebäude bekommt ein Dach über seiner obersten Etage – ohne Angabe ein Flachdach. Es erscheint, sobald
 eine höhere Ebene gezeigt wird (z. B. die Garage, wenn das 1. OG des Hauses gewählt ist); über der obersten Ebene
@@ -117,6 +129,7 @@ Jeder Teil hat einen **konvexen** Umriss; L-förmige Häuser bekommen zwei Teile
 | `hip_pitch` | nein | Neigung + 15 | nur Krüppelwalm: Neigung des Walms |
 | `dormers` | nein | | Gauben, siehe unten |
 | `chimneys` | nein | | Schornsteine, siehe unten |
+| `railing` | nein | | nur flache Teile (Dachterrasse): Geländer, siehe Außenbereiche |
 
 Die Dachfläche ist an jeder Stelle die niedrigste der Dachebenen (jede Traufe trägt eine Ebene mit `pitch`). Das
 ergibt auf konvexen Umrissen genau Sattel-, Walm-, Krüppelwalm- und Pultdach.
@@ -210,6 +223,7 @@ Bereiche wie Räume: Objekte können darin stehen, Außenleuchten beleuchten sie
 | `elevation` | nein | 0 | Höhe der Fläche (Terrasse auf Fußbodenhöhe, Garten tiefer); bei Gelände: Höhe der Eckpunkte ohne `z` |
 | `follow` | nein | | `terrain`: der Bereich liegt auf dem Höhenraster (`site.terrain`) – Rasen, Wege, Beete am Hang brauchen nur ihr Polygon |
 | `extend` | nein | false | Gelände je Eckpunkt: der Boden setzt den Bereich nach außen fort, auch wo er höher liegt (Hang, der über das Grundstück hinausläuft) – statt Erdkante |
+| `railing` | nein | | Geländer/Brüstung an den Kanten, siehe unten |
 | `edge` | nein | Erde bzw. Belag | Oberfläche der Kante, wo der Bereich über dem Boden liegt (z. B. `stone` für Mauern, Hochbeete, Stufen); ohne Angabe Erde bei `lawn`/`soil`, sonst der Belag selbst |
 | `ha_area` | nein | nach Name | HA-Bereich |
 
@@ -227,6 +241,16 @@ für einen geknickten Hang mehr Eckpunkte am Rand setzen (Punkte im Inneren gibt
 setzt der Boden es nach außen fort (ein Hang läuft seitlich weiter, unterhalb bleibt es unten); liegt es höher (Hügel,
 Wall), zeigt das Panel eine Erdkante wie bei einem Geländemodell. Das gilt auch für ebene Bereiche mit `elevation` über
 dem Boden.
+
+**Geländer (`railing`)** für Terrassen, Balkone, Veranden und Dachterrassen (auch an flachen Dachteilen): steht 5 cm
+innerhalb der Kante auf der Fläche (am Hang jede Docke auf ihrer Höhe).
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `style` | nein | `balusters` | `balusters` (Balustrade mit Docken, weiß), `metal` (Metall mit Stäben, anthrazit), `glass` (Glas zwischen Pfosten) |
+| `height` | nein | 1.0 | Höhe über der Fläche |
+| `edges` | nein | alle | Kanten, an denen es steht: Index i = Kante von `polygon[i]` nach `polygon[i+1]` |
+| `color` | nein | je Art | Farbe von Pfosten, Handlauf und Docken |
 
 **Mauern, Hochbeete, Stufen:** als schmale Außenbereiche mit `elevation` und `edge: stone`. Eine Trockenmauer ist ein
 Streifen mit `surface: stone`, ein Hochbeet dahinter `surface: soil`, Blockstufen sind Streifen mit steigender Höhe. Eine
@@ -622,6 +646,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 - **Version 2:** ein Dokument statt drei Dateien; Grundstück mit mehreren Gebäuden, Ebenen (`level`) und
   Außenbereichen; einheitliche Objekte mit Katalog, Rollen und Aktionen; Bodenbelag heißt `surface`.
+- **Version 2, Ergänzung (0.19.0, abwärtskompatibel):** `buildings[].facade` (Putz, Holzschalung, Ziegel, Naturstein;
+  Farbe, Eckbretter, Sockel), `railing` an Außenbereichen und flachen Dachteilen.
 - **Version 2, Ergänzung (0.18.0, abwärtskompatibel):** `site.terrain` (Höhenraster) und `outdoor[].follow:
   terrain`; Kanten von Außenbereichen relativ zum tatsächlichen Gelände bzw. Nachbarbereich (mit Raster auch nach
   oben); Werkzeug `scripts/terrain-from-scan.mjs`.

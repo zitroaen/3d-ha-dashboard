@@ -110,6 +110,8 @@ const buildings = [
       { id: 'eg', name: 'Erdgeschoss', level: 0, elevation: 0, height: 2.6, rooms, walls: walls.map((polygon) => ({ polygon })), windows, doors },
       { id: 'og', name: 'Obergeschoss', level: 1, elevation: OG_EL, height: OG_H, rooms: ogRooms, walls: ogWalls.map((polygon) => ({ polygon })), windows: ogWindows },
     ],
+    // Putzfassade in warmem Weiß mit Natursteinsockel
+    facade: { type: 'plaster', color: '#ece5d8', plinth: { height: 0.45, material: 'stone' } },
     // Krüppelwalmdach über dem Obergeschoss (Kniestock 1 m, First Nord–Süd) mit Schleppgaube und Schornstein;
     // über dem eingeschossigen Ostteil ein Walmdach rund um eine Dachterrasse
     roof: [
@@ -119,7 +121,7 @@ const buildings = [
         chimneys: [{ pos: [4.3, 2.4], size: [0.5, 0.5], height: 0.7 }],
       },
       { id: 'haus_anbau', name: 'Dach Anbau', type: 'hip', polygon: rect(6 + INT / 2, 0, 10, 8), pitch: 30, eaves: -0.25, overhang: 0.3, opening: rect(6.7, 1.2, 9.4, 6.8) },
-      { id: 'dachterrasse', name: 'Dachterrasse', polygon: rect(6.7, 1.2, 9.4, 6.8), eaves: -0.25, surface: 'slabs' },
+      { id: 'dachterrasse', name: 'Dachterrasse', polygon: rect(6.7, 1.2, 9.4, 6.8), eaves: -0.25, surface: 'slabs', railing: { style: 'glass', height: 1.0 } },
     ],
   },
   {
@@ -152,6 +154,8 @@ function gardenHouse() {
     id: 'gartenhaus',
     name: 'Gartenhaus',
     kind: 'garden_house',
+    // Schwedenrote Holzschalung mit weißen Eckbrettern, Sockel aus Naturstein
+    facade: { type: 'wood_siding', plinth: { height: 0.25, material: 'stone' } },
     floors: [{
       id: 'eg', name: 'Gartenhaus', level: 0, elevation: 0, height: 2.2,
       rooms: [{ id: 'gartenhaus', name: 'Gartenhaus', polygon: rect(X0 + T, Y0 + T, X1 - T, Y1 - T), surface: 'parquet' }],
@@ -176,6 +180,8 @@ const outdoor = [
   { id: 'beet_sued_2', name: 'Beet Süd rechts', polygon: rect(3.8, 10.5, 6.5, 11.3), surface: 'soil', elevation: -0.04 },
   { id: 'weg', name: 'Gartenweg', polygon: rect(2.7, 10.5, 3.8, 11.3), surface: 'paving' },
   ...northTerrace(),
+  // Veranda vor dem Gartenhaus: Holzdeck mit weißer Balustrade an den Schmalseiten (Westseite offen als Zugang)
+  { id: 'veranda', name: 'Veranda', polygon: rect(15.6, 7.0, 16.5, 9.4), surface: 'wood', railing: { style: 'balusters', height: 0.9, edges: [0, 2] } },
   // Garten am Südhang (Süden = +y), folgt dem Höhenraster
   { id: 'garten', name: 'Garten', surface: 'lawn', follow: 'terrain', polygon: rect(-4, 11.3, 11.2, 18) },
 ];

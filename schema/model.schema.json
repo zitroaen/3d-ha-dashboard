@@ -71,6 +71,24 @@
         "name": { "type": "string" },
         "kind": { "enum": ["house", "garage", "garden_house", "carport", "other"] },
         "floors": { "type": "array", "items": { "$ref": "#/$defs/floor" }, "minItems": 1 },
+        "facade": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "enum": ["plaster", "wood_siding", "brick", "stone"] },
+            "color": { "type": "string" },
+            "corners": { "oneOf": [{ "type": "string" }, { "const": false }] },
+            "plinth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "height": { "type": "number", "minimum": 0 },
+                "material": { "$ref": "#/$defs/surface" },
+                "color": { "type": "string" }
+              }
+            }
+          }
+        },
         "roof": {
           "oneOf": [
             { "const": false },
@@ -78,6 +96,16 @@
             { "type": "array", "items": { "$ref": "#/$defs/roofPart" }, "minItems": 1 }
           ]
         }
+      }
+    },
+    "railing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": { "enum": ["balusters", "metal", "glass"] },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "edges": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "color": { "type": "string" }
       }
     },
     "roofPart": {
@@ -100,6 +128,7 @@
         "opening": { "type": "array", "items": { "$ref": "#/$defs/pos" }, "minItems": 3 },
         "hip_height": { "type": "number", "minimum": 0 },
         "hip_pitch": { "type": "number", "exclusiveMinimum": 0, "maximum": 85 },
+        "railing": { "$ref": "#/$defs/railing" },
         "dormers": {
           "type": "array",
           "items": {
@@ -211,6 +240,7 @@
         "edge": { "$ref": "#/$defs/surface" },
         "extend": { "type": "boolean" },
         "follow": { "enum": ["terrain"] },
+        "railing": { "$ref": "#/$defs/railing" },
         "ha_area": { "type": "string" }
       }
     },

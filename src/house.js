@@ -4,11 +4,12 @@
 import * as THREE from 'three';
 import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
-import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture } from './textures.js';
+import { parquetTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
 import { buildPitchedRoof, ceilingFn, ceilingProfile } from './roof.js';
 import { GROUND_Y } from './ground.js';
 import { clipTerrain } from './terrain.js';
+import { buildRailing } from './railing.js';
 
 const DOOR_HEIGHT = 2.05;
 // Jeder Raumboden liegt minimal höher als der vorige: Raumpolygone überlappen in den Türöffnungen,
@@ -100,6 +101,12 @@ export class FloorModel {
         const ek = this.shared.mat[r.room.edge] ? r.room.edge : SOFT.has(kind) ? 'soil' : kind;
         this._outdoorEdges(r, (floors[ek] ??= new Builder()), y);
       }
+      // Geländer an den Kanten (Terrasse, Balkon, Dachterrasse)
+      if (r.room.railing) {
+        const baseAt = frags ? (p) => ground.terrain.height(p) : hs ? (p) => heightAt(r.room.polygon, hs, p) : () => r.room.elevation || 0;
+        buildRailing(r.room.polygon, r.room.railing, baseAt,
+          (role, color) => (role === 'glass' ? B.glass : role === 'metal' ? B.metal : color ? (floors[this.shared.surface('pvc', color)] ??= new Builder()) : B.pvc), r.idx);
+      }
       // floor_rot: Verlegerichtung des Bodens in Grad (z. B. 45 für diagonal verlegtes Würfelparkett)
       if (r.room.floor_rot) {
         const a = (r.room.floor_rot * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
@@ -119,6 +126,30 @@ export class FloorModel {
       this.group.add(mesh);
     }
 
+    // --- Fassade (buildings[].facade): Außenseiten der Wände (kein Raum davor) im eigenen Material, unten der Sockel
+    const S0 = this.shared, facade = floor.facade;
+    const fac = facade ? (floors[S0.facadeKey(facade)] ??= new Builder()) : null;
+    const plinth = facade?.plinth && floor.lowest ? { height: 0.4, ...facade.plinth } : null;
+    const plinthB = plinth ? (floors[S0.surface(plinth.material || 'stone', plinth.color)] ??= new Builder()) : null;
+    const extSegs = [];
+    /** Außenseite a→b (n nach außen) von y0 bis zur Oberkante tops = [{ p, y }] (gerade oder unter der Dachschräge) */
+    const exterior = (a, b, n, y0, tops) => {
+      extSegs.push({ a, b, y0, top: Math.min(...tops.map((t) => t.y)) });
+      const out = (p, d) => [p[0] + n[0] * d, p[1] + n[1] * d];
+      for (let k = 0; k + 1 < tops.length; k++) {
+        const A = tops[k], C = tops[k + 1];
+        let from = y0;
+        if (plinthB && y0 < plinth.height) {
+          // Sockel 1,5 cm vor der Wand, auf der untersten Etage bis auf den Boden davor
+          const g = (p) => (y0 <= 0.01 && S0.ground ? Math.min(y0, S0.ground.at(out(p, 0.05)) - (floor.elevation || 0) - 0.02) : y0);
+          const ta = Math.min(plinth.height, A.y), tc = Math.min(plinth.height, C.y);
+          plinthB.skirt(out(A.p, 0.015), g(A.p), ta, out(C.p, 0.015), g(C.p), tc, 0);
+          from = plinth.height;
+        }
+        if (A.y > from + 1e-3 || C.y > from + 1e-3) fac.quadVT(A.p, C.p, from, Math.max(A.y, from), Math.max(C.y, from), 0);
+      }
+    };
+
     // --- Prismen (Wände, Brüstungen, Stürze): Seitenflächen bekommen den Raum, in den sie zeigen
     const prism = (poly, y0, y1, capRoom = 0) => {
       const cut = this.ceilingAt && y1 >= H - 0.01;
@@ -133,14 +164,16 @@ export class FloorModel {
           [a, b] = [b, a];
           n = [-n[0], -n[1]];
         }
-        if (cut) {
-          // unter dem Steildach: Oberkante folgt der Dachfläche
-          const prof = ceilingProfile(floor.roofCut, this.ceilingAt, a, b);
-          for (let k = 0; k + 1 < prof.length; k++) {
-            const A = prof[k], C = prof[k + 1];
-            if (A.y > y0 + 1e-3 || C.y > y0 + 1e-3) walls.quadVT(A.p, C.p, y0, Math.max(A.y, y0), Math.max(C.y, y0), this.roomBeside(mid, n));
+        const room = this.roomBeside(mid, n);
+        // unter dem Steildach: Oberkante folgt der Dachfläche
+        const tops = cut ? ceilingProfile(floor.roofCut, this.ceilingAt, a, b) : [{ p: a, y: y1 }, { p: b, y: y1 }];
+        if (fac && !room) exterior(a, b, n, y0, tops);
+        else if (cut) {
+          for (let k = 0; k + 1 < tops.length; k++) {
+            const A = tops[k], C = tops[k + 1];
+            if (A.y > y0 + 1e-3 || C.y > y0 + 1e-3) walls.quadVT(A.p, C.p, y0, Math.max(A.y, y0), Math.max(C.y, y0), room);
           }
-        } else walls.quadV(a, b, y0, y1, this.roomBeside(mid, n));
+        } else walls.quadV(a, b, y0, y1, room);
       }
       // Oben auf Wandhöhe: dunkle Schnittfläche; darunter (Fensterbank): Wandmaterial
       if (cut) this._cutCap(caps, poly, y0);
@@ -175,6 +208,11 @@ export class FloorModel {
       buildDoor(this, d, B);
     }
 
+    // --- Eckbretter der Holzfassade (z. B. weiß auf Schwedenrot) an Hausecken und Fensterlaibungen
+    if (fac && facade.type === 'wood_siding' && facade.corners !== false) {
+      this._cornerTrims(extSegs, facade.corners ? (floors[S0.surface('pvc', facade.corners)] ??= new Builder()) : B.pvc, plinth ? plinth.height : 0);
+    }
+
     // --- Dach: Dachrand (Blende bis auf die Wände darunter) und niedrige Attika rundum
     if (floor.roof) {
       const edge = (floors.roof_edge ??= new Builder());
@@ -202,7 +240,7 @@ export class FloorModel {
       this.group.add(m);
       return m;
     };
-    for (const [kind, b] of Object.entries(floors)) add(b, S.mat[kind], { cast: kind.startsWith('roof') || kind === 'soffit' || kind === 'chimney' });
+    for (const [kind, b] of Object.entries(floors)) add(b, S.mat[kind], { cast: kind.startsWith('roof') });
     add(walls, S.mat.wall, { cast: true });
     add(caps, S.mat.cap, { cast: true });
     add(B.pvc, S.mat.pvc, { cast: true });
@@ -289,11 +327,14 @@ export class FloorModel {
   _pitchedRoof(r, floors, walls, B) {
     const surf = new Builder();
     const kind = this.shared.surface(r.room.floor, r.room.color);
+    const facade = this.floor.facade;
     buildPitchedRoof(r.room, r.idx, {
+      facade: facade ? (floors[this.shared.facadeKey(facade)] ??= new Builder()) : walls,
       surf,
-      under: (floors.soffit ??= new Builder()),
+      // Untersicht in Wandfarbe, Schornstein mit Blechverkleidung wie der Dachrand – keine eigenen Zeichenaufrufe
+      under: walls,
       edge: (floors.roof_edge ??= new Builder()),
-      chimney: (floors.chimney ??= new Builder()),
+      chimney: (floors.roof_edge ??= new Builder()),
       walls,
       glass: B.glass,
       pvc: B.pvc,
@@ -307,6 +348,51 @@ export class FloorModel {
     mesh.userData.roomId = r.room.id;
     r.hitMesh = mesh;
     this.group.add(mesh);
+  }
+
+  /**
+   * Eckbretter: wo zwei Außenseiten an einer Ecke zusammentreffen, je ein 10 cm breites Brett auf beiden Seiten,
+   * 1,2 cm vor der Fassade.
+   */
+  _cornerTrims(segs, b, bottom) {
+    const W = 0.1, T = 0.012;
+    const same = (p, q) => Math.abs(p[0] - q[0]) < 1e-3 && Math.abs(p[1] - q[1]) < 1e-3;
+    const dir = (s) => {
+      const l = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]) || 1;
+      return [(s.b[0] - s.a[0]) / l, (s.b[1] - s.a[1]) / l];
+    };
+    const done = new Set();
+    for (const s of segs) {
+      for (const t of segs) {
+        if (s === t) continue;
+        for (const [ps, pt] of [[s.b, t.a], [s.a, t.b], [s.a, t.a], [s.b, t.b]]) {
+          if (!same(ps, pt)) continue;
+          const d1 = dir(s), d2 = dir(t);
+          if (Math.abs(d1[0] * d2[0] + d1[1] * d2[1]) > 0.9) continue; // keine Ecke
+          const key = `${ps[0].toFixed(3)},${ps[1].toFixed(3)}`;
+          if (done.has(key)) continue;
+          done.add(key);
+          const y0 = Math.max(bottom, Math.max(s.y0, t.y0)), y1 = Math.min(s.top, t.top);
+          if (y1 - y0 < 0.2) continue;
+          for (const seg of [s, t]) {
+            // Brett auf dieser Seite: von der Ecke ein Stück entlang, nach außen versetzt
+            const d = dir(seg), from = same(seg.a, ps) ? 1 : -1;
+            const nOut = this._outward(seg);
+            const p0 = [ps[0] + nOut[0] * T, ps[1] + nOut[1] * T];
+            const p1 = [p0[0] + d[0] * from * W, p0[1] + d[1] * from * W];
+            b.skirt(p0, y0, y1, p1, y0, y1, 0);
+          }
+        }
+      }
+    }
+  }
+
+  /** Nach außen zeigende Normale einer Außenseite (kein Raum davor) */
+  _outward(seg) {
+    const l = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1]) || 1;
+    const n = [-(seg.b[1] - seg.a[1]) / l, (seg.b[0] - seg.a[0]) / l];
+    const m = [(seg.a[0] + seg.b[0]) / 2, (seg.a[1] + seg.b[1]) / 2];
+    return this.floor.walls.some((w) => pointInPoly([m[0] + n[0] * 0.02, m[1] + n[1] * 0.02], w)) ? [-n[0], -n[1]] : n;
   }
 
   /** Oberseite einer Wand unter dem Steildach: Band entlang der Wand, Höhe aus der Dachfläche */
@@ -460,6 +546,10 @@ export function createSharedMaterials() {
   roofTex.repeat.set(1 / 0.7, 1 / 0.7);
   const tilesRoof = roofTileTexture();
   tilesRoof.repeat.set(1 / 1.2, 1 / 1.2);
+  const siding = sidingTexture();
+  siding.repeat.set(1 / 1.2, 1 / 1.2);
+  const bricks = brickTexture();
+  bricks.repeat.set(1 / 1.2, 1 / 1.2);
   const slabs = slabTexture();
   slabs.repeat.set(1 / 1.2, 1 / 1.2);
   const stone = stoneTexture();
@@ -480,10 +570,11 @@ export function createSharedMaterials() {
     // Flachdach: dunkle Dachbahn; Dachrand/Attika in hellem Metall
     roof: lit({ map: roofTex, normalMap: relief(roofTex, 4), normalScale: N(0.6), roughness: 0.95 }, { weather: true }),
     roof_edge: lit({ color: 0xa9adb1, roughness: 0.5, metalness: 0.3 }, { weather: true }),
-    // Steildach: Ziegel (Farbe je Dach über `color`, Standard Ziegelrot), Untersicht des Überstands, Schornstein
+    // Steildach: Ziegel (Farbe je Dach über `color`, Standard Ziegelrot)
     roof_tiles: lit({ map: tilesRoof, normalMap: relief(tilesRoof, 6), normalScale: N(0.9), color: 0xa4553b, roughness: 0.8 }, { weather: true }),
-    soffit: lit({ color: 0xe9e4da, roughness: 0.8 }),
-    chimney: lit({ color: 0x8a5a48, normalMap: plaster, normalScale: N(0.4), roughness: 0.9 }, { weather: true }),
+    // Fassaden (buildings[].facade): Holzschalung (Standard Schwedenrot), Ziegel, Putz = wall
+    wood_siding: lit({ map: siding, normalMap: relief(siding, 5), normalScale: N(0.8), color: 0x8e2f22, roughness: 0.75 }, { weather: true }),
+    brick: lit({ map: bricks, normalMap: relief(bricks, 6), normalScale: N(0.8), color: 0xb05a3c, roughness: 0.85 }, { weather: true }),
     slabs: lit({ map: slabs, normalMap: relief(slabs, 8), normalScale: N(0.7), roughness: 0.75 }, { weather: true }),
     stone: lit({ map: stone, normalMap: relief(stone, 10), normalScale: N(1.2), roughness: 0.95 }, { weather: true }),
     wood: lit({ color: 0x8a6440, roughness: 0.7 }, { weather: true }),
@@ -517,7 +608,12 @@ export function createSharedMaterials() {
     }
     return key;
   };
+  // Fassade -> Material-Schlüssel: plaster (Putz, Farbe), wood_siding, brick, stone
+  const facadeKey = (f) => {
+    const type = f.type || 'plaster';
+    return surface(type === 'plaster' ? 'wall' : mat[type] ? type : 'wall', f.color);
+  };
   const hitMaterial = new THREE.MeshBasicMaterial({ visible: false });
   const lampHitGeometry = new THREE.SphereGeometry(0.35, 8, 6);
-  return { mat, surface, hitMaterial, lampHitGeometry };
+  return { mat, surface, facadeKey, hitMaterial, lampHitGeometry };
 }

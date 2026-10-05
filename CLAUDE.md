@@ -88,7 +88,7 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
   über den Dev-Server bzw. HA-Benutzerdaten, Export) · `src/picker.js` Entity-Auswahl
   · `src/objsettings.js` Einstellungen eines Objekts (Rollen, Gesten, Zustandsanzeige, fester Zustand)
   · `src/catalogpanel.js` Katalog und Lager im Editor · `src/preview.js` Vorschaubilder · `src/ha.js` Zustand/Dienste
-- `src/terrain.js` Höhenraster (Höhe, Normalen, Zuschnitt auf Bereiche) · `src/ground.js` Boden (Höhe daneben für
+- `src/railing.js` Geländer · `src/terrain.js` Höhenraster (Höhe, Normalen, Zuschnitt auf Bereiche) · `src/ground.js` Boden (Höhe daneben für
   Kanten, Bodennetz mit Aussparungen)
 - `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
@@ -247,6 +247,12 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   = keine Kante, sonst `ground.at`), mit Raster auch nach oben (Stützmauer). Gebäudesockel (Bodenplatte der untersten
   Etage) reicht bis auf den Boden. Ohne Raster bleibt das alte Gitter (`ground.at`), nur unter Gelände-Bereichen
   6 cm statt 1,2 cm tiefer (Flackern). YAML-Schreiber: Zahlentabellen mit langen Zeilen als eine Zeile je Zeile.
+- Fassaden und Geländer (0.19.0): Außenseite = Wandfläche ohne Raum davor (`roomBeside` = 0); mit `facade` geht sie
+  in einen eigenen Builder (`shared.facadeKey`: Putz = Wandmaterial mit Farbe, `wood_siding`, `brick`, `stone`), der
+  Sockel 1,5 cm davor (`floor.lowest`: bis auf `ground.at`). Eckbretter, wo zwei Außenseiten im Winkel
+  zusammentreffen (auch an Fensterlaibungen). Giebel- und Gaubenwände im Dach nutzen dieselbe Fassade. Geländer
+  (`src/railing.js`) aus Quadern in vorhandenen Materialien (pvc mit Farbe, Glas) – keine eigenen Zeichenaufrufe je
+  Geländer, durch `_mergeLevels` mit den Fenstern der Ebene zusammengefasst.
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).
