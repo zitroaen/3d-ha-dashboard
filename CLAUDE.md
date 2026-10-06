@@ -347,3 +347,8 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - `elevation` für alle Objekte (0.35.0): furnishing.js hebt den Ursprung an, außer bei `OWN_ELEVATION` (Modelle mit
   eigener Standardhöhe wie TV, Bild). Leuchten: Ursprung auf Boden + elevation, das Modell bekommt `height − elevation`
   (und die Decke entsprechend), die Lichtquelle (LightTable) bleibt auf `light.height`.
+- Kreuzdach und Gauben (0.36.0): `ceilingFn` = Maximum über die Dachteile (Vereinigung), unter einer Gaube deren
+  Dachunterseite (`dormerFrame()` in roof.js: gemeinsame Lage für Zeichnen, Wände, Prüfung). `buildPitchedRoof` bekommt
+  die anderen Steildach-Teile: je Fläche wird der Bereich, in dem diese Ebene unter allen Ebenen des anderen Teils
+  liegt (Halbebenen, konvex), per `minusConvex` abgezogen; Traufen-/Giebelstücke im anderen Teil entfallen. Unter
+  Gauben ist die Fläche ausgespart (`hole`), bei `window: openings` bis über den Überstand.

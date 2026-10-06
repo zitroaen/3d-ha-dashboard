@@ -81,7 +81,7 @@ const OG_H = 2.4, OG_EL = 2.85;
 const ogWalls = [
   ...wall({ axis: 'x', from: 0, to: 6 + INT / 2, at0: 0, at1: EXT, gaps: [[2.0, 3.4]] }),
   ...wall({ axis: 'x', from: 0, to: 6 + INT / 2, at0: 8 - EXT, at1: 8, gaps: [[2.0, 3.6]] }),
-  ...wall({ axis: 'y', from: EXT, to: 8 - EXT, at0: 0, at1: EXT }),
+  ...wall({ axis: 'y', from: EXT, to: 8 - EXT, at0: 0, at1: EXT, gaps: [[1.2, 2.1]] }),
   ...wall({ axis: 'y', from: EXT, to: 8 - EXT, at0: 6 - INT / 2, at1: 6 + INT / 2 }),
 ];
 const ogRooms = [{ id: 'studio', name: 'Studio', polygon: rect(EXT, EXT, 6 - INT / 2, 8 - EXT), surface: 'parquet' }];
@@ -89,6 +89,10 @@ const ogWindows = [
   { rect: [2.0, 0, 3.4, EXT], room: 'studio' },
   { rect: [2.0, 8 - EXT, 3.6, 8], room: 'studio', sill: 0.5 },
 ].map((w) => ({ sill: 0.9, top: 2.0, ...w, rect: w.rect.map(r3) }));
+// Glastür nach Westen in einer Gaube bis zur Traufe (französischer Balkon)
+const ogDoors = [
+  { hinge: [EXT / 2, 1.2], end: [EXT / 2, 2.1], swing: 1, jamb: [-EXT / 2, EXT / 2], type: 'exterior', leaf: 'glass', rooms: ['studio'], height: 2.05 },
+].map((d) => ({ ...d, hinge: d.hinge.map(r3), end: d.end.map(r3), jamb: d.jamb.map(r3) }));
 
 // --- Garage östlich des Hauses: 4 × 6 m, Tor nach Süden (Öffnung in der Südwand)
 const GX = 11.5, GW = 4, GD = 6, GE = 0.2;
@@ -109,7 +113,7 @@ const buildings = [
     kind: 'house',
     floors: [
       { id: 'eg', name: 'Erdgeschoss', level: 0, elevation: 0, height: 2.6, rooms, walls: walls.map((polygon) => ({ polygon })), windows, doors },
-      { id: 'og', name: 'Obergeschoss', level: 1, elevation: OG_EL, height: OG_H, rooms: ogRooms, walls: ogWalls.map((polygon) => ({ polygon })), windows: ogWindows },
+      { id: 'og', name: 'Obergeschoss', level: 1, elevation: OG_EL, height: OG_H, rooms: ogRooms, walls: ogWalls.map((polygon) => ({ polygon })), windows: ogWindows, doors: ogDoors },
     ],
     // Putzfassade in warmem Weiß mit Natursteinsockel
     facade: { type: 'plaster', color: '#ece5d8', flush: true, plinth: { height: 0.45, material: 'stone' } },
@@ -118,9 +122,16 @@ const buildings = [
     roof: [
       {
         type: 'half_hip', ridge: 'y', pitch: 40, eaves: 1.0, overhang: 0.4,
-        dormers: [{ pos: [0.9, 4.0], width: 1.8, height: 1.3, type: 'shed' }],
-        chimneys: [{ pos: [4.3, 2.4], size: [0.5, 0.5], height: 0.7 }],
+        dormers: [
+          { pos: [0.9, 4.0], width: 1.8, height: 1.3, type: 'shed' },
+          { pos: [0.9, 6.3], width: 1.2, height: 1.1, type: 'flat' },
+          // bis zur Traufe: die Glastür der Wand darunter ist die Front
+          { pos: [0.02, 1.65], width: 1.4, height: 1.5, type: 'shed', window: 'openings' },
+        ],
+        chimneys: [{ pos: [4.3, 1.6], size: [0.5, 0.5], height: 0.7 }],
       },
+      // Zwerchhaus nach Osten: Satteldach quer zum Hauptdach, durchdringt es (Kehlen)
+      { id: 'haus_zwerch', name: 'Zwerchdach', type: 'gable', ridge: 'x', polygon: rect(2.8, 2.6, 6.0, 5.4), pitch: 40, eaves: 1.0, overhang: 0.3 },
       { id: 'haus_anbau', name: 'Dach Anbau', type: 'hip', polygon: rect(6 + INT / 2, 0, 10, 8), pitch: 30, eaves: -0.25, overhang: 0.3, opening: rect(6.7, 1.2, 9.4, 6.8) },
       { id: 'dachterrasse', name: 'Dachterrasse', polygon: rect(6.7, 1.2, 9.4, 6.8), eaves: -0.25, surface: 'slabs', railing: { style: 'glass', height: 1.0 } },
     ],

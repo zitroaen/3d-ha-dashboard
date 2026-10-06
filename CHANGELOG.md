@@ -1,5 +1,21 @@
 # Änderungen
 
+## 0.36.0
+
+- **Gaubenfenster sichtbar (Fehler):** Die Front einer Gaube ist jetzt eine Wand mit Fensteröffnung (Brüstung, Sturz,
+  Pfeiler) und Glas darin – vorher verdeckte die geschlossene Front das Fenster. Unter Gauben fehlt die Dachfläche
+  (man sah sie durchs Fenster).
+- **Wände unter Gauben (Fehler):** reichen bis unter das Gaubendach statt schräg unter der Dachfläche zu enden.
+- **Durchdringende Dachteile (Fehler):** Kreuzdach, Zwerchhaus: Die Wände enden unter dem höchsten Teil (vorher dem
+  niedrigsten), Flächen, Untersicht und Traufe eines Teils nur dort, wo kein anderer höher liegt – es ergeben sich
+  Kehlen; Giebel im anderen Teil entfallen.
+- **Türen unter der Schräge (Fehler):** werden auf die Wandhöhe begrenzt statt durchs Dach zu ragen; die Prüfung
+  meldet sie.
+- **Gaube bis zur Traufe:** `window: openings` – die Fenster und Türen der Wand darunter sitzen in der Gaubenfront,
+  Traufe und Überstand sind über ihre Breite unterbrochen.
+- Demo-Haus: Zwerchhaus nach Osten, Flachdachgaube mit Fenster, Gaube bis zur Traufe mit Glastür.
+- Screenshots: `view.at` mit dritter Zahl = Höhe des Drehpunkts (Dachansichten).
+
 ## 0.35.0
 
 - **`elevation` für alle Objekte:** Jedes Möbel und Gerät lässt sich höher stellen (Lautsprecher auf dem Sideboard),

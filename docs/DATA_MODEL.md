@@ -155,14 +155,19 @@ Jeder Teil hat einen **konvexen** Umriss; L-förmige Häuser bekommen zwei Teile
 Die Dachfläche ist an jeder Stelle die niedrigste der Dachebenen (jede Traufe trägt eine Ebene mit `pitch`). Das
 ergibt auf konvexen Umrissen genau Sattel-, Walm-, Krüppelwalm- und Pultdach.
 
+**Mehrere Dachteile** (Kreuzdach, Zwerchhaus, L-Form) dürfen sich überlappen und durchdringen: Wo ein Teil höher
+liegt, zeichnet der andere dort keine Fläche, Untersicht und Traufe (es ergeben sich Kehlen); Giebel im anderen Teil
+entfallen. Die Wände der obersten Etage enden unter dem höchsten Teil an ihrer Stelle.
+
 **Oberste Etage unter einem Steildach:** Liegt die Traufe (`eaves`) unter der Etagenhöhe, enden die Wände der obersten
 Etage unter der Dachfläche – Kniestock, Giebelwände und Innenwände zeigen die Dachschräge (höchstens bis zur
 Etagenhöhe, z. B. Kehlbalkenlage). Darüber zeichnet das Dach die Giebelwände bis zum First. Deckenleuchten unter der
 Schräge hängen an der Schräge. Dachteile über einer tieferen Etage (Anbau) schneiden nichts; ihre Giebelwände
 beginnen an der Traufe. Fenster in diesen Wänden, die über die Dachfläche ragen würden, werden auf die verbleibende Wandhöhe gekürzt (5 cm
 darunter) oder – bei weniger als 30 cm über der Brüstung – weggelassen (die Öffnung wird Wand); unter einer Gaube
-entfallen sie ebenfalls (die Gaube hat ihr Fenster). `npm run validate` meldet solche Fenster („Gaube anlegen?“) und
-Wände der obersten Etage, über denen kein Dachteil liegt (sie ragen bis zur Etagenhöhe).
+entfallen sie ebenfalls (die Gaube hat ihr Fenster). Unter einer Gaube reichen die Wände bis unter das Gaubendach.
+Türen, die über die Dachfläche ragen würden, werden auf die Wandhöhe begrenzt. `npm run validate` meldet solche Fenster
+und Türen („Gaube anlegen?“) und Wände der obersten Etage, über denen kein Dachteil liegt (sie ragen bis zur Etagenhöhe).
 
 **Gauben** (`roof.dormers[]`): stehen auf der Dachfläche an `pos`, die Front zeigt zur Traufe.
 
@@ -173,7 +178,7 @@ Wände der obersten Etage, über denen kein Dachteil liegt (sie ragen bis zur Et
 | `height` | nein | 1.4 | Höhe der Front über der Dachfläche |
 | `type` | nein | `shed` | `shed` (Schleppgaube), `flat` (Flachdachgaube), `gable` (Satteldachgaube) |
 | `pitch` | nein | 10 / 0 / 40 | Neigung des Gaubendachs |
-| `window` | nein | `true` | Fenster in der Front |
+| `window` | nein | `true` | Fenster in der Front (Wand mit Öffnung: Brüstung, Sturz, Pfeiler, Glas); `false` = geschlossene Front; `openings` = Gaube bis zur Traufe: keine eigene Front, die Fenster und Türen der Wand darunter sitzen darin (`pos` auf der Außenkante der Wand), Traufe und Überstand sind über die Breite unterbrochen |
 | `window_width` | nein | Breite − 0,4 | Fensterbreite |
 
 **Schornsteine** (`roof.chimneys[]`): `pos` (Mitte, Plan), `size` (`[Breite, Tiefe]`, Standard `[0.5, 0.5]`),
@@ -756,7 +761,7 @@ Zusätzliche Screenshot-Ansichten für `npm test` der Instanz:
 ```
 
 `rooms`: Bereichs-IDs oder `"all"`, `level`: Ebene (Standard 0), `sun`: `{ "azimuth": 215, "elevation": 38 }` (sonst Nacht), `view.at`: Plan-Punkt
-(Standard: Mitte der Ausgangslage), `zoom`, `az`: Schwenk um die Hochachse in Grad, `tilt`: Neigung der Kamera über dem
+`[x, y]` oder `[x, y, Höhe]` (Höhe des Drehpunkts, z. B. für Dachansichten; Standard: Mitte der Ausgangslage), `zoom`, `az`: Schwenk um die Hochachse in Grad, `tilt`: Neigung der Kamera über dem
 Horizont in Grad (Standard wie die Startansicht, ~57°; z. B. 25 für eine flache Gesamtansicht von Haus und Hang).
 Eingebaut ist dazu die Ansicht `schraeg` (Ebene 0, Tag, 25°).
 
@@ -792,6 +797,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.36.0, abwärtskompatibel):** Gauben `window: openings` (bis zur Traufe); Dachteile
+  durchdringen sich (vorher bestimmte der niedrigste Teil die Wandhöhe). Werkzeuge: `view.at` mit Höhe.
 - **Version 2, Ergänzung (0.35.0, abwärtskompatibel):** `elevation` auch für Leuchten; Katalog `desk_lamp`;
   `floor_column` mit `params.base: disc`; `speaker` mit `params.style: compact` und `params.color`.
 - **Version 2, Ergänzung (0.34.0, abwärtskompatibel):** Katalog `column`, `balustrade`, `stairs`; Materialien
