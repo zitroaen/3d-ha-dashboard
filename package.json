@@ -12,6 +12,7 @@
     "serve": "node tests/devserver.mjs",
     "demo": "node examples/demo/build-house.mjs",
     "validate": "node tests/validate-data.mjs",
+    "preview": "node scripts/preview.mjs",
     "link-check": "node tests/link-check.mjs",
     "test:unit": "node tests/model.test.mjs",
     "test:screens": "node tests/screenshots.mjs",

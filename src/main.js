@@ -11,7 +11,8 @@ import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides,
 import { toScene, writeBack, gestureAction, roleEntities, showsBadge, badgeSpec, badgeEntities, conditionMet, playerSpec, GESTURES, activityOf } from './model/model.js';
 import { CATALOG, hasCapability, DEFAULT_MOUNT, DEFAULT_LIGHT_HEIGHT, MODEL_LIGHT_HEIGHT } from './model/catalog.js';
 import { CatalogPanel } from './catalogpanel.js';
-import { modelPreview } from './preview.js';
+import { modelPreview, surfacePreview, contactSheet } from './preview.js';
+import { isSurface, surfaceDef } from './surfaces.js';
 import { pointInPoly } from './geometry.js';
 import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
@@ -825,6 +826,28 @@ class Ha3dDashboard extends HTMLElement {
     });
     if (select && o && !o.stored) ed.select({ type, id });
     else ed._emit();
+  }
+
+  /**
+   * Kontaktbogen für das Werkzeug scripts/preview.mjs: Oberflächen und Katalog-Modelle (IDs) als ein Bild (data-URL).
+   * Unbekannte IDs erscheinen rot beschriftet.
+   */
+  async previewSheet(ids) {
+    const r = this.view.renderer, items = [];
+    for (const id of ids) {
+      if (isSurface(id)) items.push({ label: `${id} · ${surfaceDef(id).label || ''}`, url: surfacePreview(r, this.view.shared.mat[id]) });
+      else if (CATALOG[id]) items.push({ label: `${id} · ${CATALOG[id].label || ''}`, url: modelPreview(r, id), error: CATALOG[id].broken });
+      else items.push({ label: `${id}: unbekannt`, url: null, error: true });
+    }
+    // Bilder eigener Oberflächen laden asynchron: kurz warten und die betroffenen neu rechnen
+    if (ids.some((id) => isSurface(id) && surfaceDef(id).image)) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      for (const it of items) {
+        const id = it.label.split(' · ')[0];
+        if (isSurface(id) && surfaceDef(id).image) it.url = surfacePreview(r, this.view.shared.mat[id]);
+      }
+    }
+    return contactSheet(items);
   }
 
   _rebuildObjects() {
