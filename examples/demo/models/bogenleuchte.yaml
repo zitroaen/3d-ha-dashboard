@@ -16,5 +16,5 @@ parts:
       radius: 0.012
       material: metall
   - sphere: { radius: 0.18, at: [$ausladung, 1.62, 0], scale: [1, 0.55, 1], material: metall }
-  - cylinder: { radius: 0.15, height: 0.01, at: [$ausladung, 1.555, 0], material: "#fff1d6", glow: true }
+  - cylinder: { radius: 0.15, height: 0.01, at: [$ausladung, 1.555, 0], material: bulb, glow: true }
 light: { at: [$ausladung, 1.55, 0], mount: floor, range: 2.5 }
