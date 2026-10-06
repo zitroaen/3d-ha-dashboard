@@ -31,7 +31,9 @@ if [[ "${1:-}" != "--data" ]]; then
   FILES+=("$ENGINE/dist/ha-3d-dashboard.js")
 fi
 
-ssh "$HA_SSH" "mkdir -p '$DEST/textures'"
+ssh "$HA_SSH" "mkdir -p '$DEST/textures' '$DEST/models'"
 scp "${FILES[@]}" "$HA_SSH:$DEST/"
 if compgen -G "$DATA_DIR/textures/*" > /dev/null; then scp "$DATA_DIR"/textures/* "$HA_SSH:$DEST/textures/"; fi
+# eigene Modelle (models/<id>.yaml, glTF-Dateien)
+if compgen -G "$DATA_DIR/models/*" > /dev/null; then scp "$DATA_DIR"/models/* "$HA_SSH:$DEST/models/"; fi
 echo "Deploy fertig: ${FILES[*]}"

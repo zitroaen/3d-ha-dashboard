@@ -3,7 +3,7 @@
 // Das Modell (model.yaml, docs/DATA_MODEL.md) wird zur Laufzeit geladen – standardmäßig aus
 // demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url.
 import { HouseScene } from './scene.js';
-import { loadData, loadShared, DataUnavailableError } from './data.js';
+import { loadData, loadShared, loadUserModels, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
 import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides, download } from './store.js';
@@ -470,6 +470,10 @@ class Ha3dDashboard extends HTMLElement {
       this._source = data.source === 'shared' ? 'gespeichertes Modell' : `${MODEL_FILE} aus ${this.dataUrl.pathname}`;
       this._setDemo(false);
       if (this.shared) this._subscribeShared();
+      // eigene Modelle (models/<id>.yaml): fehlerhafte als Platzhalter, mit Hinweis
+      const warn = await loadUserModels(this.dataUrl, data.model);
+      for (const w of warn) console.warn('ha-3d-dashboard:', w);
+      if (warn.length) setTimeout(() => this._toast(warn.length === 1 ? warn[0] : `${warn.length} eigene Modelle fehlerhaft – siehe Konsole`), 500);
       return data;
     } catch (e) {
       // nur bei unerreichbaren Daten (404, Netzwerk) und nur, solange noch nichts angezeigt wird;

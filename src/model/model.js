@@ -369,7 +369,7 @@ export function toScene(model) {
         height: l.height ?? 2.2,
         // Leuchte steht erhöht (Tischleuchte auf dem Sideboard): das Modell beginnt dort, light.height bleibt ab Boden
         elevation: o.elevation || 0,
-        range: l.range ?? 3,
+        range: l.range ?? CATALOG[o.model]?.lightRange ?? 3,
         color: l.color,
         facing: l.facing,
         outdoor: !sp || sp.kind === 'outdoor' || sp.kind === 'roof',
