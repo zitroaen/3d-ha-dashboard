@@ -11,6 +11,8 @@ import { makeGround, terrainGroundGeometry, setupTerrainShading, loadAerial, aer
 import { SkyEnvironment } from './environment.js';
 
 const NO_WEATHER = { cloud: 0, rain: 0, snow: 0, fog: 0 };
+/** Kleinste halbe Bildhöhe beim Hineinzoomen (Meter) */
+const ZOOM_MIN_HALF = 1.2;
 
 /** Qualitätsstufen: Schattenauflösung und -weichheit, Bildauflösung */
 const _X = new THREE.Vector3(1, 0, 0), _Y = new THREE.Vector3(0, 1, 0), _Z = new THREE.Vector3(0, 0, 1), _q = new THREE.Quaternion();
@@ -641,7 +643,8 @@ export class HouseScene {
     c.minPolarAngle = THREE.MathUtils.degToRad(15);
     c.maxPolarAngle = THREE.MathUtils.degToRad(68);
     c.minZoom = 0.6;
-    c.maxZoom = 5;
+    c.maxZoom = 5; // wird mit dem Bildausschnitt angepasst (_zoomLimit)
+    c.zoomToCursor = true; // Zoomen auf die Stelle unter Mauszeiger bzw. zwischen den Fingern
     c.screenSpacePanning = true;
     // Touch: ein Finger dreht, zwei Finger zoomen und verschieben
     c.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
@@ -698,6 +701,15 @@ export class HouseScene {
     cam.position.add(shift);
     this.controls.target.add(shift);
     Object.assign(cam, { left: -halfW, right: halfW, top: halfH, bottom: -halfH });
+    this._zoomLimit();
+  }
+
+  /**
+   * Größter Zoom: bis etwa ZOOM_MIN_HALF Meter halbe Bildhöhe (ein Möbelstück füllt das Bild) – unabhängig davon,
+   * wie groß das Haus ist (der Bildausschnitt ohne Zoom zeigt das ganze Haus), mindestens 5.
+   */
+  _zoomLimit() {
+    if (this.controls) this.controls.maxZoom = Math.max(5, this.camera.top / ZOOM_MIN_HALF);
   }
 
   /** Richtung Norden in Weltkoordinaten (Plan-oben = -z, im Uhrzeigersinn = +x). */
@@ -761,6 +773,7 @@ export class HouseScene {
       this.onViewChange?.();
       if (k < 1) return requestAnimationFrame(step);
       this._anim = null;
+      this._zoomLimit();
       this.renderer.shadowMap.needsUpdate = true;
       this.requestRender();
     };
