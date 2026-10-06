@@ -269,6 +269,7 @@ Bereiche wie Räume: Objekte können darin stehen, Außenleuchten beleuchten sie
 | `extend` | nein | false | Gelände je Eckpunkt: der Boden setzt den Bereich nach außen fort, auch wo er höher liegt (Hang, der über das Grundstück hinausläuft) – statt Erdkante |
 | `railing` | nein | | Geländer/Brüstung an den Kanten, siehe unten |
 | `edge` | nein | Erde bzw. Belag | Oberfläche der Kante, wo der Bereich über dem Boden liegt (z. B. `stone` für Mauern, Hochbeete, Stufen); ohne Angabe Erde bei `lawn`/`soil`, sonst der Belag selbst |
+| `edge_top` | nein | Gelände | Stützmauer zum höheren Hang (mit Höhenraster): `terrain_max` = gerade Oberkante je Kante (Gerade durch das Gelände an den Enden, so weit angehoben, dass sie nirgends unter dem Gelände liegt – am Hang entlang geneigt, quer dazu waagrecht), Zahl = feste Höhe (wie `elevation`). Ohne Angabe folgt die Oberkante den Rasterdreiecken (Sägezahn, wo das Raster die Kante schräg schneidet) |
 | `ha_area` | nein | nach Name | HA-Bereich |
 
 **Gelände mit Höhenraster:** Außenbereiche mit `follow: terrain` liegen auf dem Raster (dieselben Dreiecke wie der

@@ -374,6 +374,7 @@
         "surface": { "$ref": "#/$defs/surface" },
         "elevation": { "type": "number" },
         "edge": { "$ref": "#/$defs/surface" },
+        "edge_top": { "oneOf": [{ "const": "terrain_max" }, { "type": "number" }], "description": "Stützmauer zum Hang: gerade Oberkante je Kante (terrain_max) oder feste Höhe" },
         "extend": { "type": "boolean" },
         "follow": { "enum": ["terrain"] },
         "railing": { "$ref": "#/$defs/railing" },

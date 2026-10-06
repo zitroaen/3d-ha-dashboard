@@ -197,6 +197,8 @@ const outdoor = [
   ...northTerrace(),
   // Veranda vor dem Gartenhaus: Holzdeck mit weißer Balustrade an den Schmalseiten (Westseite offen als Zugang)
   { id: 'veranda', name: 'Veranda', polygon: rect(15.6, 7.0, 16.5, 9.4), surface: 'wood', railing: { style: 'balusters', height: 0.9, edges: [0, 2] } },
+  // Sitzplatz in den Südhang gegraben, schräg zum Raster: Stützmauer mit gerader Oberkante (edge_top) statt Sägezahn
+  { id: 'sitzplatz', name: 'Sitzplatz am Hang', polygon: [[13.3, 13.0], [14.5, 14.2], [13.3, 15.4], [12.1, 14.2]], surface: 'gravel', edge: 'stone', edge_top: 'terrain_max', elevation: -0.95 },
   // Garten am Südhang (Süden = +y), folgt dem Höhenraster
   { id: 'garten', name: 'Garten', surface: 'lawn', follow: 'terrain', polygon: rect(-4, 11.3, 11.2, 18) },
 ];

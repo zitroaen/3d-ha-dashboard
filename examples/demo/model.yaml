@@ -408,6 +408,13 @@ outdoor:
     polygon: [[15.6, 7], [16.5, 7], [16.5, 9.4], [15.6, 9.4]]
     surface: wood
     railing: { style: balusters, height: 0.9, edges: [0, 2] }
+  - id: sitzplatz
+    name: Sitzplatz am Hang
+    polygon: [[13.3, 13], [14.5, 14.2], [13.3, 15.4], [12.1, 14.2]]
+    surface: gravel
+    edge: stone
+    edge_top: terrain_max
+    elevation: -0.95
   - id: garten
     name: Garten
     surface: lawn

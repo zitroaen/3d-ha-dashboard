@@ -338,7 +338,7 @@ export function toScene(model) {
       ceiling: 3,
       rooms: model.outdoor.map((z) => ({
         id: z.id, name: z.name, polygon: z.polygon.map((p) => [p[0], p[1]]), floor: z.surface || 'lawn', edge: z.edge, extend: !!z.extend,
-        elevation: z.elevation || 0, area: z.ha_area, railing: z.railing,
+        elevation: z.elevation || 0, area: z.ha_area, railing: z.railing, edgeTop: z.edge_top,
         follow: followsTerrain(z, terrain),
         heights: followsTerrain(z, terrain) ? null : terrainHeights(z),
       })),

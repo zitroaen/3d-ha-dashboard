@@ -374,6 +374,17 @@ export class FloorModel {
       }
       // ohne Raster: Kante nur, wenn der Bereich irgendwo deutlich über dem Boden liegt (wie bisher)
       if (!terrain && !S.some((x) => x.o != null && x.i > x.o + 0.1)) continue;
+      // edge_top: Stützmauer zum Hang mit gerader Oberkante statt der Rasterdreiecke (Sägezahn, wo das Raster die Kante
+      // schräg schneidet): terrain_max = Gerade durch das Gelände an den Enden, so weit angehoben, dass sie überall auf
+      // oder über dem Gelände liegt (am Hang entlang geneigt, quer dazu waagrecht); Zahl = feste Höhe
+      const et = r.room.edgeTop;
+      const hang = S.filter((x) => x.o != null && x.kind !== 'area');
+      if (terrain && et != null && hang.length >= 2 && hang.some((x) => x.o > x.i + 0.01)) {
+        const h0 = hang[0], h1 = hang.at(-1);
+        const line = (t) => h0.o + ((h1.o - h0.o) * (t - h0.t)) / (h1.t - h0.t || 1);
+        const lift = Math.max(0, ...hang.map((x) => x.o - line(x.t)));
+        for (const x of hang) x.o = et === 'terrain_max' ? line(x.t) + lift : Number(et);
+      }
       for (let m = 0; m + 1 < S.length; m++) {
         const A = S[m], B = S[m + 1];
         if (A.o == null || B.o == null) continue; // Gebäude daneben: dessen Wand
