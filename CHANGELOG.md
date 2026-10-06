@@ -10,6 +10,9 @@
   fährt mit), Farbe wie bisher über `params.color`.
 - Demo-Haus: Küchentür mit Rundbogen, zweiflügelige Rundbogentür zwischen Wohnzimmer und Küche, Garagentor mit
   Fenstern.
+- **Tageszeit „Tag“ am Abend (Fehler):** Eingeschaltete Lampen hellten bei vollem Tageslicht alle Flächen auf, dazu
+  Lichtschein auf dem Boden und vor Fenstern – das Bild wirkte milchig. Lampenlicht wirkt jetzt je nach Tageslicht
+  schwächer (bei Sonne 30 %, Lichtschein fast nicht); nachts unverändert.
 
 ## 0.32.0
 
