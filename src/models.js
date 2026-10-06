@@ -72,7 +72,18 @@ export const PALETTE = {
 };
 
 /** Farbe als Material-Schlüssel: Palette-Name oder '#rrggbb' (eigene Farbe, z. B. aus params.color) */
-export const paletteParams = (key) => (PALETTE[key] ? { ...PALETTE[key] } : /^#[0-9a-f]{6}$/i.test(key) ? { color: key, roughness: 0.6 } : null);
+export const paletteParams = (key) => (PALETTE[key] ? { ...PALETTE[key] }
+  : /^#[0-9a-f]{6}$/i.test(key) ? { color: key, roughness: 0.6 }
+  // Oberfläche des Hauses (surf:stone, surf:brick:#aa5533) – hier nur als Farbe (Vorschau); im Haus das echte Material
+  : key.startsWith('surf:') ? { color: key.split(':')[2] || SURF_COLOR[key.split(':')[1]] || '#cfc8bc', roughness: 0.85 }
+  : null);
+const SURF_COLOR = { stone: '#a8a092', brick: '#9c4a32', concrete: '#a9a8a3', plaster: '#ece5d8', sandstone: '#cdb48a', granite: '#8d8a86' };
+
+/**
+ * Material eines gemauerten Bauteils (Säule, Brüstung, Treppe): params.material = Oberfläche des Hauses (stone,
+ * brick, concrete …, mit params.color) – sonst Putz bzw. params.color aus der Palette.
+ */
+const masonry = (it, def = 'plaster') => (it.material ? `surf:${it.material}${it.color ? `:${it.color}` : ''}` : it.color || def);
 
 // Geteilte Geometrie/Materialien der Energiefluss-Lichtpunkte
 const PULSE = {};
@@ -138,6 +149,7 @@ export class PartCollector {
     g.deleteAttribute('uv1');
     const attr = kind === 'glow' ? 'lampIdx' : 'roomIdx';
     g.setAttribute(attr, new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(this.idx), 1));
+    if (key.startsWith('surf:')) planarUV(g);
     const k = `${kind}:${key}`;
     const groups = this._anim ? this._anim.groups : this.groups;
     if (!groups.has(k)) groups.set(k, { kind, key, geos: [] });
@@ -240,6 +252,22 @@ export class PartCollector {
 // ---------------------------------------------------------------------------------------------
 
 /** Strecken einer Linie (Zaun, Hecke, Freileitung): params.path (Punkte relativ zur Position) oder gerade entlang x */
+/**
+ * UV in Metern nach der Hauptrichtung der Normale (wie die Wände des Hauses: Texturen der Oberflächen haben dort ihre
+ * Größe in Metern) – für Bauteile aus Haus-Oberflächen. Geometrie bereits in Objektkoordinaten.
+ */
+function planarUV(g) {
+  if (!g.attributes.normal) g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal, uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    const [u, v] = ay >= ax && ay >= az ? [p.getX(i), p.getZ(i)] : ax >= az ? [p.getZ(i), p.getY(i)] : [p.getX(i), p.getY(i)];
+    uv[i * 2] = u;
+    uv[i * 2 + 1] = v;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+
 function linePath(it, L) {
   const path = Array.isArray(it.path) && it.path.length >= 2 ? it.path : [[-L / 2, 0], [L / 2, 0]];
   return path.slice(1).map((b, i) => [path[i], b]);
@@ -692,6 +720,118 @@ export const FURNITURE = {
       P.box('wood_dark', 0.03, h, D, W / 2 - 0.015, y, 0);
     }
     P.blob('bark', W * 0.42, H * 0.25, D * 0.42, 0, H * 0.55, 0, { seg: 8 }); // Kompost
+  },
+
+  /**
+   * Säule: size = [Breite, Tiefe, Höhe]; params.shape round (Standard) oder square, params.base / params.capital
+   * (Fuß und Kapitell, Standard an), params.material (Oberfläche des Hauses) bzw. params.color.
+   */
+  column(P, it) {
+    const [W, D, H] = it.size || [0.3, 0.3, 2.5];
+    const m = masonry(it, 'white'), round = (it.shape || 'round') !== 'square';
+    const w = Math.min(W, D), base = it.base !== false, cap = it.capital !== false;
+    const bh = base ? Math.min(0.14, H * 0.08) : 0, ch = cap ? Math.min(0.16, H * 0.08) : 0;
+    const shaft = H - bh - ch, r = (w / 2) * 0.82;
+    if (base) {
+      P.box(m, W, bh * 0.45, D, 0, 0, 0); // Plinthe
+      if (round) P.cyl(m, r * 1.08, r * 1.2, bh * 0.55, 0, bh * 0.45, 0, { seg: 20 });
+      else P.box(m, W * 0.9, bh * 0.55, D * 0.9, 0, bh * 0.45, 0);
+    }
+    // Schaft (rund: leicht verjüngt)
+    if (round) P.cyl(m, r * 0.92, r, shaft, 0, bh, 0, { seg: 20 });
+    else P.box(m, W * 0.82, shaft, D * 0.82, 0, bh, 0);
+    if (cap) {
+      if (round) P.cyl(m, r * 1.2, r * 0.95, ch * 0.55, 0, bh + shaft, 0, { seg: 20 });
+      else P.box(m, W * 0.9, ch * 0.55, D * 0.9, 0, bh + shaft, 0);
+      P.box(m, W, ch * 0.45, D, 0, H - ch * 0.45, 0); // Deckplatte
+    }
+  },
+
+  /**
+   * Brüstung (gemauert) zwischen zwei Punkten bzw. entlang params.path: size = [Länge, Tiefe, Höhe]. Sockel,
+   * Abdeckplatte, Pfeiler an den Enden und alle ~2,5 m; dazwischen Baluster (params.style balusters, Standard) oder
+   * geschlossen (solid). params.material / params.color wie Säule; folgt dem Gelände.
+   */
+  balustrade(P, it, { groundAt = () => 0 } = {}) {
+    const [L, D, H] = [it.size?.[0] ?? 3, it.size?.[1] ?? 0.3, it.size?.[2] ?? 0.9];
+    const m = masonry(it), solid = it.style === 'solid';
+    const pw = D * 1.15, plinth = 0.12, cope = 0.07;
+    for (const [a, b] of linePath(it, L)) {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len < 0.05) continue;
+      const rot = -Math.atan2(b[1] - a[1], b[0] - a[0]);
+      const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      const g = (p) => groundAt(p[0], p[1]);
+      const n = Math.max(1, Math.round(len / 2.5));
+      for (let k = 0; k <= n; k++) {
+        const p = at(k / n);
+        P.box(m, pw, H + 0.04, pw, p[0], g(p), p[1], { rotY: rot }); // Pfeiler
+      }
+      for (let k = 0; k < n; k++) {
+        const p = at(k / n), q = at((k + 1) / n), c = at((k + 0.5) / n), y = Math.min(g(p), g(q));
+        const fl = len / n - pw; // Feld zwischen den Pfeilern
+        if (fl <= 0.02) continue;
+        P.box(m, fl, plinth, D, c[0], y, c[1], { rotY: rot });
+        P.box(m, fl, cope, D * 1.1, c[0], y + H - cope, c[1], { rotY: rot });
+        if (solid) {
+          P.box(m, fl, H - plinth - cope, D * 0.85, c[0], y + plinth, c[1], { rotY: rot });
+          continue;
+        }
+        // Baluster: gedrechselt (Fuß, Bauch, Hals) alle ~15 cm
+        const bh = H - plinth - cope, nb = Math.max(1, Math.floor(fl / 0.15));
+        for (let j = 0; j < nb; j++) {
+          const t = (k + (pw / 2 + ((j + 0.5) * fl) / nb) / (len / n)) / n, bp = at(t);
+          const r = Math.min(0.06, D * 0.3), y0 = y + plinth;
+          P.cyl(m, r * 0.7, r * 0.8, bh * 0.12, bp[0], y0, bp[1], { seg: 8 });
+          P.cyl(m, r * 0.55, r, bh * 0.45, bp[0], y0 + bh * 0.12, bp[1], { seg: 8 });
+          P.cyl(m, r * 0.8, r * 0.55, bh * 0.33, bp[0], y0 + bh * 0.57, bp[1], { seg: 8 });
+          P.cyl(m, r * 0.8, r * 0.8, bh * 0.1, bp[0], y0 + bh * 0.9, bp[1], { seg: 8 });
+        }
+      }
+    }
+  },
+
+  /**
+   * Treppe: size = [Breite, Lauflänge, Höhe], steigt entlang −z (vorne = +z ist die unterste Stufe). params.steps
+   * (Standard Höhe / 18 cm), params.rise / params.run (Steigung, Auftritt – überschreiben die Größe), params.open
+   * (nur Trittstufen auf zwei Wangen statt massiv), params.material / params.color, params.railing left, right
+   * oder both (Handlauf auf Pfosten, 90 cm über den Stufenkanten).
+   */
+  stairs(P, it) {
+    const W = it.size?.[0] ?? 1.0;
+    const steps = Math.max(1, Math.round(it.steps ?? (it.size?.[2] ?? 1.0) / 0.18));
+    const rise = it.rise ?? (it.size?.[2] ?? steps * 0.18) / steps;
+    const run = it.run ?? (it.size?.[1] ?? steps * 0.28) / steps;
+    const total = run * steps, z0 = total / 2, m = masonry(it, 'slate');
+    for (let i = 0; i < steps; i++) {
+      const zc = z0 - run * (i + 0.5);
+      if (it.open) P.box(m, W, 0.05, run + 0.02, 0, rise * (i + 1) - 0.05, zc);
+      else P.box(m, W, rise * (i + 1), run, 0, 0, zc); // massiv bis zum Boden
+    }
+    if (it.open) {
+      // Wangen: schräge Bretter unter den Stufen
+      const len = Math.hypot(total, rise * steps), ang = Math.atan2(rise * steps, total);
+      for (const sx of [-1, 1]) {
+        const mtx = new THREE.Matrix4().makeRotationX(ang).setPosition(sx * (W / 2 - 0.03), (rise * steps) / 2 - 0.08, 0);
+        P.add(new THREE.BoxGeometry(0.05, 0.22, len), m, 'lit', mtx);
+      }
+    }
+    const rail = it.railing;
+    if (rail && rail !== 'none') {
+      const sides = rail === 'both' ? [-1, 1] : rail === 'left' ? [-1] : [1];
+      const hr = 0.9;
+      for (const sx of sides) {
+        const x = sx * (W / 2 - 0.05), posts = [];
+        for (let i = 0; i < steps; i += Math.max(1, Math.round(1.0 / run))) posts.push(i);
+        if (posts[posts.length - 1] !== steps - 1) posts.push(steps - 1);
+        for (const i of posts) {
+          const z = z0 - run * (i + 0.5), y = rise * (i + 1);
+          P.rod('alu_dark', [x, y, z], [x, y + hr, z], 0.02, { seg: 6 });
+        }
+        const a = [x, rise + hr, z0 - run * 0.5], b = [x, rise * steps + hr, z0 - run * (steps - 0.5)];
+        P.rod('alu_dark', a, b, 0.025, { seg: 8 });
+      }
+    }
   },
 
   /**

@@ -50,6 +50,9 @@ export const CATALOG = {
   sandbox: { label: 'Sandkasten', category: 'furniture', size: [1.5, 1.5, 0.3], params: [] },
   raised_bed: { label: 'Hochbeet (Holz)', category: 'furniture', size: [2, 0.8, 0.7], params: ['color'] },
   compost: { label: 'Komposter', category: 'furniture', size: [1, 1, 0.85], params: [] },
+  column: { label: 'Säule', category: 'furniture', size: [0.3, 0.3, 2.5], params: ['shape', 'base', 'capital', 'material', 'color'] },
+  balustrade: { label: 'Brüstung', category: 'furniture', size: [3, 0.3, 0.9], params: ['style', 'material', 'color', 'path'] },
+  stairs: { label: 'Treppe', category: 'furniture', size: [1.0, 1.4, 0.9], params: ['steps', 'rise', 'run', 'open', 'railing', 'material', 'color'] },
   fence: { label: 'Zaun', category: 'furniture', size: [6, 0.1, 1], params: ['style', 'color', 'path'] },
   power_line: { label: 'Freileitung', category: 'furniture', size: [60, 1, 8], params: ['span', 'wires', 'path'] },
   // --- Pflanzen (Garten)
