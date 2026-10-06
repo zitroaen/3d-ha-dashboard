@@ -324,3 +324,5 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Farben bewusst aus vorhandenen Materialien (Eiche hell, Regentonnen-Grün, Alu dunkel, Laub) – Ebene 2 des
   Demo-Hauses liegt damit genau am Budget (145; neu ist nur das Netz des Trampolins). Weitere Modelle: erst Material
   teilen oder zusammenfassen.
+- Zoomgrenze (0.28.0): `controls.maxZoom` = Bildausschnitt-Halbhöhe / `ZOOM_MIN_HALF` (1,2 m), mindestens 5, neu nach
+  jedem `_fitFrustum` und jeder `setView`-Fahrt (`_zoomLimit`); `zoomToCursor` zoomt auf den Zeiger bzw. die Fingermitte.
