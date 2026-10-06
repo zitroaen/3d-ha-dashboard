@@ -585,6 +585,48 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
     !doorUnderRoof(door, 2.05, Cd).top && doorUnderRoof(door, 2.05, C).top === 1.5);
 }
 
+// Eigene Modelle: Ausdrücke, Prüfung, Eintragen in den Katalog, Platzhalter, gleichmäßige Skalierung
+{
+  const { evalExpr, checkUserModel, registerUserModels, userModelIds } = await import('../src/usermodels.js');
+  const { CATALOG: CAT } = await import('../src/model/catalog.js');
+  const { FURNITURE: FUR, PartCollector: PC } = await import('../src/models.js');
+  check('Eigene Modelle: Ausdrücke mit $param, Punkt vor Strich, Klammern; Fehler bei Unbekanntem',
+    evalExpr('$b / 2 - 0.1', { b: 1.2 }) === 0.5 && evalExpr('2 * ($b + 1)', { b: 1 }) === 4 && evalExpr(0.3, {}) === 0.3
+      && (() => { try { evalExpr('$x + 1', {}); return false; } catch { return true; } })()
+      && (() => { try { evalExpr('alert(1)', {}); return false; } catch { return true; } })());
+  const regal = { id: 'test_regal', name: 'Testregal', params: { breite: 1 }, parts: [{ box: { size: ['$breite', 0.02, 0.3], at: [0, 1, 0] } }] };
+  let bad = null;
+  try { checkUserModel({ id: 'falsch', parts: [{ kugel: {} }] }, 'falsch'); } catch (e) { bad = e.message; }
+  const warn = registerUserModels([{ id: 'test_regal', def: checkUserModel(regal, 'test_regal') }, { id: 'armchair', def: regal }, { id: 'test_kaputt', error: 'YAML kaputt' }]);
+  check('Eigene Modelle: Prüfung meldet unbekannte Teile, gleiche ID wie eingebaut wird abgelehnt, Fehler -> Platzhalter',
+    /box, beam/.test(bad || '') && warn.some((w) => /armchair.*eingebaut/.test(w)) && CAT.armchair && !CAT.armchair.user
+      && CAT.test_kaputt?.broken && CAT.test_regal?.user && CAT.test_regal.size[0] === 1, JSON.stringify(warn));
+  const width = (it) => {
+    const P = new PC();
+    P.begin(0, 0, 0, 0);
+    FUR.test_regal(P, it);
+    return Math.round(P.bounds.getSize(new (P.bounds.min.constructor)()).x * 100) / 100;
+  };
+  check('Eigene Modelle: params je Objekt, size skaliert gleichmäßig', width({ breite: 1.5 }) === 1.5 && width({ size: [2] }) === 2, `${width({ breite: 1.5 })} ${width({ size: [2] })}`);
+  check('Eigene Modelle: IDs aus models und Objekten mit unbekanntem Modell', userModelIds({ models: ['a'], objects: [{ model: 'b' }, { model: 'armchair' }] }).join() === 'a,b');
+  // glTF: ein Dreieck in Rot, Material „Leuchte“ leuchtet; Knoten-Verschiebung übernommen (Node kennt ProgressEvent nicht)
+  globalThis.ProgressEvent ??= class extends Event { constructor(t, o = {}) { super(t); Object.assign(this, o); } };
+  const { gltfMeshes } = await import('../src/usermodels.js');
+  const pos = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const gltf = { asset: { version: '2.0' }, scenes: [{ nodes: [0] }], scene: 0, nodes: [{ mesh: 0, translation: [0, 2, 0] }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }], materials: [{ name: 'Leuchte', pbrMetallicRoughness: { baseColorFactor: [1, 0, 0, 1] } }],
+    buffers: [{ uri: `data:application/octet-stream;base64,${Buffer.from(pos.buffer).toString('base64')}`, byteLength: 36 }],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 36 }], accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 0] }] };
+  const meshes = await gltfMeshes(new TextEncoder().encode(JSON.stringify(gltf)).buffer, '');
+  registerUserModels([{ id: 'test_gltf', def: { id: 'test_gltf', file: 'x.gltf', gltf: meshes, scale: 2, glow_materials: ['Leuchte'] } }]);
+  const P = new PC();
+  P.begin(0, 0, 0, 0);
+  FUR.test_gltf(P, {});
+  check('Eigene Modelle: glTF – Farbe und Lage übernommen, scale, Leucht-Material', meshes[0]?.color === '#ff0000' && meshes[0].geometry.attributes.position.getY(0) === 2
+    && P.bounds.max.y === 6 && [...P.groups.keys()].some((k) => k.startsWith('glow:')), `${meshes[0]?.color} ${P.bounds.max.y} ${[...P.groups.keys()]}`);
+  for (const id of ['test_regal', 'test_kaputt', 'test_gltf']) { delete CAT[id]; delete FUR[id]; }
+}
+
 // Zustandsanzeige: Werte auswählen, Bedingungen; Medienplayer
 {
   const states = {

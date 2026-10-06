@@ -685,6 +685,16 @@ try {
   await settle(page, () => window.panel.shadowRoot.querySelectorAll('.catalog img.thumb[src]').length >= 3);
   const thumbs = await page.evaluate(() => window.panel.shadowRoot.querySelectorAll('.catalog img.thumb[src^="data:image/png"]').length);
   ok(thumbs >= 3, `Katalog: Vorschaubilder der Modelle (${thumbs} gerechnet)`, `Vorschau: ${thumbs}`);
+  // eigene Modelle (examples/demo/models): Gruppe „Eigene“ mit Vorschau
+  await clickShadow('.catalog button[data-cat=own]');
+  await settle(page, () => window.panel.shadowRoot.querySelectorAll('.catalog img.thumb[src]').length >= 2);
+  const own = await page.evaluate(() => {
+    const r = window.panel.shadowRoot.querySelector('.catalog');
+    return { items: [...r.querySelectorAll('button[data-add]')].map((b) => b.dataset.add).sort().join(), thumbs: r.querySelectorAll('img.thumb[src^="data:image/png"]').length,
+      lamp: window.panel.view.furnishingData.devices.some((d) => d.id === 'bogenleuchte' && d.model === 'bogenleuchte') };
+  });
+  ok(own.items === 'bogenleuchte,wandregal' && own.thumbs === 2 && own.lamp,
+    'Eigene Modelle: Gruppe „Eigene“ im Katalog mit Vorschau, Bogenleuchte als Leuchte im Haus', `Eigene: ${JSON.stringify(own)}`);
   await clickShadow('.catalog button[data-cat=device]');
   await clickShadow('.catalog button[data-add=floor_fan]');
   const added = await page.evaluate(() => {

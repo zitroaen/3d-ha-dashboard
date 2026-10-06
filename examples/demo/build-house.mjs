@@ -299,6 +299,8 @@ const model = {
   buildings,
   outdoor,
   objects: prev.objects || [],
+  // eigene Modelle aus models/ (Katalog „Eigene“)
+  models: prev.models || ['bogenleuchte', 'wandregal'],
 };
 const header = yamlHeader(prevText) || '# Erfundenes Demo-Haus (Testdaten und Vorlage). Format: docs/DATA_MODEL.md\n# Bauwerk erzeugt von examples/demo/build-house.mjs, Objekte von Hand bzw. im Editor';
 writeFileSync(file, toYaml(model, header));

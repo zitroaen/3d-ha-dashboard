@@ -1,7 +1,7 @@
 // Prüft ein Modell (docs/DATA_MODEL.md → Prüfung): Schema, eindeutige IDs, Verweise, Lage, Entity-IDs, Texturen.
 // Außerdem: Katalog in docs/DATA_MODEL.md stimmt mit src/model/catalog.js überein (nur im Engine-Repo).
 //   node tests/validate-data.mjs            (Datenordner: DATA_DIR bzw. --data, Standard Demo-Haus)
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Ajv from 'ajv/dist/2020.js';
 import { DATA_DIR, ENGINE_ROOT } from './lib/config.mjs';
@@ -11,6 +11,8 @@ import { parseModel, spacesOf, roleEntities, roofParts, toScene } from '../src/m
 import { ceilingFn, windowUnderRoof, doorUnderRoof } from '../src/roof.js';
 import { LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from '../src/roomlight.js';
 import { FURNITURE, LAMPS } from '../src/models.js';
+import { USER_MODEL_DIR, checkUserModel, registerUserModels } from '../src/usermodels.js';
+import { load as parseYaml } from 'js-yaml';
 
 const errors = [], warnings = [];
 const file = join(DATA_DIR, 'model.yaml');
@@ -32,6 +34,42 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 const schema = JSON.parse(readFileSync(join(ENGINE_ROOT, 'schema/model.schema.json'), 'utf8'));
 if (!ajv.validate(schema, model)) {
   for (const e of ajv.errors) errors.push(`Schema: ${e.instancePath || '/'} ${e.message}${e.params?.additionalProperty ? ` (${e.params.additionalProperty})` : ''}`);
+}
+
+// 1b. Eigene Modelle (models/<id>.yaml): Schema, ID wie Dateiname, keine ID eines eingebauten Modells; danach im
+// Katalog eingetragen wie im Panel
+{
+  const dir = join(DATA_DIR, USER_MODEL_DIR);
+  const partSchema = JSON.parse(readFileSync(join(ENGINE_ROOT, 'schema/model-part.schema.json'), 'utf8'));
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.yaml')) : [];
+  const defs = [];
+  for (const f of files) {
+    const id = f.replace(/\.yaml$/, '');
+    let def;
+    try {
+      def = parseYaml(readFileSync(join(dir, f), 'utf8'));
+    } catch (e) {
+      errors.push(`Eigenes Modell ${f}: YAML nicht lesbar – ${e.message}`);
+      continue;
+    }
+    if (!ajv.validate(partSchema, def)) {
+      for (const e of ajv.errors) errors.push(`Eigenes Modell ${f}: ${e.instancePath || '/'} ${e.message}${e.params?.additionalProperty ? ` (${e.params.additionalProperty})` : ''}`);
+      continue;
+    }
+    if (CATALOG[id] && !CATALOG[id].user) {
+      errors.push(`Eigenes Modell ${f}: gleiche ID wie das eingebaute Modell ${id}`);
+      continue;
+    }
+    try {
+      checkUserModel(def, id);
+      if (def.file && !existsSync(join(dir, def.file))) throw new Error(`${def.file} fehlt`);
+      defs.push({ id, def: def.file ? { ...def, file: undefined, parts: def.parts || [{ box: { size: [0.3, 0.3, 0.3] } }] } : def });
+    } catch (e) {
+      errors.push(`Eigenes Modell ${f}: ${e.message}`);
+    }
+  }
+  for (const w of registerUserModels(defs)) errors.push(w);
+  for (const id of model.models || []) if (!files.includes(`${id}.yaml`)) errors.push(`models: ${id}.yaml fehlt in ${USER_MODEL_DIR}`);
 }
 
 // 2. eindeutige IDs
@@ -147,7 +185,7 @@ if (existsSync(doc)) {
   const text = readFileSync(doc, 'utf8');
   const table = text.slice(text.indexOf('<!-- katalog:start -->'), text.indexOf('<!-- katalog:end -->'));
   const documented = new Set([...table.matchAll(/^\| `([a-z_]+)` \|/gm)].map((m) => m[1]));
-  for (const m of Object.keys(CATALOG)) if (!documented.has(m)) errors.push(`Katalog: Modell ${m} fehlt in docs/DATA_MODEL.md`);
+  for (const m of Object.keys(CATALOG)) if (!CATALOG[m].user && !documented.has(m)) errors.push(`Katalog: Modell ${m} fehlt in docs/DATA_MODEL.md`);
   for (const m of documented) if (!CATALOG[m]) errors.push(`Katalog: docs/DATA_MODEL.md nennt ${m}, das es nicht gibt`);
   for (const [m, c] of Object.entries(CATALOG)) {
     const geo = c.capabilities?.includes('light') ? LAMPS : FURNITURE;

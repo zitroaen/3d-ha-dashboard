@@ -13,6 +13,7 @@
     "buildings": { "type": "array", "items": { "$ref": "#/$defs/building" } },
     "outdoor": { "type": "array", "items": { "$ref": "#/$defs/outdoor" } },
     "objects": { "type": "array", "items": { "$ref": "#/$defs/object" } },
+    "models": { "type": "array", "description": "eigene Modelle (models/<id>.yaml) für den Katalog, auch ungenutzte", "items": { "$ref": "#/$defs/id" } },
     "connections": { "type": "array", "description": "reserviert für spätere Versionen", "maxItems": 0 }
   },
   "$defs": {

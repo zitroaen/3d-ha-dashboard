@@ -3,6 +3,8 @@
 // also keine externen Requests.
 import { parseModel, modelFromObject } from './model/model.js';
 import { MODEL_FILE, SHARED_WS } from './store.js';
+import { load as parseYaml } from 'js-yaml';
+import { USER_MODEL_DIR, userModelIds, checkUserModel, registerUserModels, gltfMeshes } from './usermodels.js';
 
 /** Daten nicht abrufbar (HTTP-Fehler wie 404, Netzwerk) – im Gegensatz zu kaputtem Inhalt */
 export class DataUnavailableError extends Error {}
@@ -63,4 +65,28 @@ export async function loadShared(hass, baseUrl) {
 /** Text von model.yaml -> { model (aktuelle Version), text } */
 export function parseData(text) {
   return { model: parseModel(text, MODEL_FILE), text };
+}
+
+/**
+ * Eigene Modelle neben model.yaml laden (models/<id>.yaml, optional mit glTF-Datei) und in den Katalog eintragen.
+ * Fehlende oder fehlerhafte Dateien ergeben Warnungen und einen Platzhalter – das Haus lädt trotzdem.
+ * @returns Warnungen
+ */
+export async function loadUserModels(baseUrl, model) {
+  const ids = userModelIds(model);
+  const defs = await Promise.all(ids.map(async (id) => {
+    try {
+      const def = checkUserModel(parseYaml(await fetchText(new URL(`${USER_MODEL_DIR}${id}.yaml`, baseUrl))), id);
+      if (def.file) {
+        const url = new URL(def.file, new URL(USER_MODEL_DIR, baseUrl));
+        const res = await fetch(url, { cache: 'no-cache', credentials: 'same-origin' });
+        if (!res.ok) throw new Error(`${def.file}: HTTP ${res.status}`);
+        def.gltf = await gltfMeshes(await res.arrayBuffer(), url.href.replace(/[^/]*$/, ''));
+      }
+      return { id, def };
+    } catch (e) {
+      return { id, error: e.message };
+    }
+  }));
+  return registerUserModels(defs);
 }

@@ -1,0 +1,20 @@
+# Eigenes Modell (Beispiel): Bogenleuchte aus Grundformen. Format: docs/DATA_MODEL.md, „Eigene Modelle“
+id: bogenleuchte
+name: Bogenleuchte
+category: lamp
+capabilities: [light]
+params:
+  farbe: brass          # Bogen (Palettenfarbe oder #rrggbb), je Objekt über params.farbe änderbar
+  ausladung: 1.2        # Abstand Fuß -> Schirm
+materials:
+  metall: $farbe
+  fuss: black_gloss
+parts:
+  - cylinder: { radius: 0.17, radius_back: 0.16, height: 0.04, material: fuss }
+  - tube:
+      points: [[0, 0.04, 0], [0, 1.2, 0], ["$ausladung * 0.2", 1.85, 0], ["$ausladung * 0.65", 2.0, 0], [$ausladung, 1.78, 0]]
+      radius: 0.012
+      material: metall
+  - sphere: { radius: 0.18, at: [$ausladung, 1.62, 0], scale: [1, 0.55, 1], material: metall }
+  - cylinder: { radius: 0.15, height: 0.01, at: [$ausladung, 1.555, 0], material: bulb, glow: true }
+light: { at: [$ausladung, 1.55, 0], mount: floor, range: 2.5 }

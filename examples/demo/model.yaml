@@ -468,6 +468,13 @@ objects:
     elevation: 0.58
     params: { color: rug_red }
     light: { height: 1, range: 1.5 }
+  - id: bogenleuchte
+    name: Bogenleuchte
+    model: bogenleuchte
+    space: wohnen
+    pos: [2.2, 4.7]
+    rot: 200
+    light: { height: 1.55, range: 2.5 }
   - { id: tv, model: tv, space: wohnen, pos: [5.9, 3.4], rot: 90, elevation: 0.95, size: [1.3, 0.05, 0.75] }
   - { id: ofenplatte, model: hearth, space: wohnen, pos: [5.48, 4.6], rot: 90, size: [0.8, 0.9] }
   - { id: ofen, model: stove, space: wohnen, pos: [5.66, 4.6], rot: 90, size: [0.6, 0.5, 1.5] }
@@ -530,6 +537,13 @@ objects:
     pos: [1.7, 8.06]
     light: { height: 2.1, range: 3.5, facing: [0, 1] }
     ha: { entities: { power: light.demo_terrasse } }
+  - id: wandregal_studio
+    name: Wandregal
+    model: wandregal
+    space: studio
+    pos: [5.75, 4]
+    rot: 270
+    params: { breite: 1 }
   - id: og_studio_decke
     name: Decke Studio
     model: disc
@@ -874,3 +888,4 @@ objects:
     pos: [18, 8.4]
     light: { height: 1.75, range: 2.5 }
     ha: { entities: { power: light.demo_gartenhaus } }
+models: [bogenleuchte, wandregal]

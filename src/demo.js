@@ -10,5 +10,9 @@ export function loadDemoData() {
   for (const o of data.model.objects || []) delete o.ha;
   // Das Luftbild liegt nur im Datenordner (examples/demo/textures), nicht im Bundle
   if (data.model.site?.terrain) delete data.model.site.terrain.texture;
+  // eigene Modelle (examples/demo/models) ebenso – ihre Objekte entfallen im eingebetteten Demo-Haus
+  const own = new Set(data.model.models || []);
+  data.model.objects = (data.model.objects || []).filter((o) => !own.has(o.model));
+  delete data.model.models;
   return data;
 }

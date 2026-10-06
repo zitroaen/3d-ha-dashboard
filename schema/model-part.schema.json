@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zitroaen/3d-ha-dashboard/schema/model-part.schema.json",
+  "title": "3D-HA-Dashboard eigenes Modell",
+  "description": "Eigenes Modell (<data>/models/<id>.yaml): Grundformen oder glTF-Datei. Beschreibung: docs/DATA_MODEL.md, Abschnitt „Eigene Modelle“",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id"],
+  "anyOf": [{ "required": ["parts"] }, { "required": ["file"] }],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "name": { "type": "string" },
+    "category": { "enum": ["furniture", "device", "lamp", "plant"] },
+    "capabilities": { "type": "array", "items": { "enum": ["light"] } },
+    "params": { "type": "object", "description": "Standardwerte; in Teilen als $name nutzbar, je Objekt über params änderbar", "additionalProperties": { "type": ["number", "string", "boolean"] } },
+    "materials": { "type": "object", "description": "Name -> Palettenfarbe, #rrggbb, surf:<Oberfläche> oder $param", "additionalProperties": { "type": "string" } },
+    "material": { "type": "string", "description": "Standardmaterial der Teile" },
+    "parts": { "type": "array", "items": { "$ref": "#/$defs/part" } },
+    "light": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "at": { "$ref": "#/$defs/vec3" },
+        "direction": { "$ref": "#/$defs/vec3" },
+        "mount": { "enum": ["ceiling", "pendant", "floor", "table", "wall", "spot"] },
+        "range": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "file": { "type": "string", "description": "glTF-Datei (.glb/.gltf) relativ zu models/" },
+    "scale": { "type": "number", "exclusiveMinimum": 0 },
+    "offset": { "$ref": "#/$defs/vec3" },
+    "glow_materials": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "num": { "type": ["number", "string"], "description": "Zahl oder Ausdruck mit $param (+ - * / Klammern)" },
+    "vec3": { "type": "array", "items": { "$ref": "#/$defs/num" }, "minItems": 3, "maxItems": 3 },
+    "vec2": { "type": "array", "items": { "$ref": "#/$defs/num" }, "minItems": 2, "maxItems": 2 },
+    "part": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "box": { "type": "object", "additionalProperties": false, "required": ["size"], "properties": { "size": { "$ref": "#/$defs/vec3" }, "at": { "$ref": "#/$defs/vec3" }, "rot": { "$ref": "#/$defs/vec3" }, "radius": { "$ref": "#/$defs/num" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
+        "beam": { "type": "object", "additionalProperties": false, "required": ["from", "to", "size"], "properties": { "from": { "$ref": "#/$defs/vec3" }, "to": { "$ref": "#/$defs/vec3" }, "size": { "$ref": "#/$defs/vec2" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
+        "rod": { "type": "object", "additionalProperties": false, "required": ["from", "to"], "properties": { "from": { "$ref": "#/$defs/vec3" }, "to": { "$ref": "#/$defs/vec3" }, "radius": { "$ref": "#/$defs/num" }, "segments": { "type": "integer" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
+        "cylinder": { "type": "object", "additionalProperties": false, "properties": { "radius": { "$ref": "#/$defs/num" }, "radius_back": { "$ref": "#/$defs/num" }, "height": { "$ref": "#/$defs/num" }, "at": { "$ref": "#/$defs/vec3" }, "rot": { "$ref": "#/$defs/vec3" }, "from": { "$ref": "#/$defs/vec3" }, "to": { "$ref": "#/$defs/vec3" }, "segments": { "type": "integer" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
+        "sphere": { "type": "object", "additionalProperties": false, "properties": { "radius": { "$ref": "#/$defs/num" }, "at": { "$ref": "#/$defs/vec3" }, "scale": { "$ref": "#/$defs/vec3" }, "rot": { "$ref": "#/$defs/vec3" }, "segments": { "type": "integer" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
+        "tube": { "type": "object", "additionalProperties": false, "required": ["points"], "properties": { "points": { "type": "array", "items": { "$ref": "#/$defs/vec3" }, "minItems": 2 }, "radius": { "$ref": "#/$defs/num" }, "segments": { "type": "integer" }, "closed": { "type": "boolean" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } }
+      }
+    }
+  }
+}

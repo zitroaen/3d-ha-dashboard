@@ -11,7 +11,7 @@ const PLURAL = { furniture: 'Möbel', lamp: 'Leuchten', device: 'Geräte', plant
 export function catalogInfo(model) {
   const c = CATALOG[model] || {};
   const size = c.size ? `${c.size.map((v) => String(v).replace('.', ',')).join(' × ')} m` : '';
-  return [CATEGORY_LABEL[c.category], size, c.anim ? 'bewegt sich' : ''].filter(Boolean).join(' · ');
+  return [c.broken ? 'fehlerhaft (Platzhalter)' : c.user ? 'eigenes Modell' : '', CATEGORY_LABEL[c.category], size, c.anim ? 'bewegt sich' : ''].filter(Boolean).join(' · ');
 }
 
 export class CatalogPanel {
@@ -80,7 +80,7 @@ export class CatalogPanel {
     const n = this.stored?.length || 0;
     const tab = (id, label) => `<button data-tab="${id}" class="${this.tab === id ? 'on' : ''}" aria-pressed="${this.tab === id}">${label}</button>`;
     const chips = this.tab === 'catalog'
-      ? `<div class="chips">${[['all', 'Alle'], ...ORDER.map((c) => [c, PLURAL[c]])].map(([c, l]) =>
+      ? `<div class="chips">${[['all', 'Alle'], ...ORDER.map((c) => [c, PLURAL[c]]), ...(Object.values(CATALOG).some((c) => c.user) ? [['own', 'Eigene']] : [])].map(([c, l]) =>
         `<button class="chip ${this.cat === c ? 'sel' : ''}" data-cat="${c}">${l}</button>`).join('')}</div>
         <input class="search" type="search" placeholder="Suchen, z. B. Lampe, Tisch, Ventilator" value="${esc(this.query)}" autocomplete="off" spellcheck="false">`
       : '<p class="hint">Eingelagerte Objekte behalten Lage und Verknüpfungen. Aufstellen holt sie an ihren alten Platz zurück.</p>';
@@ -103,7 +103,7 @@ export class CatalogPanel {
       return this._fillThumbs();
     }
     const items = Object.entries(CATALOG)
-      .filter(([, c]) => this.cat === 'all' || c.category === this.cat)
+      .filter(([, c]) => this.cat === 'all' || (this.cat === 'own' ? c.user : c.category === this.cat))
       .filter(([m, c]) => !q || `${c.label} ${m} ${CATEGORY_LABEL[c.category]}`.toLowerCase().includes(q))
       .sort(([, a], [, b]) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category) || (a.label || '').localeCompare(b.label || '', 'de'));
     ul.innerHTML = items.map(([m, c]) => `<li><button data-add="${m}"><b>${esc(c.label || m)}</b>

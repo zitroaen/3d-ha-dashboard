@@ -1,5 +1,18 @@
 # Änderungen
 
+## 0.37.0
+
+- **Eigene Modelle:** Fehlt etwas im Katalog, beschreibt `models/<id>.yaml` im Datenordner ein eigenes Modell aus
+  Grundformen (Quader mit runden Kanten, Balken, Stab, Zylinder/Kegel, Kugel/Ellipsoid, Rohr), mit Parametern
+  (`$breite`, auch in Ausdrücken), Materialien (Palette, `#rrggbb`, Oberflächen des Hauses) und leuchtenden Teilen
+  (`glow`, Leuchten mit `capabilities: [light]` und `light.at`). Optional statt der Grundformen eine glTF-Datei
+  (`file`, `scale`, `offset`, `glow_materials`). Größe und Treffer-Fläche ergeben sich von selbst, `size` skaliert
+  gleichmäßig.
+- Im Editor in der Gruppe **Eigene** mit Vorschaubild; fehlerhafte Modelle erscheinen als Platzhalter mit Hinweis.
+  `npm run validate` prüft sie (Schema `schema/model-part.schema.json`, keine ID eines eingebauten Modells).
+- `model.yaml`: Liste `models` (auch ungenutzte eigene Modelle im Katalog). `deploy.sh` kopiert `models/` mit.
+- Demo-Haus: Bogenleuchte im Wohnzimmer und Wandregal im Studio als eigene Modelle (`examples/demo/models/`).
+
 ## 0.36.0
 
 - **Gaubenfenster sichtbar (Fehler):** Die Front einer Gaube ist jetzt eine Wand mit Fensteröffnung (Brüstung, Sturz,
