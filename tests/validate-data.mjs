@@ -58,10 +58,7 @@ if (!ajv.validate(schema, model)) {
       for (const e of ajv.errors) errors.push(`Eigenes Modell ${f}: ${e.instancePath || '/'} ${e.message}${e.params?.additionalProperty ? ` (${e.params.additionalProperty})` : ''}`);
       continue;
     }
-    if (CATALOG[id] && !CATALOG[id].user) {
-      errors.push(`Eigenes Modell ${f}: gleiche ID wie das eingebaute Modell ${id}`);
-      continue;
-    }
+    if (CATALOG[id] && !CATALOG[id].user) warnings.push(`Eigenes Modell ${f} ersetzt das Beispielmodell ${id}`);
     try {
       checkUserModel(def, id);
       if (def.file && !existsSync(join(dir, def.file))) throw new Error(`${def.file} fehlt`);

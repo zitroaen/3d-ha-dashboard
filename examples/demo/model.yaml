@@ -808,6 +808,7 @@ objects:
     size: [3, 0.2, 2.1]
     params: { glass: true }
     ha: { entities: { power: cover.demo_garagentor }, tap: toggle }
+  - { id: gartentor, name: Gartentor, model: gartentor, pos: [3.25, 11.3], params: { breite: 1.1, hoehe: 0.9 }, ha: { entities: { power: cover.demo_gartentor }, tap: toggle } }
   - id: balkonkraftwerk
     name: Balkonkraftwerk
     model: solar_panels
@@ -892,4 +893,4 @@ objects:
     pos: [18, 8.4]
     light: { height: 1.75, range: 2.5 }
     ha: { entities: { power: light.demo_gartenhaus } }
-models: [bogenleuchte, wandregal]
+models: [bogenleuchte, wandregal, gartentor]

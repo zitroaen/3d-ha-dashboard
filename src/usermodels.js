@@ -98,12 +98,35 @@ export function checkUserModel(def, id) {
   if (light && !def.light) throw new Error('capabilities: light braucht einen light-Block (at, mount, range)');
   if (!def.file && !(def.parts?.length)) throw new Error('parts (Grundformen) oder file (glTF) nötig');
   const params = { ...(def.params || {}) };
-  for (const [i, part] of (def.parts || []).entries()) {
+  checkParts(def.parts || [], params, 'parts');
+  return def;
+}
+
+const ANIM_TYPES = ['swing', 'slide', 'spin'];
+
+/** Teile prüfen (auch in beweglichen Gruppen) */
+function checkParts(parts, params, path) {
+  for (const [i, part] of parts.entries()) {
+    if (part?.group) {
+      const g = part.group;
+      if (!ANIM_TYPES.includes(g.anim?.type)) throw new Error(`${path}[${i}].group: anim.type ${ANIM_TYPES.join(' | ')} erwartet`);
+      if (!Array.isArray(g.parts) || !g.parts.length) throw new Error(`${path}[${i}].group: parts fehlen`);
+      vec(g.pivot, params, 3, [0, 0, 0]);
+      checkParts(g.parts, params, `${path}[${i}].group.parts`);
+      continue;
+    }
     const type = PART_TYPES.find((t) => part?.[t]);
-    if (!type) throw new Error(`parts[${i}]: eine von ${PART_TYPES.join(', ')} erwartet`);
+    if (!type) throw new Error(`${path}[${i}]: eine von ${PART_TYPES.join(', ')} oder group erwartet`);
     shapeOf(type, part[type], params); // prüft die Zahlen
   }
-  return def;
+}
+
+/** Animation einer Gruppe -> Szenen-Spezifikation (Grad -> Bogenmaß, Standardwerte) */
+function animSpec(a, params) {
+  const N = (v, d) => (v == null ? d : evalExpr(v, params));
+  if (a.type === 'spin') return { type: 'spin', axis: a.axis || 'y', speed: N(a.speed, 0.5) };
+  if (a.type === 'slide') return { type: 'slide', axis: a.axis || 'x', distance: N(a.distance, 1), duration: N(a.duration, 6) };
+  return { type: 'swing', axis: a.axis || 'y', angle: rad(N(a.angle, 90)), duration: N(a.duration, 6) };
 }
 
 /** Geometrie und Lage einer Grundform (lokal, Meter) */
@@ -164,15 +187,28 @@ function materialOf(def, part, params) {
 function drawParts(P, def, params, scale, shift, lampIdx = null) {
   const S = new THREE.Matrix4().makeScale(scale, scale, scale).multiply(new THREE.Matrix4().makeTranslation(...shift));
   const roomIdx = P.idx;
-  for (const part of def.parts || []) {
-    const type = PART_TYPES.find((t) => part[t]);
-    const p = part[type];
-    const { geo, m } = shapeOf(type, p, params);
-    const glow = !!(p.glow ?? part.glow);
-    if (glow && lampIdx != null) P.idx = lampIdx;
-    P.add(geo, materialOf(def, p.material ? p : part, params), glow ? 'glow' : 'lit', S.clone().multiply(m));
-    P.idx = roomIdx;
-  }
+  const draw = (parts) => {
+    for (const part of parts) {
+      if (part.group) {
+        // bewegliche Gruppe (Tor, Flügel, Rad): dreht/schiebt sich um pivot, solange das Objekt aktiv ist
+        const pivot = new THREE.Vector3(...vec(part.group.pivot, params, 3, [0, 0, 0])).applyMatrix4(S);
+        const spec = animSpec(part.group.anim, params);
+        if (spec.type === 'slide') spec.distance *= scale;
+        P.beginAnim(spec, pivot.toArray());
+        draw(part.group.parts);
+        P.endAnim();
+        continue;
+      }
+      const type = PART_TYPES.find((t) => part[t]);
+      const p = part[type];
+      const { geo, m } = shapeOf(type, p, params);
+      const glow = !!(p.glow ?? part.glow);
+      if (glow && lampIdx != null) P.idx = lampIdx;
+      P.add(geo, materialOf(def, p.material ? p : part, params), glow ? 'glow' : 'lit', S.clone().multiply(m));
+      P.idx = roomIdx;
+    }
+  };
+  draw(def.parts || []);
   for (const mesh of def.gltf || []) {
     const glow = (def.glow_materials || []).includes(mesh.name);
     if (glow && lampIdx != null) P.idx = lampIdx;
@@ -189,17 +225,14 @@ function placeholder(P) {
 }
 
 /**
- * Eigene Modelle eintragen: Katalog (Gruppe „Eigene“), Zeichenfunktion für Möbel bzw. Leuchten. Doppelte IDs eines
- * eingebauten Modells werden abgelehnt. Liefert die Warnungen.
+ * Eigene Modelle eintragen: Katalog (Gruppe „Eigene“), Zeichenfunktion für Möbel bzw. Leuchten. Gleiche ID wie ein
+ * Beispielmodell der Engine ersetzt dieses. Liefert die Warnungen.
  * @param defs  [{ id, def?, error? }] – def = geprüfte Modelldatei, error = Meldung (dann Platzhalter)
  */
 export function registerUserModels(defs) {
   const warnings = [];
   for (const { id, def, error } of defs) {
-    if (CATALOG[id] && !CATALOG[id].user) {
-      warnings.push(`Eigenes Modell ${id}: gleiche ID wie ein eingebautes Modell – nicht geladen`);
-      continue;
-    }
+    // gleiche ID wie ein Beispielmodell der Engine: das eigene ersetzt es (Instanz geht vor)
     if (error || !def) {
       warnings.push(`Eigenes Modell ${id}: ${error}`);
       CATALOG[id] = { label: id, category: 'furniture', size: [0.5, 0.5, 0.5], params: [], user: true, broken: true };
@@ -212,6 +245,7 @@ export function registerUserModels(defs) {
     const box = new THREE.Box3();
     try {
       const P = new PartCollector();
+      P.static = true; // bewegliche Teile mitmessen
       P.begin(0, 0, 0, 0);
       drawParts(P, def, { ...defaults }, 1, [0, 0, 0]);
       for (const m of P.build(() => new THREE.MeshBasicMaterial())) {
@@ -251,7 +285,11 @@ export function registerUserModels(defs) {
       MODEL_LIGHT_HEIGHT[id] = at[1];
       DEFAULT_MOUNT[id] = def.light.mount || 'table';
       LAMPS[id] = (P, l, { lampIdx }) => draw(P, l, lampIdx);
-    } else FURNITURE[id] = (P, it) => draw(P, it);
+      delete FURNITURE[id];
+    } else {
+      FURNITURE[id] = (P, it) => draw(P, it);
+      delete LAMPS[id];
+    }
   }
   return warnings;
 }

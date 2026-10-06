@@ -213,6 +213,7 @@ export class PartCollector {
       const node = new THREE.Group();
       a.node.decompose(node.position, node.quaternion, node.scale);
       node.userData.baseQuaternion = node.quaternion.clone();
+      node.userData.basePosition = node.position.clone();
       for (const m of this._meshes(a.groups.values(), materialFor)) node.add(m);
       if (a.spec.type === 'flow') {
         // Lichtpunkte entlang des Pfads (Energiefluss); unsichtbar, solange nichts fließt

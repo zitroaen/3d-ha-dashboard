@@ -37,7 +37,7 @@ function pathOf(pts) {
 }
 
 /** Animationen mit Fortschritt 0..1 (Tore): laufen bis in die Endlage, auch beim Schließen */
-const PROGRESS = new Set(['swing', 'sectional']);
+const PROGRESS = new Set(['swing', 'sectional', 'slide']);
 
 /** Punkt der Torschiene nach Weglänge s (y, z in der Ebene des Tors): senkrecht bis H, Viertelbogen, waagrecht nach innen */
 function trackAt(s, H, R) {
@@ -1041,6 +1041,12 @@ export class HouseScene {
     if (!PROGRESS.has(spec.type)) return;
     const e = a.progress * a.progress * (3 - 2 * a.progress);
     if (spec.type === 'sectional') return poseSections(node, spec, e);
+    if (spec.type === 'slide') {
+      // Schiebetor: entlang der eigenen Achse um `distance` (Meter) verschieben
+      const dir = (spec.axis === 'y' ? _Y : spec.axis === 'z' ? _Z : _X).clone().applyQuaternion(node.userData.baseQuaternion);
+      node.position.copy(node.userData.basePosition).addScaledVector(dir, spec.distance * e);
+      return;
+    }
     const axis = spec.axis === 'y' ? _Y : spec.axis === 'z' ? _Z : _X;
     node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, spec.angle * e));
   }
