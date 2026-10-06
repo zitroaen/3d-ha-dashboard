@@ -288,7 +288,10 @@
         "leaf": { "enum": ["glass", "solid"] },
         "rooms": { "type": "array", "items": { "$ref": "#/$defs/id" } },
         "height": { "type": "number", "exclusiveMinimum": 0 },
-        "open_deg": { "type": "number" }
+        "open_deg": { "type": "number" },
+        "arch": { "type": "boolean" },
+        "top": { "const": "arch" },
+        "leaves": { "enum": [1, 2] }
       }
     },
     "outdoor": {
