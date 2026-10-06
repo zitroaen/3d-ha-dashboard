@@ -336,3 +336,6 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   gesucht, Enden per Halbierung genau an der Grenze) und die Kanten der Geschossdecke (`_houseOutline`). Keine neue
   Geometrie in house.js, kein zusätzlicher Zeichenaufruf (gleiches Material wie die Fassade, `_mergeLevels`).
   Außenwände unter Dachschrägen bekommen oben die Fassade statt der dunklen Schnittfläche.
+- Türen (0.33.0): Rundbogen ohne neue Materialien – `buildArchOpening()` (openings.js) zeichnet Zwickel und Laibung
+  in Streifen mit `triN` (Wicklung nach gewünschter Normale), Bogenfelder als `archBand` (Kreisring/-scheibe in
+  senkrechter Ebene, auch Viertel für Doppeltüren). Der Sturz darüber bleibt das normale Prisma (auch unter Dachschrägen).

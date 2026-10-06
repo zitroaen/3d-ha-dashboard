@@ -234,6 +234,8 @@ Höhe = Etagenhöhe.
 | `rooms` | nein | | angrenzende Räume |
 | `height` | nein | 2.05 | Durchgangshöhe |
 | `open_deg` | nein | 85 | Öffnungswinkel (Innentüren) |
+| `arch` | nein | `false` | Rundbogen (gleichwertig `top: arch`): Radius = halbe Breite, `height` = Scheitel (ohne Angabe 2,05 m + Radius, der Kämpfer liegt dann auf Türhöhe). Die Wand bekommt Zwickel und eine gewölbte Laibung; Türblatt bzw. Haustür mit Bogenfeld, Glastür mit Oberlicht im Bogen, Innentüren ohne Zargenkopf |
+| `leaves` | nein | 1 | `2` = zweiflügelig: Innentüren mit zwei Blättern (je eins von jeder Seite), Glastüren mit Mittelpfosten, Haustüren mit Fuge |
 
 ## `outdoor` – Außenbereiche („Gartenräume“)
 
@@ -548,7 +550,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `floor_fan` | Gerät | | 0.42 × 0.42 × 1.15 | `color` (Rotor) – Animation: Rotor dreht sich, Tempo aus `percentage` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
 | `fridge` | Gerät | | 0.6 × 0.65 × 1.85 | `glass` (Getränkekühlschrank mit Glastür und Flaschen), `color` |
-| `garage_door` | Gerät | | 3.0 × 0.2 × 2.1 | `color`, `sections` (Lamellen, Standard 5) – Sektionaltor innen hinter einer Wandöffnung, Ursprung an der Innenkante; Schienen, Deckenantrieb; Animation: die Lamellen fahren die Schienen hoch unter die Decke, solange offen (`cover`: open/opening); Sturz bis zur Decke |
+| `garage_door` | Gerät | | 3.0 × 0.2 × 2.1 | `color`, `sections` (Lamellen, Standard 5), `glass` (`true`: zweitoberste Lamelle als Fensterreihe) – Sektionaltor innen hinter einer Wandöffnung, Ursprung an der Innenkante; Schienen, Deckenantrieb; Animation: die Lamellen fahren die Schienen hoch unter die Decke, solange offen (`cover`: open/opening); Sturz bis zur Decke |
 | `garden_chair` | Möbel | | | `color` (Bespannung; Gartenstuhl) |
 | `garden_table` | Möbel | | 1.6 × 0.9 × 0.74 | `color` (Platte; Gartentisch) |
 | `grand_piano` | Möbel | | 1.48 × 1.6 | |
@@ -783,6 +785,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.33.0, abwärtskompatibel):** `doors[].arch` (bzw. `top: arch`), `doors[].leaves`;
+  `garage_door` mit `params.glass`.
 - **Version 2, Ergänzung (0.32.0, abwärtskompatibel):** `buildings[].facade.flush` (bündige Fassade über die
   Geschossdecke). Wände unter Dachschrägen haben oben keine dunkle Schnittfläche mehr, wo sie außen liegen.
 - **Version 2, Ergänzung (0.31.0):** `surface: parquet` ist jetzt echtes Fischgrätparkett (vorher sahen die Böden wie

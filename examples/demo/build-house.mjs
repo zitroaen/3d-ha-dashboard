@@ -70,8 +70,8 @@ const ej = [-EXT / 2, EXT / 2], ij = [-INT / 2, INT / 2];
 const doors = [
   { hinge: [2.0, 8 - EXT / 2], end: [2.8, 8 - EXT / 2], swing: -1, jamb: ej, type: 'exterior', leaf: 'glass', rooms: ['wohnen'], height: 2.1 },
   { hinge: [3.6, 8 - EXT / 2], end: [2.8, 8 - EXT / 2], swing: 1, jamb: ej, type: 'exterior', leaf: 'glass', rooms: ['wohnen'], height: 2.1 },
-  { hinge: [8.6, EXT / 2], end: [9.5, EXT / 2], swing: 1, jamb: ej, type: 'exterior', leaf: 'solid', rooms: ['kueche'], height: 2.0 },
-  { hinge: [6.0, 1.4], end: [6.0, 2.3], swing: 1, jamb: ij, type: 'interior', rooms: ['wohnen', 'kueche'], height: 2.0 },
+  { hinge: [8.6, EXT / 2], end: [9.5, EXT / 2], swing: 1, jamb: ej, type: 'exterior', leaf: 'solid', rooms: ['kueche'], arch: true },
+  { hinge: [6.0, 1.2], end: [6.0, 2.5], swing: 1, jamb: ij, type: 'interior', rooms: ['wohnen', 'kueche'], height: 2.5, arch: true, leaves: 2 },
   { hinge: [6.0, 5.2], end: [6.0, 6.1], swing: 1, jamb: ij, type: 'interior', rooms: ['wohnen', 'schlafen'], height: 2.0 },
   { hinge: [8.0, 6.4], end: [8.0, 7.2], swing: 1, jamb: ij, type: 'interior', rooms: ['schlafen', 'bad'], height: 2.0 },
 ].map((d) => ({ ...d, hinge: d.hinge.map(r3), end: d.end.map(r3), jamb: d.jamb.map(r3) }));
