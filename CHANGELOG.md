@@ -20,6 +20,9 @@
   fährt mit), Farbe wie bisher über `params.color`.
 - Demo-Haus: Küchentür mit Rundbogen, zweiflügelige Rundbogentür zwischen Wohnzimmer und Küche, Garagentor mit
   Fenstern.
+- **Tageszeit „Tag“ am Abend (Fehler):** Eingeschaltete Lampen hellten bei vollem Tageslicht alle Flächen auf, dazu
+  Lichtschein auf dem Boden und vor Fenstern – das Bild wirkte milchig. Lampenlicht wirkt jetzt je nach Tageslicht
+  schwächer (bei Sonne 30 %, Lichtschein fast nicht); nachts unverändert.
 
 ## 0.32.0
 
@@ -61,6 +64,9 @@
   (`power_line`: Holzmasten mit durchhängenden Seilen). Zaun und Freileitung folgen dem Gelände; alle mit
   Katalog-Vorschau. Möglichst vorhandene Materialien (Leistungsbudget).
 - Demo-Haus: Spielwiese östlich der Garage, Lattenzaun, Freileitung am Feldweg.
+- **Weiter hineinzoomen:** Die Zoomgrenze richtet sich nach dem Bildausschnitt statt fest beim Fünffachen –
+  hinein bis etwa 2,4 m Bildhöhe (ein Sessel füllt das Bild), egal wie groß Haus und Grundstück sind. Gezoomt wird
+  auf die Stelle unter dem Mauszeiger bzw. zwischen den Fingern.
 - Standardansicht: Die Kamerafahrt kommt auch an, wenn der Browser keine Bilder rechnet (verdeckter Tab, dunkles
   Wand-Tablet) – vorher blieb die Kamera dann am Start stehen.
 

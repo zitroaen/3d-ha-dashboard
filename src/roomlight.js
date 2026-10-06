@@ -59,6 +59,9 @@ export const lightUniforms = {
   // Wetter (scene.setWeather): Nässe 0..1 (dunkler, glänzend) und Schneedecke 0..1 (auf nach oben zeigenden Flächen)
   uWet: { value: 0 },
   uSnow: { value: 0 },
+  // Wirkung der Lampen auf die Flächen (scene.setSky): bei Tageslicht gedämpft – im Sonnenschein fällt Lampenlicht kaum
+  // auf, sonst wirkt das Bild mit eingeschalteten Lampen milchig (z. B. Tageszeit „Tag“ am Abend)
+  uLampDay: { value: 1 },
   // Höhenraster (scene.js): Hangschattierung (r) und Geländehöhe (g) je Rasterpunkt; Lage xMin, zMin, Breite, Tiefe
   uTerrain: { value: null },
   uTerrainBox: { value: new THREE.Vector4(0, 0, 1, 1) },
@@ -90,7 +93,7 @@ const FRAG_PARS = /* glsl */ `
 uniform highp sampler2D uLights;
 uniform sampler2D uFloorAO;
 uniform vec4 uFloorAOBox;
-uniform float uWet, uSnow;
+uniform float uWet, uSnow, uLampDay;
 uniform sampler2D uTerrain, uAerial;
 uniform vec4 uTerrainBox;
 uniform float uTerrainOn, uAerialK;
@@ -119,7 +122,7 @@ vec3 roomIrradiance(vec3 n, float bounce) {
     float ndl = max(dot(n, L / d), 0.0);
     acc += col * fall * (0.2 + 0.8 * ndl);
   }
-  return acc;
+  return acc * uLampDay;
 }
 `;
 
@@ -216,13 +219,14 @@ export function lampMaterial({ map = null, strength = 1, offColor = null, additi
       .replace('#include <common>', `#include <common>\nattribute float lampIdx;\nvarying float vLampIdx;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\nvLampIdx = lampIdx;`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform highp sampler2D uLights;\nuniform vec3 uOff;\nvarying float vLampIdx;`)
+      .replace('#include <common>', `#include <common>\nuniform highp sampler2D uLights;\nuniform vec3 uOff;\nuniform float uLampDay;\nvarying float vLampIdx;`)
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
         int li = int(vLampIdx + 0.5) - 1;
         vec3 lc = li >= 0 ? texelFetch(uLights, ivec2(li, 1), 0).rgb : vec3(0.0);
-        diffuseColor.rgb *= dot(lc, lc) > 1e-8 ? lc * ${strength.toFixed(3)} : uOff;`
+        diffuseColor.rgb *= dot(lc, lc) > 1e-8 ? lc * ${strength.toFixed(3)} : uOff;${additive ? `
+        diffuseColor.rgb *= uLampDay * uLampDay; // Lichtschein: im Sonnenschein kaum zu sehen` : ''}`
       );
   };
   m.customProgramCacheKey = () => `lamp:${strength}:${additive}:${off.getHexString()}`;
