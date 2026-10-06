@@ -51,6 +51,7 @@ site:
       - [-2.609, -2.607, -2.554, -2.512, -2.511, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.53, -2.544, -2.562, -2.547, -2.496, -2.448, -2.46, -2.541, -2.614, -2.624]
       - [-2.674, -2.676, -2.717, -2.751, -2.752, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.736, -2.725, -2.712, -2.723, -2.763, -2.801, -2.792, -2.728, -2.67, -2.663]
     texture: { file: textures/luftbild.svg, strength: 0.8 }
+surfaces: { dielen_gartenhaus: { label: Dielen Gartenhaus, base: planks_wide, color: "#8a6a48" } }
 buildings:
   - id: haus
     name: Wohnhaus
@@ -146,6 +147,7 @@ buildings:
             type: interior
             rooms: [wohnen, schlafen]
             height: 2
+            style: interior_panels
           - hinge: [8, 6.4]
             end: [8, 7.2]
             swing: 1
@@ -153,6 +155,7 @@ buildings:
             type: interior
             rooms: [schlafen, bad]
             height: 2
+            style: interior_glass
       - id: og
         name: Obergeschoss
         level: 1
@@ -162,7 +165,7 @@ buildings:
           - id: studio
             name: Studio
             polygon: [[0.3, 0.3], [5.94, 0.3], [5.94, 7.7], [0.3, 7.7]]
-            surface: parquet
+            surface: parquet_chevron
         walls:
           - { polygon: [[0, 0], [2, 0], [2, 0.3], [0, 0.3]] }
           - { polygon: [[3.4, 0], [6.06, 0], [6.06, 0.3], [3.4, 0.3]] }
@@ -251,6 +254,7 @@ buildings:
     name: Gartenhaus
     kind: garden_house
     facade: { type: wood_siding, plinth: { height: 0.25, material: stone } }
+    styles: { window: bars }
     floors:
       - id: eg
         name: Gartenhaus
@@ -261,7 +265,7 @@ buildings:
           - id: gartenhaus
             name: Gartenhaus
             polygon: [[16.62, 7.12], [19.38, 7.12], [19.38, 9.28], [16.62, 9.28]]
-            surface: parquet
+            surface: dielen_gartenhaus
             beams: { dir: "y", spacing: 0.7, size: [0.1, 0.14] }
         walls:
           - { polygon: [[16.5, 7], [19.5, 7], [19.5, 7.12], [16.5, 7.12]] }

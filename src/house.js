@@ -6,6 +6,7 @@ import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
 import { glowTexture, normalFromCanvas, noiseCanvas } from './textures.js';
 import { isSurface, surfaceDef, surfaceIds, surfaceMaterial } from './surfaces.js';
+import { windowStyle, doorStyle } from './styles.js';
 import { buildWindow, buildDoor, hasBoard, BOARD, DOOR_TOP, doorArch, buildArchOpening } from './openings.js';
 import { buildPitchedRoof, ceilingFn, ceilingProfile, windowUnderRoof, doorUnderRoof } from './roof.js';
 import { GROUND_Y } from './ground.js';
@@ -86,6 +87,8 @@ export class FloorModel {
     const floors = {}; // Bodenbelag -> Builder
     // Fenster und Türen
     const B = { glass: new Builder(), pvc: new Builder(), board: new Builder(), door: new Builder(), doorDark: new Builder(), metal: new Builder() };
+    // Bauteil in eigener Farbe (Fenster-/Türart): eigener Builder je Farbe, ohne Farbe das Standardmaterial
+    B.tint = (base, color) => (color ? (floors[this.shared.surface(base, color)] ??= new Builder()) : B[base]);
 
     // --- Böden pro Raum (Hit-Meshes zum Antippen + gemeinsame Geometrie je Bodenbelag)
     for (const r of this.rooms.values()) {
@@ -213,9 +216,10 @@ export class FloorModel {
       const sill = win.sill ?? 0.9, top = win.top ?? 2.1;
       const roomIdx = win.room ? this.rooms.get(win.room)?.idx || 0 : 0;
       // Brüstung endet unter der Fensterbank (sonst liegen zwei Flächen aufeinander und flackern)
-      if (sill > 0.01) prism(rect, 0, hasBoard(win) ? sill - BOARD : sill, roomIdx);
+      const wst = windowStyle(win, floor.styles);
+      if (sill > 0.01) prism(rect, 0, hasBoard(win, wst) ? sill - BOARD : sill, roomIdx);
       if (top < H - 0.01) prism(rect, top, H);
-      buildWindow(this, win, B);
+      buildWindow(this, win, B, wst);
     }
 
     // --- Türen: Sturz über der Öffnung (volle Laibungstiefe); Außentüren bekommen ein Türblatt
@@ -242,7 +246,7 @@ export class FloorModel {
         buildArchOpening(this, P, [(ex - hx) / len, (ey - hy) / len], [nx, ny], len, d.jamb, { ...arch, crown: top },
           (room) => (!room && fac ? fac : walls));
       }
-      buildDoor(this, d, B);
+      buildDoor(this, d, B, doorStyle(d, floor.styles));
     }
 
     // --- Eckbretter der Holzfassade (z. B. weiß auf Schwedenrot) an Hausecken und Fensterlaibungen

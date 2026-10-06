@@ -14,6 +14,7 @@ import { FURNITURE, LAMPS } from '../src/models.js';
 import { USER_MODEL_DIR, checkUserModel, registerUserModels } from '../src/usermodels.js';
 import { load as parseYaml } from 'js-yaml';
 import { setSurfaceDefs, checkSurface, isSurface, surfaceDef, surfaceIds } from '../src/surfaces.js';
+import { setStyleDefs, WINDOW_STYLES, DOOR_STYLES } from '../src/styles.js';
 
 const errors = [], warnings = [];
 const file = join(DATA_DIR, 'model.yaml');
@@ -101,6 +102,26 @@ if (!ajv.validate(schema, model)) {
   for (const o of model.outdoor || []) {
     ref(`Außenbereich ${o.id}`, o.surface);
     ref(`Außenbereich ${o.id}: edge`, o.edge);
+  }
+  // Fenster- und Türarten
+  setStyleDefs(parseYaml(readFileSync(join(ENGINE_ROOT, 'library/openings.yaml'), 'utf8')), model);
+  const sref = (where, S, id, kind) => {
+    if (id != null && !S.has(id)) errors.push(`${where}: ${kind} „${id}“ unbekannt (library/openings.yaml oder model.yaml → ${kind === 'Fensterart' ? 'window_styles' : 'door_styles'})`);
+  };
+  for (const [S, kind] of [[WINDOW_STYLES, 'Fensterart'], [DOOR_STYLES, 'Türart']]) {
+    for (const id of S.ids()) {
+      const b = S.def(id);
+      if (!/^[a-z0-9_]+$/.test(id)) errors.push(`${kind} ${id}: nur Kleinbuchstaben, Ziffern und _`);
+      if (b?.base && !S.has(b.base)) errors.push(`${kind} ${id}: base „${b.base}“ unbekannt`);
+    }
+  }
+  for (const b of model.buildings || []) {
+    sref(`${b.id}: styles.window`, WINDOW_STYLES, b.styles?.window, 'Fensterart');
+    for (const k of ['door', 'exterior_door', 'front_door']) sref(`${b.id}: styles.${k}`, DOOR_STYLES, b.styles?.[k], 'Türart');
+    for (const f of b.floors || []) {
+      for (const [i, w] of (f.windows || []).entries()) sref(`${b.id}/${f.id} Fenster ${i + 1}`, WINDOW_STYLES, w.style, 'Fensterart');
+      for (const [i, d] of (f.doors || []).entries()) sref(`${b.id}/${f.id} Tür ${i + 1}`, DOOR_STYLES, d.style, 'Türart');
+    }
   }
   for (const o of model.objects || []) {
     const m = o.params?.material;

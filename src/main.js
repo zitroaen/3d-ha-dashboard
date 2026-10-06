@@ -503,8 +503,8 @@ class Ha3dDashboard extends HTMLElement {
         const scene = toScene(data.model);
         if (!scene.house.floors.length) throw new Error('Das Modell enthält noch keine Gebäude – Grundriss importieren (docs/SETUP.md)');
         // Was hat sich geändert? Bauwerk -> ganze Szene; nur Objekte -> nur die Einrichtungs-Schicht
-        const { site, buildings, outdoor, objects, surfaces } = data.model;
-        const keys = { structure: JSON.stringify([site, buildings, outdoor, surfaces]), objects: JSON.stringify(objects) };
+        const { site, buildings, outdoor, objects, surfaces, window_styles, door_styles } = data.model;
+        const keys = { structure: JSON.stringify([site, buildings, outdoor, surfaces, window_styles, door_styles]), objects: JSON.stringify(objects) };
         const old = this._keys;
         this._keys = keys;
         this.model = data.model;
