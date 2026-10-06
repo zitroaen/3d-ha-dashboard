@@ -547,6 +547,9 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `curtain` | Möbel | | | `color` |
 | `dining_table` | Möbel | | 1.8 × 0.9 × 0.75 | `color` (Holz), `legs` (`wood` oder `metal`) – Esstisch |
 | `fence` | Möbel | | 6 × 0.1 × 1 | `style` (`wood` Lattenzaun, `chain_link` Maschendraht, `bars` Stabgitter), `color`, `path` (Punkte relativ zur Position; sonst gerade entlang der lokalen x-Achse, Länge = `size[0]`) – folgt dem Gelände |
+| `column` | Möbel | | 0.3 × 0.3 × 2.5 | `shape` (`round` Standard, `square`), `base`/`capital` (Fuß und Kapitell, Standard an; `false` = ohne), `material` (Oberfläche des Hauses: `stone`, `brick`, `concrete`, `plaster` …), `color` – Säule, z. B. unter einem Vordach |
+| `balustrade` | Möbel | | 3 × 0.3 × 0.9 | `style` (`balusters` gedrechselte Baluster, Standard; `solid` geschlossen), `material`, `color`, `path` (wie `fence`) – gemauerte Brüstung mit Sockel, Abdeckplatte und Pfeilern alle ~2,5 m, folgt dem Gelände |
+| `stairs` | Möbel | | 1.0 × 1.4 × 0.9 | `steps` (Standard Höhe / 18 cm), `rise`/`run` (Steigung/Auftritt, überschreiben die Größe), `open` (nur Trittstufen auf Wangen), `railing` (`left`, `right`, `both`), `material`, `color` – steigt entlang der lokalen −z-Achse (vorne die unterste Stufe), massiv bis zum Boden |
 | `floor_fan` | Gerät | | 0.42 × 0.42 × 1.15 | `color` (Rotor) – Animation: Rotor dreht sich, Tempo aus `percentage` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
 | `fridge` | Gerät | | 0.6 × 0.65 × 1.85 | `glass` (Getränkekühlschrank mit Glastür und Flaschen), `color` |
@@ -785,6 +788,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.34.0, abwärtskompatibel):** Katalog `column`, `balustrade`, `stairs`; Materialien
+  gemauerter Bauteile als Oberfläche des Hauses (`params.material`).
 - **Version 2, Ergänzung (0.33.0, abwärtskompatibel):** `doors[].arch` (bzw. `top: arch`), `doors[].leaves`;
   `garage_door` mit `params.glass`.
 - **Version 2, Ergänzung (0.32.0, abwärtskompatibel):** `buildings[].facade.flush` (bündige Fassade über die

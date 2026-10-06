@@ -1,5 +1,15 @@
 # Änderungen
 
+## 0.34.0
+
+- **Säulen** (`column`): rund oder eckig (`params.shape`), mit Fuß und Kapitell (abschaltbar).
+- **Brüstungen** (`balustrade`): gemauert zwischen zwei Punkten bzw. entlang `params.path`, Sockel, Abdeckplatte,
+  Pfeiler, gedrechselte Baluster oder geschlossen (`params.style: solid`); folgt dem Gelände.
+- **Treppen** (`stairs`): `steps`, `rise`, `run`, massiv oder offen (`params.open`), Handlauf links/rechts/beidseitig.
+- Material gemauerter Bauteile auf Wunsch aus den Oberflächen des Hauses (`params.material: stone`, `brick`,
+  `concrete` …, Textur in Metern wie an den Wänden); alle drei mit Katalog-Vorschau.
+- Demo-Haus: zwei Säulen und eine Steinbrüstung an der Terrasse, offene Treppe aufs Garagendach.
+
 ## 0.33.0
 
 - **Rundbogen-Türen:** `doors[].arch: true` (oder `top: arch`) – Bogen über der ganzen Türbreite, Scheitel aus

@@ -346,3 +346,6 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Lampenlicht und Tageslicht (0.33.0): Uniform `uLampDay` (roomlight.js) = lerp(1, `LAMP_DAY` 0,3, daylight) aus
   `setSky`; skaliert `roomIrradiance` und (quadriert) den additiven Lichtschein. Sonst wirkte „Tag“ mit abends
   eingeschalteten HA-Lampen milchig. Die Leuchtkörper selbst bleiben unverändert.
+- Bauteile (0.34.0): `column`, `balustrade`, `stairs` prozedural; `params.material` = Haus-Oberfläche über den Schlüssel
+  `surf:<name>[:farbe]` (furnishing.js nimmt `shared.mat`, die Vorschau eine Ersatzfarbe; `planarUV` setzt UV in
+  Metern nach der Normalen). Standard bleibt ein Palettenmaterial (kein zusätzlicher Zeichenaufruf).

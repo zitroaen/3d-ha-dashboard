@@ -17,7 +17,7 @@ const GLOW_OFF = { shade: 0x8f897d, bulb: 0x7d786f, disc: 0x1f1e1c };
 const glowOff = (key) => GLOW_OFF[key] ?? (/#[0-9a-f]{6}$/i.test(key) ? Number.parseInt(key.slice(-6), 16) : 0x777777);
 
 // Kein Kontaktschatten: liegt flach am Boden oder hängt an der Wand
-const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door', 'wall_clock', 'fence', 'power_line', 'hedge']);
+const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door', 'wall_clock', 'fence', 'power_line', 'hedge', 'balustrade']);
 
 /** Weicher Kontaktschatten (Alpha-Verlauf, Rechteck mit runden Ecken), einmal pro Szene */
 function contactTexture() {
@@ -258,7 +258,11 @@ export class FurnishingLayer {
     if (!cache.has(k)) {
       if (kind === 'glow') cache.set(k, lampMaterial({ strength: 1.6, offColor: glowOff(key) }));
       else if (kind === 'inst') cache.set(k, patchVegetation(withRoomLight(new THREE.MeshStandardMaterial(paletteParams(key)), { weather: true })));
-      else if (key.startsWith('tex:')) {
+      else if (key.startsWith('surf:') && this.shared.mat[key.split(':')[1] === 'plaster' ? 'wall' : key.split(':')[1]]) {
+        // Oberfläche des Hauses (Säulen, Brüstungen, Treppen aus Naturstein, Ziegel, Beton, Putz …)
+        const [, name, color] = key.split(':');
+        cache.set(k, this.shared.mat[this.shared.surface(name === 'plaster' ? 'wall' : name, color)]);
+      } else if (key.startsWith('tex:')) {
         // Bildtextur aus dem Datenordner (z. B. tex:textures/gemaelde.jpg)
         cache.set(k, withRoomLight(new THREE.MeshStandardMaterial({ map: this.shared.loadTexture(key.slice(4)), roughness: 0.85 })));
       } else {
