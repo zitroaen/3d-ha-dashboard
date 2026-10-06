@@ -670,9 +670,12 @@ export class HouseScene {
     // Abstand Kamera–Drehpunkt (orthografisch, fest): vorne bleibt klar, nach hinten verschwindet der Garten im Dunst
     this.scene.background.lerp(mix(0x1d2024, 0xb4b9be), w.fog * 0.7);
     this.scene.fog.color.copy(this.scene.background);
+    // ohne Nebel nur Dunst hinter dem Grundstück (Größe aus allen Bereichen) – ein festes Maß ließe große Grundstücke
+    // bei klarem Wetter im Dunst verschwinden
     const dist = this.camera ? this.camera.position.distanceTo(this.controls.target) : 40;
-    this.scene.fog.near = THREE.MathUtils.lerp(45, dist * 0.85, w.fog);
-    this.scene.fog.far = THREE.MathUtils.lerp(95, dist * 1.45, w.fog);
+    const R = this._siteRadius();
+    this.scene.fog.near = THREE.MathUtils.lerp(dist + R, dist * 0.85, w.fog);
+    this.scene.fog.far = THREE.MathUtils.lerp(dist + 2 * R + 30, dist * 1.45, w.fog);
     // Regen: nasse Flächen draußen; Schnee: weiße Oberseiten (roomlight.js)
     lightUniforms.uWet.value = w.snow > 0.6 ? 0 : w.rain > 0 ? Math.max(0.6, w.rain) : 0;
     lightUniforms.uSnow.value = w.snow;
@@ -680,6 +683,12 @@ export class HouseScene {
     this.renderer.shadowMap.needsUpdate = true;
     this.onSkyChange?.(day);
     this.requestRender();
+  }
+
+  /** Halbmesser des Grundstücks (Wände aller Etagen und Außenbereiche), mindestens 15 m */
+  _siteRadius() {
+    const b = this.bounds;
+    return b ? Math.max(15, Math.hypot(b.x1 - b.x0, b.z1 - b.z0) / 2) : 15;
   }
 
   /**
