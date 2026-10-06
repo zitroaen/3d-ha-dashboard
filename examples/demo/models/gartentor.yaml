@@ -1,0 +1,39 @@
+# Eigenes Modell (Beispiel): zweiflügeliges Gartentor aus Holz. Die Flügel sind bewegliche Gruppen (group): sie
+# schwenken um ihren Pfosten auf, solange das Objekt aktiv ist (cover offen), und zurück, wenn es schließt.
+id: gartentor
+name: Gartentor
+category: device
+params:
+  breite: 1.6
+  hoehe: 1.0
+  holz: oak_light
+materials:
+  holz: $holz
+  metall: black_matte
+parts:
+  # Pfosten
+  - box: { size: [0.1, "$hoehe + 0.2", 0.1], at: ["0 - $breite / 2 - 0.05", "($hoehe + 0.2) / 2", 0], material: holz }
+  - box: { size: [0.1, "$hoehe + 0.2", 0.1], at: ["$breite / 2 + 0.05", "($hoehe + 0.2) / 2", 0], material: holz }
+  # linker Flügel: dreht um den linken Pfosten
+  - group:
+      pivot: ["0 - $breite / 2", 0, 0]
+      anim: { type: swing, axis: y, angle: 95, duration: 4 }
+      parts:
+        - box: { size: ["$breite / 2 - 0.02", 0.08, 0.04], at: ["0 - $breite / 4", 0.15, 0], material: holz }
+        - box: { size: ["$breite / 2 - 0.02", 0.08, 0.04], at: ["0 - $breite / 4", "$hoehe - 0.05", 0], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["0 - $breite * 0.4", "$hoehe / 2 + 0.05", 0.03], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["0 - $breite * 0.3", "$hoehe / 2 + 0.05", 0.03], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["0 - $breite * 0.2", "$hoehe / 2 + 0.05", 0.03], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["0 - $breite * 0.1", "$hoehe / 2 + 0.05", 0.03], material: holz }
+        - box: { size: [0.03, 0.12, 0.05], at: [-0.06, "$hoehe * 0.6", -0.04], material: metall }
+  # rechter Flügel: spiegelbildlich um den rechten Pfosten
+  - group:
+      pivot: ["$breite / 2", 0, 0]
+      anim: { type: swing, axis: y, angle: -95, duration: 4 }
+      parts:
+        - box: { size: ["$breite / 2 - 0.02", 0.08, 0.04], at: ["$breite / 4", 0.15, 0], material: holz }
+        - box: { size: ["$breite / 2 - 0.02", 0.08, 0.04], at: ["$breite / 4", "$hoehe - 0.05", 0], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["$breite * 0.4", "$hoehe / 2 + 0.05", 0.03], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["$breite * 0.3", "$hoehe / 2 + 0.05", 0.03], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["$breite * 0.2", "$hoehe / 2 + 0.05", 0.03], material: holz }
+        - box: { size: [0.07, "$hoehe - 0.1", 0.03], at: ["$breite * 0.1", "$hoehe / 2 + 0.05", 0.03], material: holz }

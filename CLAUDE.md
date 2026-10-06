@@ -15,7 +15,9 @@ spezifiziert (maschinenlesbar: `schema/model.schema.json`).
 **Engine vs. Instanz:** Dieses Repo ist öffentlich und enthält nur Code, Werkzeuge, Doku und das erfundene Demo-Haus
 (`examples/demo`). Echte Häuser leben in privaten Instanzen, die die Engine als Submodul `engine/` einbinden
 (`templates/instance`, `scripts/init-instance.mjs`, `docs/SETUP.md`). Die Instanz konfiguriert die Werkzeuge über
-`ha3d.config.json` in ihrem Ordner.
+`ha3d.config.json` in ihrem Ordner. Alles, was von Haus zu Haus verschieden ist (Beläge, Fassaden, Fenster-, Tür-,
+Torarten, Möbel), sind Daten: Die Engine hat Generatoren und eine Beispiel-Bibliothek (`library/`), die Instanz
+ergänzt/ändert sie in `model.yaml` bzw. `models/` (`docs/LIBRARY.md`) – nie Hausspezifisches in den Engine-Code.
 
 ## Harte Regeln
 
@@ -62,6 +64,7 @@ pip install pymupdf                                 # nur für scripts/extract_p
 | `npm run test:perf` | Leistungsbudget: Zeichenaufrufe und Dreiecke pro Bild (Teil von `npm test`) |
 | `node scripts/logo.mjs` | Logo: `docs/logo.svg` und Markenbilder `custom_components/ha_3d_dashboard/brand/*.png` |
 | `npm run test:unit` | Modell: Migration, YAML, Szenen-Adapter, Zurückschreiben (Teil von `npm test`) |
+| `npm run preview -- <id> …` | Kontaktbogen (ein Bild) von Oberflächen/Modellen, ohne IDs alle eigenen, `--all-surfaces` (nach `npm run build`) |
 | `python scripts/extract_plan.py <pdf> --out building.json [--config plan.json] [--debug]` | Magicplan-Import (ein Gebäude; Etagen drehen/verschieben, Raum-IDs, Räume teilen: `scripts/plan_transform.py`) |
 | `node scripts/import-building.mjs building.json` | Gebäude in `model.yaml` einfügen/ersetzen |
 | `node scripts/terrain-from-scan.mjs scan.obj --cell 0.5 --rotate … --offset x,y --floor … --write` | Höhenraster `site.terrain` aus einem LiDAR-Scan (OBJ) |
@@ -88,7 +91,11 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
   · `src/roofshape.js` Dachform (Ebenen, Flächen, Profile) · `src/roof.js` Steildach zeichnen, Wände unter der Schräge
 - `src/furnishing.js` Einrichtungs-Schicht (austauschbar ohne das Haus neu zu bauen) · `src/vegetation.js` Bäume und
   Sträucher als Instanzen (Vorlagen je Form/Detailstufe, Variation, Detailstufen nach Bildschirmgröße)
-- `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE`
+- `src/models.js` prozedurale Möbel (`FURNITURE`) und Leuchten (`LAMPS`), Material-`PALETTE` (Beispielmodelle; eigene
+  Modelle gleicher ID ersetzen sie) · `src/usermodels.js` eigene Modelle (Grundformen, bewegliche Gruppen, glTF)
+- `library/*.yaml` Beispiel-Bibliothek (Oberflächen, Fenster-/Türarten, als Text im Bundle) · `src/library.js` lädt sie
+  und legt `model.yaml` darüber · `src/surfaces.js` Oberflächen: Definitionen (`base`), Muster-Generatoren, Bilder,
+  Materialien · `src/styles.js` Fenster-/Türarten
 - `src/roomlight.js` Raumlicht im Shader (Lampen in einer Float-Textur, `roomIdx` pro Fläche)
 - `src/environment.js` Himmel als Umgebung (PMREM, Spiegelungen)
 - `src/editor.js` Editiermodus (TransformControls, Anlegen, Rückgängig) · `src/store.js` Speichern (ganzes Modell
@@ -98,7 +105,7 @@ ist das Demo-Haus. `ENTITIES` = HA-Export für Link-Check/Harness, `VIEWS` = zus
 - `src/railing.js` Geländer · `src/terrain.js` Höhenraster (Höhe, Normalen, Zuschnitt auf Bereiche, Hangschattierung,
   Luftbild-Lage) · `src/ground.js` Boden (Höhe daneben für Kanten, Bodennetz mit Aussparungen, Schattierungs-Textur,
   Luftbild laden)
-- `src/geometry.js`, `src/textures.js` Helfer, prozedurale Texturen
+- `src/geometry.js`, `src/textures.js` Helfer (Normalen aus Bildern, Rauschen, Gewebe)
 - `tests/` Harness + simuliertes HA (`mock-hass.js`), `screenshots.mjs` (beliebige Daten), `interaction.mjs`
   (Demo-IDs), `demo.mjs`, `shared.mjs` (gemeinsamer Speicher), `performance.mjs` (Leistungsbudget), `validate-data.mjs`, `link-check.mjs`, `model.test.mjs`, `privacy-guard.mjs`, `lib/`
 - `custom_components/ha_3d_dashboard/` HA-Integration: Config-Flow (ein Klick), liefert `frontend/ha-3d-dashboard.js`
@@ -363,3 +370,14 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   ein (`user: true`, Gruppe „Eigene“), eingebaute IDs haben Vorrang. Geladen werden die IDs aus `models` und aus
   Objekten mit unbekanntem Modell; das eingebettete Demo-Haus lässt ihre Objekte weg. GLTFLoader macht das Bundle
   ~100 kB größer (1,0 MB).
+- Bibliothek als Daten (0.38.0): Beläge, Fassaden, Dachdeckung, Fenster- und Türarten sind keine Engine-Konstanten
+  mehr, sondern Einträge (`library/surfaces.yaml`, `library/openings.yaml`, im Bundle per esbuild-Loader `.yaml: text`);
+  die Instanz ergänzt/ändert sie in `model.yaml` (`surfaces`, `window_styles`, `door_styles`; gleiche ID = Felder
+  ändern, `base` = ableiten). `shared.mat` ist ein Proxy: Oberflächen-Materialien entstehen beim ersten Zugriff
+  (`id`, `id:#farbe`, `id_out` = Wetter-Variante draußen, außer `outdoor: true`). Muster werden mit der gewünschten
+  Farbe gezeichnet (Farbwechsel = neue Textur statt Tönung), Bilder (`image`) laden asynchron und lösen ein neues Bild
+  aus. Fenster/Türen: `B.tint(base, farbe)` legt farbige Bauteile in eigene Builder (ohne Farbe das
+  Standardmaterial, also kein zusätzlicher Zeichenaufruf). Eigene Modelle dürfen Beispielmodelle ersetzen und
+  bewegliche Gruppen (`swing`, `slide`, `spin`) haben. Für Agenten token-sparsam: Kurzreferenz `docs/LIBRARY.md`,
+  Prüfung in `npm run validate` (auch Doku-Tabelle = Bibliothek), `npm run preview` = ein Kontaktbogen-Bild statt
+  Screenshot-Reihe. Leistungsbudget 150 -> 155 (Demo-Gartentor: zwei bewegliche Flügel).

@@ -585,6 +585,30 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
     !doorUnderRoof(door, 2.05, Cd).top && doorUnderRoof(door, 2.05, C).top === 1.5);
 }
 
+// Bibliothek: Oberflächen sowie Fenster- und Türarten (Beispiele der Engine, Instanz ergänzt/ändert, base erbt)
+{
+  const { load } = await import('js-yaml');
+  const { readFileSync } = await import('node:fs');
+  const lib = (f) => load(readFileSync(new URL(`../library/${f}`, import.meta.url), 'utf8'));
+  const { setSurfaceDefs, surfaceDef, checkSurface, isSurface, surfaceIds } = await import('../src/surfaces.js');
+  setSurfaceDefs(lib('surfaces.yaml'), { parquet: { color: '#6b4a2e' }, eiche_dunkel: { base: 'parquet_strip', color: '#4a3020' }, kaputt: { pattern: 'zickzack' } });
+  const libErrors = surfaceIds().filter((id) => id !== 'kaputt').flatMap((id) => checkSurface(id, surfaceDef(id)));
+  check('Bibliothek: Oberflächen gültig; gleiche ID ändert nur Felder, base erbt, unbekanntes Muster gemeldet',
+    !libErrors.length && surfaceDef('parquet').color === '#6b4a2e' && surfaceDef('parquet').pattern === 'herringbone'
+      && surfaceDef('parquet_double').color === '#6b4a2e' && surfaceDef('eiche_dunkel').pattern === 'planks' && surfaceDef('eiche_dunkel').color === '#4a3020'
+      && checkSurface('kaputt', surfaceDef('kaputt')).some((e) => /zickzack/.test(e)) && isSurface('lawn') && !isSurface('gibtsnicht'),
+    JSON.stringify(libErrors));
+  setSurfaceDefs(lib('surfaces.yaml'), {});
+  const { setStyleDefs, windowStyle, doorStyle } = await import('../src/styles.js');
+  setStyleDefs(lib('openings.yaml'), { window_styles: { holz_weiss: { base: 'wood', color: '#f4f1ea' } }, door_styles: { standard_innen: { base: 'interior', panels: 2 } } });
+  const ws = windowStyle({ style: 'holz_weiss' }), wb = windowStyle({}, { window: 'bars' }), w0 = windowStyle({});
+  const di = doorStyle({ type: 'interior' }, { door: 'standard_innen' }), de = doorStyle({ type: 'exterior', leaf: 'solid' }), dg = doorStyle({ type: 'exterior' });
+  check('Bibliothek: Fenster-/Türarten je Öffnung, je Gebäude und nach Türtyp (innen, Terrasse, Haustür)',
+    ws.frame === 0.075 && ws.color === '#f4f1ea' && wb.bars?.[1] === 2 && w0.id === 'standard' && !w0.color
+      && di.panels === 2 && di.kind === 'interior' && de.leaf === 'solid' && de.kind === 'exterior' && dg.leaf === 'glass',
+    JSON.stringify([ws, wb, di, de, dg]));
+}
+
 // Eigene Modelle: Ausdrücke, Prüfung, Eintragen in den Katalog, Platzhalter, gleichmäßige Skalierung
 {
   const { evalExpr, checkUserModel, registerUserModels, userModelIds } = await import('../src/usermodels.js');
@@ -597,10 +621,29 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const regal = { id: 'test_regal', name: 'Testregal', params: { breite: 1 }, parts: [{ box: { size: ['$breite', 0.02, 0.3], at: [0, 1, 0] } }] };
   let bad = null;
   try { checkUserModel({ id: 'falsch', parts: [{ kugel: {} }] }, 'falsch'); } catch (e) { bad = e.message; }
+  const saved = [CAT.armchair, FUR.armchair];
   const warn = registerUserModels([{ id: 'test_regal', def: checkUserModel(regal, 'test_regal') }, { id: 'armchair', def: regal }, { id: 'test_kaputt', error: 'YAML kaputt' }]);
-  check('Eigene Modelle: Prüfung meldet unbekannte Teile, gleiche ID wie eingebaut wird abgelehnt, Fehler -> Platzhalter',
-    /box, beam/.test(bad || '') && warn.some((w) => /armchair.*eingebaut/.test(w)) && CAT.armchair && !CAT.armchair.user
+  check('Eigene Modelle: Prüfung meldet unbekannte Teile, gleiche ID wie ein Beispielmodell ersetzt es, Fehler -> Platzhalter',
+    /box, beam/.test(bad || '') && CAT.armchair?.user && FUR.armchair !== saved[1]
       && CAT.test_kaputt?.broken && CAT.test_regal?.user && CAT.test_regal.size[0] === 1, JSON.stringify(warn));
+  [CAT.armchair, FUR.armchair] = saved;
+  // bewegliche Gruppe (Tor): eigene Animationsgruppe um den Drehpunkt, Grad -> Bogenmaß; ohne Animation mitgemessen
+  const tor = { id: 'test_tor', params: { b: 1 }, parts: [
+    { box: { size: [0.1, 1, 0.1], at: [-0.55, 0.5, 0] } },
+    { group: { pivot: ['0 - $b / 2', 0, 0], anim: { type: 'swing', angle: 90 }, parts: [{ box: { size: ['$b', 0.8, 0.04], at: [0, 0.5, 0] } }] } },
+    { group: { anim: { type: 'slide', axis: 'x', distance: 2 }, parts: [{ box: { size: [0.2, 0.2, 0.2] } }] } },
+  ] };
+  registerUserModels([{ id: 'test_tor', def: checkUserModel(tor, 'test_tor') }]);
+  const PT = new PC();
+  PT.begin(0, 0, 0, 0);
+  FUR.test_tor(PT, {});
+  const an = PT.anims || [];
+  let badGroup = null;
+  try { checkUserModel({ id: 'g', parts: [{ group: { anim: { type: 'hop' }, parts: [{ box: { size: [1, 1, 1] } }] } }] }, 'g'); } catch (e) { badGroup = e.message; }
+  check('Eigene Modelle: bewegliche Gruppen (swing/slide) mit Drehpunkt, Breite inkl. Flügel, unbekannte Animation gemeldet',
+    an.length === 2 && an[0].spec.type === 'swing' && Math.abs(an[0].spec.angle - Math.PI / 2) < 1e-9 && an[1].spec.distance === 2
+      && Math.abs(new (await import('three')).Vector3().setFromMatrixPosition(an[0].node).x + 0.5) < 1e-9
+      && CAT.test_tor.size[0] === 1.1 && /anim\.type/.test(badGroup || ''), JSON.stringify([an.map((a) => a.spec), CAT.test_tor.size, badGroup]));
   const width = (it) => {
     const P = new PC();
     P.begin(0, 0, 0, 0);

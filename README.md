@@ -119,7 +119,7 @@ npm test             # Datenschutz-Check, Datenprüfung, Unit-Tests, Build, Scre
 ```
 
 Unter Linux/macOS einmalig `npx playwright-core install chromium` (Linux: `--with-deps`); Windows nutzt Edge.
-Architektur und Regeln für Beiträge: [CLAUDE.md](CLAUDE.md). Datenmodell: [docs/DATA_MODEL.md](docs/DATA_MODEL.md) (Schema: [schema/model.schema.json](schema/model.schema.json)).
+Architektur und Regeln für Beiträge: [CLAUDE.md](CLAUDE.md). Datenmodell: [docs/DATA_MODEL.md](docs/DATA_MODEL.md) (Schema: [schema/model.schema.json](schema/model.schema.json)). Beläge, Fassaden, Fenster, Türen, Tore und Möbel als Daten: [docs/LIBRARY.md](docs/LIBRARY.md).
 
 ## Lizenz
 

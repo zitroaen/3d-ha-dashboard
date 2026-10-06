@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { vegShape, vegPlacement, vegGeometry, vegTemplate } from './vegetation.js';
+import { surfaceDef } from './surfaces.js';
 
 /** Material-Palette (Schlüssel -> MeshStandardMaterial-Parameter). Wird in furnishing.js mit Raumlicht versehen. */
 export const PALETTE = {
@@ -75,9 +76,8 @@ export const PALETTE = {
 export const paletteParams = (key) => (PALETTE[key] ? { ...PALETTE[key] }
   : /^#[0-9a-f]{6}$/i.test(key) ? { color: key, roughness: 0.6 }
   // Oberfläche des Hauses (surf:stone, surf:brick:#aa5533) – hier nur als Farbe (Vorschau); im Haus das echte Material
-  : key.startsWith('surf:') ? { color: key.split(':')[2] || SURF_COLOR[key.split(':')[1]] || '#cfc8bc', roughness: 0.85 }
+  : key.startsWith('surf:') ? { color: key.split(':')[2] || surfaceDef(key.split(':')[1])?.color || (key.split(':')[1] === 'plaster' ? '#ece5d8' : '#cfc8bc'), roughness: 0.85 }
   : null);
-const SURF_COLOR = { stone: '#a8a092', brick: '#9c4a32', concrete: '#a9a8a3', plaster: '#ece5d8', sandstone: '#cdb48a', granite: '#8d8a86' };
 
 /**
  * Material eines gemauerten Bauteils (Säule, Brüstung, Treppe): params.material = Oberfläche des Hauses (stone,
@@ -213,6 +213,7 @@ export class PartCollector {
       const node = new THREE.Group();
       a.node.decompose(node.position, node.quaternion, node.scale);
       node.userData.baseQuaternion = node.quaternion.clone();
+      node.userData.basePosition = node.position.clone();
       for (const m of this._meshes(a.groups.values(), materialFor)) node.add(m);
       if (a.spec.type === 'flow') {
         // Lichtpunkte entlang des Pfads (Energiefluss); unsichtbar, solange nichts fließt

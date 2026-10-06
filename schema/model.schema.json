@@ -13,6 +13,9 @@
     "buildings": { "type": "array", "items": { "$ref": "#/$defs/building" } },
     "outdoor": { "type": "array", "items": { "$ref": "#/$defs/outdoor" } },
     "objects": { "type": "array", "items": { "$ref": "#/$defs/object" } },
+    "surfaces": { "type": "object", "description": "eigene Oberflächen bzw. Änderungen an der Bibliothek (docs/LIBRARY.md)", "propertyNames": { "pattern": "^[a-z0-9_]+$" }, "additionalProperties": { "$ref": "#/$defs/surfaceDef" } },
+    "window_styles": { "type": "object", "description": "eigene Fensterarten bzw. Änderungen (docs/LIBRARY.md)", "propertyNames": { "pattern": "^[a-z0-9_]+$" }, "additionalProperties": { "$ref": "#/$defs/windowStyle" } },
+    "door_styles": { "type": "object", "description": "eigene Türarten bzw. Änderungen (docs/LIBRARY.md)", "propertyNames": { "pattern": "^[a-z0-9_]+$" }, "additionalProperties": { "$ref": "#/$defs/doorStyle" } },
     "models": { "type": "array", "description": "eigene Modelle (models/<id>.yaml) für den Katalog, auch ungenutzte", "items": { "$ref": "#/$defs/id" } },
     "connections": { "type": "array", "description": "reserviert für spätere Versionen", "maxItems": 0 }
   },
@@ -26,7 +29,36 @@
       "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 },
       "minItems": 3
     },
-    "surface": { "enum": ["parquet", "planks", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water", "slabs", "stone", "roof", "roof_tiles", "flagstone"] },
+    "surface": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Oberfläche aus library/surfaces.yaml oder `surfaces` (docs/LIBRARY.md)" },
+    "surfaceDef": {
+      "type": "object",
+      "description": "Oberfläche: Muster oder Bild (docs/LIBRARY.md)",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "base": { "$ref": "#/$defs/surface" },
+        "pattern": { "enum": ["planks", "herringbone", "chevron", "basket", "tiles", "siding", "roof_tiles", "stone", "flagstone", "speckle", "lawn", "plain"] },
+        "image": { "type": "string" },
+        "size": { "oneOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 1, "maxItems": 2 }] },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "variation": { "type": "number", "minimum": 0, "maximum": 1 },
+        "joint": { "type": "number", "minimum": 0 },
+        "joint_color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "bond": { "oneOf": [{ "type": "number", "minimum": 0, "maximum": 1 }, { "const": "random" }] },
+        "rows": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "angle": { "type": "number" },
+        "strips": { "type": "integer", "minimum": 1 },
+        "spread": { "type": "number", "minimum": 0 },
+        "seed": { "type": "integer" },
+        "res": { "type": "number" },
+        "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "metalness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "relief": { "type": "number", "minimum": 0 },
+        "bump": { "type": "number", "minimum": 0 },
+        "outdoor": { "type": "boolean" },
+        "edge": { "$ref": "#/$defs/surface" }
+      }
+    },
     "entityId": { "type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$" },
     "entityList": {
       "oneOf": [
@@ -111,11 +143,17 @@
         "name": { "type": "string" },
         "kind": { "enum": ["house", "garage", "garden_house", "carport", "other"] },
         "floors": { "type": "array", "items": { "$ref": "#/$defs/floor" }, "minItems": 1 },
+        "styles": {
+          "type": "object",
+          "description": "Standard-Fenster- und Türarten des Gebäudes",
+          "additionalProperties": false,
+          "properties": { "window": { "$ref": "#/$defs/id" }, "door": { "$ref": "#/$defs/id" }, "exterior_door": { "$ref": "#/$defs/id" }, "front_door": { "$ref": "#/$defs/id" } }
+        },
         "facade": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "type": { "enum": ["plaster", "wood_siding", "brick", "stone"] },
+            "type": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "plaster (Putz) oder eine Oberfläche" },
             "color": { "type": "string" },
             "corners": { "oneOf": [{ "type": "string" }, { "const": false }] },
             "flush": { "type": "boolean" },
@@ -273,7 +311,8 @@
         "sill": { "type": "number" },
         "top": { "type": "number" },
         "sashes": { "type": "integer", "minimum": 1 },
-        "transom": { "type": "number", "minimum": 0, "maximum": 1 }
+        "transom": { "type": "number", "minimum": 0, "maximum": 1 },
+        "style": { "$ref": "#/$defs/id", "description": "Fensterart (library/openings.yaml oder window_styles)" }
       }
     },
     "door": {
@@ -292,9 +331,34 @@
         "open_deg": { "type": "number" },
         "arch": { "type": "boolean" },
         "top": { "const": "arch" },
-        "leaves": { "enum": [1, 2] }
+        "leaves": { "enum": [1, 2] },
+        "style": { "$ref": "#/$defs/id", "description": "Türart (library/openings.yaml oder door_styles)" }
       }
     },
+    "windowStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" }, "base": { "$ref": "#/$defs/id" },
+        "frame": { "type": "number", "exclusiveMinimum": 0 }, "depth": { "type": "number", "exclusiveMinimum": 0 }, "sash": { "type": "number", "exclusiveMinimum": 0 },
+        "offset": { "type": "number" }, "color": { "$ref": "#/$defs/hex" }, "sash_color": { "$ref": "#/$defs/hex" },
+        "board": { "oneOf": [{ "$ref": "#/$defs/hex" }, { "const": false }] },
+        "bars": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 2, "maxItems": 2 }, "bar": { "type": "number", "exclusiveMinimum": 0 },
+        "fixed": { "type": "boolean" }
+      }
+    },
+    "doorStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" }, "base": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["interior", "exterior"] }, "leaf": { "enum": ["panel", "flush", "glass", "solid"] },
+        "panels": { "type": "integer", "minimum": 1 }, "glass": { "type": "integer", "minimum": 0 },
+        "color": { "$ref": "#/$defs/hex" }, "frame_color": { "$ref": "#/$defs/hex" }, "handle": { "$ref": "#/$defs/hex" },
+        "bars": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 2, "maxItems": 2 }, "bar": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "hex": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
     "outdoor": {
       "type": "object",
       "additionalProperties": false,

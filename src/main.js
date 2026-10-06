@@ -3,6 +3,7 @@
 // Das Modell (model.yaml, docs/DATA_MODEL.md) wird zur Laufzeit geladen – standardmäßig aus
 // demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url.
 import { HouseScene } from './scene.js';
+import { applyLibrary } from './library.js';
 import { loadData, loadShared, loadUserModels, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
@@ -10,7 +11,8 @@ import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides,
 import { toScene, writeBack, gestureAction, roleEntities, showsBadge, badgeSpec, badgeEntities, conditionMet, playerSpec, GESTURES, activityOf } from './model/model.js';
 import { CATALOG, hasCapability, DEFAULT_MOUNT, DEFAULT_LIGHT_HEIGHT, MODEL_LIGHT_HEIGHT } from './model/catalog.js';
 import { CatalogPanel } from './catalogpanel.js';
-import { modelPreview } from './preview.js';
+import { modelPreview, surfacePreview, contactSheet } from './preview.js';
+import { isSurface, surfaceDef } from './surfaces.js';
 import { pointInPoly } from './geometry.js';
 import { toYaml, yamlHeader } from './model/yaml.js';
 import { entitiesOf, lampLight, callForEntities, isOn, stateText } from './ha.js';
@@ -498,11 +500,12 @@ class Ha3dDashboard extends HTMLElement {
         // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen
         // (Demo-Haus: aus eigenen Demo-Benutzerdaten, siehe store)
         applyOverrides(data.model, await this.store.loadOverrides());
+        applyLibrary(data.model);
         const scene = toScene(data.model);
         if (!scene.house.floors.length) throw new Error('Das Modell enthält noch keine Gebäude – Grundriss importieren (docs/SETUP.md)');
         // Was hat sich geändert? Bauwerk -> ganze Szene; nur Objekte -> nur die Einrichtungs-Schicht
-        const { site, buildings, outdoor, objects } = data.model;
-        const keys = { structure: JSON.stringify([site, buildings, outdoor]), objects: JSON.stringify(objects) };
+        const { site, buildings, outdoor, objects, surfaces, window_styles, door_styles } = data.model;
+        const keys = { structure: JSON.stringify([site, buildings, outdoor, surfaces, window_styles, door_styles]), objects: JSON.stringify(objects) };
         const old = this._keys;
         this._keys = keys;
         this.model = data.model;
@@ -823,6 +826,28 @@ class Ha3dDashboard extends HTMLElement {
     });
     if (select && o && !o.stored) ed.select({ type, id });
     else ed._emit();
+  }
+
+  /**
+   * Kontaktbogen für das Werkzeug scripts/preview.mjs: Oberflächen und Katalog-Modelle (IDs) als ein Bild (data-URL).
+   * Unbekannte IDs erscheinen rot beschriftet.
+   */
+  async previewSheet(ids) {
+    const r = this.view.renderer, items = [];
+    for (const id of ids) {
+      if (isSurface(id)) items.push({ label: `${id} · ${surfaceDef(id).label || ''}`, url: surfacePreview(r, this.view.shared.mat[id]) });
+      else if (CATALOG[id]) items.push({ label: `${id} · ${CATALOG[id].label || ''}`, url: modelPreview(r, id), error: CATALOG[id].broken });
+      else items.push({ label: `${id}: unbekannt`, url: null, error: true });
+    }
+    // Bilder eigener Oberflächen laden asynchron: kurz warten und die betroffenen neu rechnen
+    if (ids.some((id) => isSurface(id) && surfaceDef(id).image)) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      for (const it of items) {
+        const id = it.label.split(' · ')[0];
+        if (isSurface(id) && surfaceDef(id).image) it.url = surfacePreview(r, this.view.shared.mat[id]);
+      }
+    }
+    return contactSheet(items);
   }
 
   _rebuildObjects() {

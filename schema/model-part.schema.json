@@ -45,7 +45,16 @@
         "rod": { "type": "object", "additionalProperties": false, "required": ["from", "to"], "properties": { "from": { "$ref": "#/$defs/vec3" }, "to": { "$ref": "#/$defs/vec3" }, "radius": { "$ref": "#/$defs/num" }, "segments": { "type": "integer" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
         "cylinder": { "type": "object", "additionalProperties": false, "properties": { "radius": { "$ref": "#/$defs/num" }, "radius_back": { "$ref": "#/$defs/num" }, "height": { "$ref": "#/$defs/num" }, "at": { "$ref": "#/$defs/vec3" }, "rot": { "$ref": "#/$defs/vec3" }, "from": { "$ref": "#/$defs/vec3" }, "to": { "$ref": "#/$defs/vec3" }, "segments": { "type": "integer" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
         "sphere": { "type": "object", "additionalProperties": false, "properties": { "radius": { "$ref": "#/$defs/num" }, "at": { "$ref": "#/$defs/vec3" }, "scale": { "$ref": "#/$defs/vec3" }, "rot": { "$ref": "#/$defs/vec3" }, "segments": { "type": "integer" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
-        "tube": { "type": "object", "additionalProperties": false, "required": ["points"], "properties": { "points": { "type": "array", "items": { "$ref": "#/$defs/vec3" }, "minItems": 2 }, "radius": { "$ref": "#/$defs/num" }, "segments": { "type": "integer" }, "closed": { "type": "boolean" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } }
+        "tube": { "type": "object", "additionalProperties": false, "required": ["points"], "properties": { "points": { "type": "array", "items": { "$ref": "#/$defs/vec3" }, "minItems": 2 }, "radius": { "$ref": "#/$defs/num" }, "segments": { "type": "integer" }, "closed": { "type": "boolean" }, "material": { "type": "string" }, "glow": { "type": "boolean" } } },
+        "group": {
+          "type": "object", "additionalProperties": false, "required": ["anim", "parts"],
+          "description": "Bewegliche Gruppe (Tor, Flügel, Rad): bewegt sich, solange das Objekt aktiv ist (z. B. cover offen)",
+          "properties": {
+            "pivot": { "$ref": "#/$defs/vec3" },
+            "anim": { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "enum": ["swing", "slide", "spin"] }, "axis": { "enum": ["x", "y", "z"] }, "angle": { "$ref": "#/$defs/num" }, "distance": { "$ref": "#/$defs/num" }, "speed": { "$ref": "#/$defs/num" }, "duration": { "$ref": "#/$defs/num" } } },
+            "parts": { "type": "array", "items": { "$ref": "#/$defs/part" }, "minItems": 1 }
+          }
+        }
       }
     }
   }

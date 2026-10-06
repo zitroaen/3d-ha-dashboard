@@ -282,6 +282,7 @@ export function toScene(model) {
         id: floorKey(b, f),
         building: b.id,
         facade: b.facade,
+        styles: b.styles,
         lowest: (f.level ?? 0) === lowest,
         name: f.name,
         buildingName: b.name,

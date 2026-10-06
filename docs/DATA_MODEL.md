@@ -22,7 +22,15 @@ site: { ... }        # Grundstück: Name, Nordrichtung, Boden
 buildings: [ ... ]   # Wohnhaus, Garage, Gartenhaus … mit Etagen und Räumen
 outdoor: [ ... ]     # Außenbereiche („Gartenräume“): Terrasse, Rasen, Einfahrt …
 objects: [ ... ]     # Möbel, Leuchten, Geräte – mit Verknüpfung zu Home Assistant
+surfaces: { ... }    # optional: eigene Beläge/Fassaden bzw. Änderungen an der Bibliothek (docs/LIBRARY.md)
+window_styles: { ... }  # optional: eigene Fensterarten (docs/LIBRARY.md)
+door_styles: { ... }    # optional: eigene Türarten (docs/LIBRARY.md)
+models: [ ... ]      # optional: eigene Modelle (models/<id>.yaml)
 ```
+
+Was von Haus zu Haus verschieden ist – Beläge, Fassaden, Fenster-, Tür- und Torarten, Möbel – kommt aus einer
+**Bibliothek**: Die Engine bringt Beispiele mit, die Instanz ergänzt und ändert sie in ihren eigenen Daten
+(**[LIBRARY.md](LIBRARY.md)**).
 
 ## Grundregeln
 
@@ -108,13 +116,14 @@ Wohnhaus, Garage, Gartenhaus, Carport … jeweils mit Etagen.
 | `floors` | ja | | Etagen, mindestens eine |
 | `facade` | nein | Putz (Wandfarbe) | Außenwände des Gebäudes, siehe unten |
 | `roof` | nein | Flachdach | Dach über der obersten Etage: ein Dachteil oder eine Liste davon, siehe unten; `false` = keins |
+| `styles` | nein | | Standard-Fenster- und Türarten: `{ window, door, exterior_door, front_door }` ([LIBRARY.md](LIBRARY.md#fenster--und-türarten-window_styles-door_styles)) |
 
 **Fassade (`buildings[].facade`):** Material der Außenseiten aller Wände (auch Giebel und Gauben); innen bleibt die
 Wandfarbe.
 
 | Feld | Pflicht | Standard | Bedeutung |
 |---|---|---|---|
-| `type` | nein | `plaster` | `plaster` (Putz), `wood_siding` (Holzschalung, waagrechte Bretter), `brick` (Ziegel), `stone` (Naturstein) |
+| `type` | nein | `plaster` | `plaster` (Putz in Wandfarbe) oder jede [Oberfläche](LIBRARY.md#oberflächen-surfaces), z. B. `wood_siding` (Holzschalung), `brick` (Ziegel), `stone` (Naturstein) oder eine eigene |
 | `color` | nein | je Art | Farbe (`#rrggbb`), z. B. `#8e2f22` Schwedenrot (Standard bei `wood_siding`), `#ece5d8` Putz |
 | `corners` | nein | weiß bei `wood_siding` | Farbe der Eckbretter (an Hausecken und Fensterlaibungen); `false` = keine |
 | `plinth` | nein | | Sockel: `{ height (0.4), material (Oberfläche, z. B. stone), color }` – auf der untersten Etage bis auf das Gelände davor |
@@ -226,6 +235,7 @@ Höhe = Etagenhöhe.
 | `top` | nein | 2.1 | Oberkante |
 | `sashes` | nein | ca. 50 cm je Flügel | Anzahl Flügel |
 | `transom` | nein | | Kämpfer: Anteil der Glashöhe für die Querteilung |
+| `style` | nein | Gebäude-Standard bzw. `standard` | Fensterart (Rahmen, Farbe, Sprossen, Festverglasung – [LIBRARY.md](LIBRARY.md#fenster--und-türarten-window_styles-door_styles)) |
 
 **Tür** (`doors[]`):
 
@@ -241,6 +251,7 @@ Höhe = Etagenhöhe.
 | `open_deg` | nein | 85 | Öffnungswinkel (Innentüren) |
 | `arch` | nein | `false` | Rundbogen (gleichwertig `top: arch`): Radius = halbe Breite, `height` = Scheitel (ohne Angabe 2,05 m + Radius, der Kämpfer liegt dann auf Türhöhe). Die Wand bekommt Zwickel und eine gewölbte Laibung; Türblatt bzw. Haustür mit Bogenfeld, Glastür mit Oberlicht im Bogen, Innentüren ohne Zargenkopf |
 | `leaves` | nein | 1 | `2` = zweiflügelig: Innentüren mit zwei Blättern (je eins von jeder Seite), Glastüren mit Mittelpfosten, Haustüren mit Fuge |
+| `style` | nein | Gebäude-Standard bzw. `interior`/`patio`/`front` | Türart (Füllung, glatt, Glas, Haustür, Farben – [LIBRARY.md](LIBRARY.md#fenster--und-türarten-window_styles-door_styles)) |
 
 ## `outdoor` – Außenbereiche („Gartenräume“)
 
@@ -493,26 +504,12 @@ Bedingung. Einstellbar im Editor (Objekt → Einstellungen).
 
 ## Oberflächen
 
-`surface` von Räumen, Außenbereichen und `site.ground`:
-
-| Wert | Darstellung |
-|---|---|
-| `parquet` | Fischgrätparkett (Stäbe 7 × 50 cm im Zickzack) |
-| `planks` | Dielen im Versatz (bis 0.30 hieß das `parquet`) |
-| `parquet_cube` | Würfelparkett |
-| `tiles` | Fliesen |
-| `concrete` | Beton/Estrich |
-| `lawn` | Rasen |
-| `paving` | Pflaster/Platten |
-| `gravel` | Kies |
-| `soil` | Erde/Beet |
-| `wood` | Holzdeck |
-| `water` | Wasser |
-| `slabs` | Großformatplatten (60 × 30 cm, hellgrau) |
-| `stone` | Naturstein (Trockenmauer, Blockstufen) |
-| `roof` | Flachdach (dunkle Dachbahn) |
-| `roof_tiles` | Dachziegel (Falzziegel, Farbe über `color` des Dachs) |
-| `flagstone` | Polygonalplatten aus Naturstein (hell, dunkle Einsprengsel), innen wie außen (Natursteinweg) |
+`surface` von Räumen, Zonen, Außenbereichen, Dachteilen und `site.ground` (sowie `edge`, `facade.type`,
+`facade.plinth.material`, `params.material`) ist die ID einer Oberfläche: aus der Beispiel-Bibliothek der Engine
+(`parquet` Fischgrät, `parquet_chevron`, `parquet_double`, `parquet_strip`, `parquet_ship`, `parquet_cube`, `planks`,
+`tiles`, `concrete`, `lawn`, `paving`, `gravel`, `soil`, `wood`, `stone`, `roof`, `roof_tiles`, `brick` …) oder eine
+eigene aus `surfaces` in `model.yaml` – Muster mit Maßen und Farben oder ein eigenes Foto. Liste, Muster und Felder:
+**[LIBRARY.md](LIBRARY.md#oberflächen-surfaces)**.
 
 ## Katalog
 
@@ -624,8 +621,8 @@ Fehlt ein Modell im Katalog, lässt es sich als eigene Datei im Datenordner besc
 `model.yaml` (Schema: `schema/model-part.schema.json`). Das Panel lädt sie mit `model.yaml` – alle, die ein Objekt
 benutzt (`model: <id>`), dazu die in der Liste `models: [<id>, …]` von `model.yaml` (so erscheinen auch noch
 ungenutzte im Katalog). Im Editor stehen sie in der Gruppe **Eigene** mit Vorschaubild. Ein fehlerhaftes Modell lädt
-als magentafarbener Platzhalter-Quader mit Hinweis; `npm run validate` prüft die Dateien (eine ID wie ein
-eingebautes Modell ist ein Fehler). Der Dev-Server, `deploy.sh` und die Integration (Datenordner `data_url`)
+als magentafarbener Platzhalter-Quader mit Hinweis; `npm run validate` prüft die Dateien. Die Katalog-Modelle der
+Engine sind Beispiele: ein eigenes Modell mit derselben ID (in `models` eintragen) ersetzt sie. Der Dev-Server, `deploy.sh` und die Integration (Datenordner `data_url`)
 liefern den Ordner `models/` mit aus; der Export im Editor betrifft nur `model.yaml`.
 
 | Feld | Pflicht | Standard | Bedeutung |
@@ -646,6 +643,11 @@ Grundformen (je Eintrag genau eine, jeweils mit `material` und optional `glow: t
 `radius`, `radius_back` = Radius oben bzw. am Ende), `sphere` (`radius`, `at`, `scale` für Ellipsoide), `tube` (weiches
 Rohr durch `points`, `radius`). Größe und Treffer-Fläche ergeben sich aus den Teilen; `size[0]` eines Objekts
 skaliert das Modell gleichmäßig (Faktor aus der Breite).
+
+Bewegliche Teile (Tor, Flügel, Rad): `group: { pivot, anim, parts }` – `anim.type` `swing` (um `axis` x/y/z,
+`angle` in Grad), `slide` (entlang `axis`, `distance` in Metern) oder `spin` (`speed` Umdrehungen/s); `duration`
+(Sekunden). Die Gruppe bewegt sich, solange das Objekt aktiv ist (power-Entity an bzw. `cover` offen); `swing` und
+`slide` fahren zurück. Beispiel: `examples/demo/models/gartentor.yaml`, Kurzreferenz: [LIBRARY.md](LIBRARY.md).
 
 Beispiel: Schreibtischleuchte mit Gelenkarm (`models/arbeitsleuchte.yaml`; das Demo-Haus hat `bogenleuchte` und
 `wandregal` in `examples/demo/models/`):
@@ -684,6 +686,8 @@ light: { at: [0, "$arm - 0.05", 0], mount: table, range: 1.5 }
 1. das Schema (`schema/model.schema.json`),
 2. eindeutige IDs (Gebäude, Etagen je Gebäude, Bereiche, Objekte),
 3. Verweise: `space`, `windows[].room`, `doors[].rooms`, Modelle aus dem Katalog, `light` genau bei Leuchten,
+   Oberflächen (`surface`, `edge`, `facade.type` …), Fenster-/Türarten (`style`, `styles`) samt `base`, Bilder eigener
+   Oberflächen,
 4. Lage: jedes Objekt mit `space` liegt in dessen Polygon; Leuchten unter der Raumhöhe,
 5. Entity-IDs syntaktisch gültig, Texturen (auch das Luftbild) vorhanden,
 6. Steildächer: Fenster über der Dachfläche (werden gekürzt oder weggelassen – Gaube anlegen?), Wände der obersten
@@ -774,6 +778,8 @@ objects:
 3. **Etagen:** `level` je Stockwerk; gleiche Ebene in mehreren Gebäuden ist erlaubt und erwünscht.
 4. **Außenbereiche** für Terrasse, Garten, Einfahrt anlegen (Polygone, `surface`).
 5. **Objekte:** zuerst Leuchten (Fähigkeit `light`), dann Möbel und Geräte. Unbekannte Geräte: `box`.
+   Beläge, Fassaden, Fenster-/Türarten und fehlende Modelle als Daten anlegen ([LIBRARY.md](LIBRARY.md)), nie im
+   Engine-Code; prüfen mit `npm run validate` und `npm run preview -- <id> …` (ein Bild statt der Screenshot-Reihe).
 6. **Verknüpfen:** HA-Export lesen, `ha.entities.power` bzw. `info` setzen; Aktionen nur angeben, wenn sie vom Standard
    abweichen.
 7. `npm run validate` muss fehlerfrei sein, dann `npm test` und die Screenshots ansehen.
@@ -844,6 +850,13 @@ oder geänderte Datei = Import, sie gewinnt). Ohne beides: Demo-Haus. Das gespei
 Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Speicher.
 
 ## Änderungen
+
+- **Version 2, Ergänzung (0.38.0, abwärtskompatibel):** Bibliothek als Daten ([LIBRARY.md](LIBRARY.md)): `surfaces`
+  (eigene Beläge/Fassaden aus Mustern oder Bildern, Änderungen an Beispielen), `window_styles`/`door_styles`,
+  `windows[].style`, `doors[].style`, `buildings[].styles`; `facade.type` und alle `surface`-Felder nehmen jede
+  Oberfläche; neue Beispiele (u. a. `parquet_chevron`, `parquet_double`, `parquet_strip`, `parquet_ship`,
+  `planks_wide`, `tiles_metro`, `cobble`, `sandstone`, `granite`); eigene Modelle mit beweglichen Gruppen (`group`)
+  und gleicher ID wie ein Beispielmodell (ersetzt es). `wood` (Holzdeck) ist jetzt gedielt.
 
 - **Version 2, Ergänzung (0.37.0, abwärtskompatibel):** eigene Modelle `models/<id>.yaml` (Grundformen oder glTF), Liste
   `models` in `model.yaml`; Schema `schema/model-part.schema.json`.

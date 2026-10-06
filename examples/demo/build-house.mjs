@@ -72,8 +72,8 @@ const doors = [
   { hinge: [3.6, 8 - EXT / 2], end: [2.8, 8 - EXT / 2], swing: 1, jamb: ej, type: 'exterior', leaf: 'glass', rooms: ['wohnen'], height: 2.1 },
   { hinge: [8.6, EXT / 2], end: [9.5, EXT / 2], swing: 1, jamb: ej, type: 'exterior', leaf: 'solid', rooms: ['kueche'], arch: true },
   { hinge: [6.0, 1.2], end: [6.0, 2.5], swing: 1, jamb: ij, type: 'interior', rooms: ['wohnen', 'kueche'], height: 2.5, arch: true, leaves: 2 },
-  { hinge: [6.0, 5.2], end: [6.0, 6.1], swing: 1, jamb: ij, type: 'interior', rooms: ['wohnen', 'schlafen'], height: 2.0 },
-  { hinge: [8.0, 6.4], end: [8.0, 7.2], swing: 1, jamb: ij, type: 'interior', rooms: ['schlafen', 'bad'], height: 2.0 },
+  { hinge: [6.0, 5.2], end: [6.0, 6.1], swing: 1, jamb: ij, type: 'interior', rooms: ['wohnen', 'schlafen'], height: 2.0, style: 'interior_panels' },
+  { hinge: [8.0, 6.4], end: [8.0, 7.2], swing: 1, jamb: ij, type: 'interior', rooms: ['schlafen', 'bad'], height: 2.0, style: 'interior_glass' },
 ].map((d) => ({ ...d, hinge: d.hinge.map(r3), end: d.end.map(r3), jamb: d.jamb.map(r3) }));
 
 // --- Obergeschoss: ein Studio über dem Wohnzimmer (Außenwände wie unten, ohne Türen)
@@ -84,7 +84,7 @@ const ogWalls = [
   ...wall({ axis: 'y', from: EXT, to: 8 - EXT, at0: 0, at1: EXT, gaps: [[1.2, 2.1]] }),
   ...wall({ axis: 'y', from: EXT, to: 8 - EXT, at0: 6 - INT / 2, at1: 6 + INT / 2 }),
 ];
-const ogRooms = [{ id: 'studio', name: 'Studio', polygon: rect(EXT, EXT, 6 - INT / 2, 8 - EXT), surface: 'parquet' }];
+const ogRooms = [{ id: 'studio', name: 'Studio', polygon: rect(EXT, EXT, 6 - INT / 2, 8 - EXT), surface: 'parquet_chevron' }];
 const ogWindows = [
   { rect: [2.0, 0, 3.4, EXT], room: 'studio' },
   { rect: [2.0, 8 - EXT, 3.6, 8], room: 'studio', sill: 0.5 },
@@ -168,9 +168,11 @@ function gardenHouse() {
     kind: 'garden_house',
     // Schwedenrote Holzschalung mit weißen Eckbrettern, Sockel aus Naturstein
     facade: { type: 'wood_siding', plinth: { height: 0.25, material: 'stone' } },
+    // Fenster- und Türarten aus der Bibliothek (library/openings.yaml): weiße Sprossenfenster
+    styles: { window: 'bars' },
     floors: [{
       id: 'eg', name: 'Gartenhaus', level: 0, elevation: 0, height: 2.2,
-      rooms: [{ id: 'gartenhaus', name: 'Gartenhaus', polygon: rect(X0 + T, Y0 + T, X1 - T, Y1 - T), surface: 'parquet', beams: { dir: 'y', spacing: 0.7, size: [0.1, 0.14] } }],
+      rooms: [{ id: 'gartenhaus', name: 'Gartenhaus', polygon: rect(X0 + T, Y0 + T, X1 - T, Y1 - T), surface: 'dielen_gartenhaus', beams: { dir: 'y', spacing: 0.7, size: [0.1, 0.14] } }],
       walls: ws.map((polygon) => ({ polygon })),
       windows: [{ rect: [17.6, Y1 - T, 18.6, Y1].map(r3), room: 'gartenhaus', sill: 0.9, top: 1.8 }],
       doors: [{ hinge: [r3(X0 + T / 2), 7.8], end: [r3(X0 + T / 2), 8.7], swing: -1, jamb: [-T / 2, T / 2].map(r3), type: 'exterior', leaf: 'solid', rooms: ['gartenhaus'], height: 1.95 }],
@@ -296,11 +298,13 @@ const model = {
     attribution: 'Luftbild und Gelände: erfunden (Demo-Haus, keine echten Geodaten)',
     terrain: { ...terrain(), texture: { file: 'textures/luftbild.svg', strength: 0.8 } },
   },
+  // eigene Oberfläche: aus der Bibliothek abgeleitet (docs/LIBRARY.md)
+  surfaces: { dielen_gartenhaus: { label: 'Dielen Gartenhaus', base: 'planks_wide', color: '#8a6a48' } },
   buildings,
   outdoor,
   objects: prev.objects || [],
   // eigene Modelle aus models/ (Katalog „Eigene“)
-  models: prev.models || ['bogenleuchte', 'wandregal'],
+  models: prev.models || ['bogenleuchte', 'wandregal', 'gartentor'],
 };
 const header = yamlHeader(prevText) || '# Erfundenes Demo-Haus (Testdaten und Vorlage). Format: docs/DATA_MODEL.md\n# Bauwerk erzeugt von examples/demo/build-house.mjs, Objekte von Hand bzw. im Editor';
 writeFileSync(file, toYaml(model, header));

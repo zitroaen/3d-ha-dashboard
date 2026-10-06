@@ -4,7 +4,7 @@
   "license": "MIT",
   "repository": "github:zitroaen/3d-ha-dashboard",
   "private": true,
-  "version": "0.37.0",
+  "version": "0.38.0",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -12,6 +12,7 @@
     "serve": "node tests/devserver.mjs",
     "demo": "node examples/demo/build-house.mjs",
     "validate": "node tests/validate-data.mjs",
+    "preview": "node scripts/preview.mjs",
     "link-check": "node tests/link-check.mjs",
     "test:unit": "node tests/model.test.mjs",
     "test:screens": "node tests/screenshots.mjs",

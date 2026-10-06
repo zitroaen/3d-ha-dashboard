@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FloorModel, createSharedMaterials } from './house.js';
+import { setSurfaceAssets } from './surfaces.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from './roomlight.js';
 import { pointInPoly, heightAt, Builder } from './geometry.js';
@@ -36,7 +37,7 @@ function pathOf(pts) {
 }
 
 /** Animationen mit Fortschritt 0..1 (Tore): laufen bis in die Endlage, auch beim Schließen */
-const PROGRESS = new Set(['swing', 'sectional']);
+const PROGRESS = new Set(['swing', 'sectional', 'slide']);
 
 /** Punkt der Torschiene nach Weglänge s (y, z in der Ebene des Tors): senkrecht bis H, Viertelbogen, waagrecht nach innen */
 function trackAt(s, H, R) {
@@ -181,6 +182,8 @@ export class HouseScene {
     this.scene.background = new THREE.Color(0x0a0d13);
     this.scene.fog = new THREE.Fog(0x0a0d13, 45, 95);
 
+    // Bilder eigener Oberflächen (surfaces → image) aus dem Datenordner; nach dem Laden neu zeichnen
+    setSurfaceAssets(assetBase, () => this.requestRender());
     this.shared = createSharedMaterials();
     // scharfe Böden auch bei flachem Blickwinkel (anisotrope Filterung, kostet kaum etwas)
     const aniso = Math.min(8, r.capabilities.getMaxAnisotropy());
@@ -208,7 +211,7 @@ export class HouseScene {
     setupTerrainShading(terrain);
     const aerial = aerialSpec(terrain);
     if (aerial) {
-      const groundMat = this.shared.mat[this.house.ground] || this.shared.mat.lawn;
+      const groundMat = this.shared.mat[this.shared.outName(this.house.ground)] || this.shared.mat.lawn;
       withRoomLight(groundMat, { ...(groundMat.userData.roomLightOpts || {}), aerial: true });
       this.aerialReady = loadAerial(aerial, new URL(aerial.file, assetBase || location.href).href, () => {
         this.renderer.shadowMap.needsUpdate = true;
@@ -546,7 +549,7 @@ export class HouseScene {
     this.center = new THREE.Vector3(cx, 0, cz);
 
     // Boden außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen (kein Flackern)
-    const groundMat = this.shared.mat[this.house.ground] || this.shared.mat.lawn;
+    const groundMat = this.shared.mat[this.shared.outName(this.house.ground)] || this.shared.mat.lawn;
     const ground = new THREE.Mesh(this._groundGeometry(cx, cz), groundMat);
     ground.receiveShadow = true;
     this.scene.add(ground);
@@ -1038,6 +1041,12 @@ export class HouseScene {
     if (!PROGRESS.has(spec.type)) return;
     const e = a.progress * a.progress * (3 - 2 * a.progress);
     if (spec.type === 'sectional') return poseSections(node, spec, e);
+    if (spec.type === 'slide') {
+      // Schiebetor: entlang der eigenen Achse um `distance` (Meter) verschieben
+      const dir = (spec.axis === 'y' ? _Y : spec.axis === 'z' ? _Z : _X).clone().applyQuaternion(node.userData.baseQuaternion);
+      node.position.copy(node.userData.basePosition).addScaledVector(dir, spec.distance * e);
+      return;
+    }
     const axis = spec.axis === 'y' ? _Y : spec.axis === 'z' ? _Z : _X;
     node.quaternion.copy(node.userData.baseQuaternion).multiply(_q.setFromAxisAngle(axis, spec.angle * e));
   }

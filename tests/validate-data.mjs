@@ -13,6 +13,8 @@ import { LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from '../src/roomlight.js';
 import { FURNITURE, LAMPS } from '../src/models.js';
 import { USER_MODEL_DIR, checkUserModel, registerUserModels } from '../src/usermodels.js';
 import { load as parseYaml } from 'js-yaml';
+import { setSurfaceDefs, checkSurface, isSurface, surfaceDef, surfaceIds } from '../src/surfaces.js';
+import { setStyleDefs, WINDOW_STYLES, DOOR_STYLES } from '../src/styles.js';
 
 const errors = [], warnings = [];
 const file = join(DATA_DIR, 'model.yaml');
@@ -56,10 +58,7 @@ if (!ajv.validate(schema, model)) {
       for (const e of ajv.errors) errors.push(`Eigenes Modell ${f}: ${e.instancePath || '/'} ${e.message}${e.params?.additionalProperty ? ` (${e.params.additionalProperty})` : ''}`);
       continue;
     }
-    if (CATALOG[id] && !CATALOG[id].user) {
-      errors.push(`Eigenes Modell ${f}: gleiche ID wie das eingebaute Modell ${id}`);
-      continue;
-    }
+    if (CATALOG[id] && !CATALOG[id].user) warnings.push(`Eigenes Modell ${f} ersetzt das Beispielmodell ${id}`);
     try {
       checkUserModel(def, id);
       if (def.file && !existsSync(join(dir, def.file))) throw new Error(`${def.file} fehlt`);
@@ -70,6 +69,61 @@ if (!ajv.validate(schema, model)) {
   }
   for (const w of registerUserModels(defs)) errors.push(w);
   for (const id of model.models || []) if (!files.includes(`${id}.yaml`)) errors.push(`models: ${id}.yaml fehlt in ${USER_MODEL_DIR}`);
+}
+
+// 1c. Oberflächen: Bibliothek der Engine + `surfaces` der Instanz; alle Verweise müssen bekannt sein
+{
+  setSurfaceDefs(parseYaml(readFileSync(join(ENGINE_ROOT, 'library/surfaces.yaml'), 'utf8')), model.surfaces);
+  for (const id of surfaceIds()) for (const e of checkSurface(id, surfaceDef(id))) errors.push(`Oberfläche ${e}`);
+  for (const [id, d] of Object.entries(model.surfaces || {})) {
+    const img = surfaceDef(id)?.image;
+    if (img && !existsSync(join(DATA_DIR, img))) errors.push(`Oberfläche ${id}: Bild ${img} fehlt im Datenordner`);
+    if (d && typeof d === 'object' && !d.base && !d.pattern && !d.image && !isSurface(id)) errors.push(`Oberfläche ${id}: pattern, image oder base nötig`);
+  }
+  const ref = (where, id) => {
+    if (id != null && id !== false && !isSurface(id)) errors.push(`${where}: Oberfläche „${id}“ unbekannt (Bibliothek oder model.yaml → surfaces)`);
+  };
+  ref('site.ground', model.site?.ground?.surface);
+  for (const b of model.buildings || []) {
+    const ft = b.facade?.type;
+    if (ft && ft !== 'plaster') ref(`${b.id}: facade.type`, ft);
+    if (b.facade?.plinth) ref(`${b.id}: facade.plinth.material`, b.facade.plinth.material);
+    for (const r of [b.roof].flat().filter((x) => x && typeof x === 'object')) ref(`${b.id}: roof.surface`, r.surface);
+    for (const f of b.floors || []) {
+      for (const r of f.rooms || []) {
+        ref(`Raum ${r.id}`, r.surface);
+        for (const z of r.zones || []) ref(`Raum ${r.id}: zones`, z.surface);
+      }
+    }
+  }
+  for (const o of model.outdoor || []) {
+    ref(`Außenbereich ${o.id}`, o.surface);
+    ref(`Außenbereich ${o.id}: edge`, o.edge);
+  }
+  // Fenster- und Türarten
+  setStyleDefs(parseYaml(readFileSync(join(ENGINE_ROOT, 'library/openings.yaml'), 'utf8')), model);
+  const sref = (where, S, id, kind) => {
+    if (id != null && !S.has(id)) errors.push(`${where}: ${kind} „${id}“ unbekannt (library/openings.yaml oder model.yaml → ${kind === 'Fensterart' ? 'window_styles' : 'door_styles'})`);
+  };
+  for (const [S, kind] of [[WINDOW_STYLES, 'Fensterart'], [DOOR_STYLES, 'Türart']]) {
+    for (const id of S.ids()) {
+      const b = S.def(id);
+      if (!/^[a-z0-9_]+$/.test(id)) errors.push(`${kind} ${id}: nur Kleinbuchstaben, Ziffern und _`);
+      if (b?.base && !S.has(b.base)) errors.push(`${kind} ${id}: base „${b.base}“ unbekannt`);
+    }
+  }
+  for (const b of model.buildings || []) {
+    sref(`${b.id}: styles.window`, WINDOW_STYLES, b.styles?.window, 'Fensterart');
+    for (const k of ['door', 'exterior_door', 'front_door']) sref(`${b.id}: styles.${k}`, DOOR_STYLES, b.styles?.[k], 'Türart');
+    for (const f of b.floors || []) {
+      for (const [i, w] of (f.windows || []).entries()) sref(`${b.id}/${f.id} Fenster ${i + 1}`, WINDOW_STYLES, w.style, 'Fensterart');
+      for (const [i, d] of (f.doors || []).entries()) sref(`${b.id}/${f.id} Tür ${i + 1}`, DOOR_STYLES, d.style, 'Türart');
+    }
+  }
+  for (const o of model.objects || []) {
+    const m = o.params?.material;
+    if (typeof m === 'string' && m !== 'plaster') ref(`Objekt ${o.id}: params.material`, m);
+  }
 }
 
 // 2. eindeutige IDs
@@ -191,6 +245,17 @@ if (existsSync(doc)) {
     const geo = c.capabilities?.includes('light') ? LAMPS : FURNITURE;
     if (!geo[m]) errors.push(`Katalog: Modell ${m} hat keine Geometrie in src/models.js`);
   }
+}
+
+// Bibliothek in der Doku = Bibliothek der Engine (Oberflächen, nur im Engine-Repo)
+const libDoc = join(ENGINE_ROOT, 'docs/LIBRARY.md');
+if (existsSync(libDoc)) {
+  const text = readFileSync(libDoc, 'utf8');
+  const table = text.slice(text.indexOf('<!-- oberflaechen:start -->'), text.indexOf('<!-- oberflaechen:end -->'));
+  const documented = new Set([...table.matchAll(/^\| `([a-z0-9_]+)` \|/gm)].map((m) => m[1]));
+  const lib = Object.keys(parseYaml(readFileSync(join(ENGINE_ROOT, 'library/surfaces.yaml'), 'utf8')));
+  for (const id of lib) if (!documented.has(id)) errors.push(`Bibliothek: Oberfläche ${id} fehlt in docs/LIBRARY.md`);
+  for (const id of documented) if (!lib.includes(id)) errors.push(`Bibliothek: docs/LIBRARY.md nennt ${id}, das es nicht gibt`);
 }
 
 const nRooms = buildings.reduce((n, b) => n + (b.floors || []).reduce((m, f) => m + (f.rooms || []).length, 0), 0);

@@ -69,27 +69,87 @@ export function modelPreview(renderer, model) {
     camera.far = dist * 4;
     camera.updateProjectionMatrix();
 
-    const prevTarget = renderer.getRenderTarget(), prevColor = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
-    // (Schatten bleiben eingeschaltet – kein Licht hier wirft welche; Umschalten würde alle Shader neu bauen)
-    renderer.setRenderTarget(target);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear();
-    renderer.render(scene, camera);
-    renderer.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, pixels);
-    renderer.setRenderTarget(prevTarget);
-    renderer.setClearColor(prevColor, prevAlpha);
-
-    // Bild (WebGL liest von unten nach oben) in ein Canvas umdrehen
-    const c = document.createElement('canvas');
-    c.width = c.height = SIZE;
-    const g = c.getContext('2d');
-    const img = g.createImageData(SIZE, SIZE);
-    for (let y = 0; y < SIZE; y++) img.data.set(pixels.subarray((SIZE - 1 - y) * SIZE * 4, (SIZE - y) * SIZE * 4), y * SIZE * 4);
-    g.putImageData(img, 0, 0);
+    const c = renderTo(renderer, scene, camera, target, pixels);
     url = c.toDataURL('image/png');
   }
   scene.remove(group);
   group.traverse((o) => o.isMesh && o.geometry.dispose());
   cache.set(model, url);
   return url;
+}
+
+/** Szene in das Render-Target rechnen und als Canvas (richtig herum) zurückgeben */
+function renderTo(renderer, scene, camera, target, pixels) {
+  const prevTarget = renderer.getRenderTarget(), prevColor = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
+  // (Schatten bleiben eingeschaltet – kein Licht hier wirft welche; Umschalten würde alle Shader neu bauen)
+  renderer.setRenderTarget(target);
+  renderer.setClearColor(0x000000, 0);
+  renderer.clear();
+  renderer.render(scene, camera);
+  renderer.readRenderTargetPixels(target, 0, 0, target.width, target.height, pixels);
+  renderer.setRenderTarget(prevTarget);
+  renderer.setClearColor(prevColor, prevAlpha);
+  // Bild (WebGL liest von unten nach oben) in ein Canvas umdrehen
+  const W = target.width, H = target.height;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) img.data.set(pixels.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+/**
+ * Vorschau einer Oberfläche (Belag, Fassade): 2 × 2 m schräg von oben, mit Textur, Relief und Farbe des Materials
+ * aus der Szene (ohne Raumlicht). Für das Werkzeug `scripts/preview.mjs`.
+ */
+export function surfacePreview(renderer, mat, size = 256) {
+  stage ??= setup();
+  const { scene } = stage;
+  const target = new THREE.WebGLRenderTarget(size, size, { samples: 4 });
+  target.texture.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.MeshStandardMaterial({ color: mat.color, map: mat.map, normalMap: mat.normalMap, normalScale: mat.normalScale, roughness: mat.roughness, metalness: mat.metalness });
+  // UV in Metern wie im Haus (die Texturen wiederholen sich je Meter)
+  const geo = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 2);
+  const plane = new THREE.Mesh(geo, m);
+  scene.add(plane);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+  camera.position.set(0, 3.6, 1.6);
+  camera.lookAt(0, 0, 0.05);
+  const c = renderTo(renderer, scene, camera, target, new Uint8Array(size * size * 4));
+  scene.remove(plane);
+  geo.dispose();
+  m.dispose();
+  target.dispose();
+  return c.toDataURL('image/png');
+}
+
+/**
+ * Kontaktbogen: Vorschaubilder mit Beschriftung in einem Raster (data-URL). items: [{ label, url }]
+ */
+export async function contactSheet(items, cell = 192, cols = 6) {
+  const rows = Math.ceil(items.length / cols), pad = 22;
+  const c = document.createElement('canvas');
+  c.width = cols * cell;
+  c.height = rows * (cell + pad);
+  const g = c.getContext('2d');
+  g.fillStyle = '#20242b';
+  g.fillRect(0, 0, c.width, c.height);
+  g.font = '13px sans-serif';
+  for (const [i, it] of items.entries()) {
+    const x = (i % cols) * cell, y = Math.floor(i / cols) * (cell + pad);
+    if (it.url) {
+      const img = new Image();
+      img.src = it.url;
+      await img.decode();
+      g.drawImage(img, x + 4, y + 4, cell - 8, cell - 8);
+    }
+    g.fillStyle = it.error ? '#ff8080' : '#e8e6e1';
+    g.fillText(it.label.slice(0, 30), x + 6, y + cell + 15);
+  }
+  return c.toDataURL('image/png');
 }
