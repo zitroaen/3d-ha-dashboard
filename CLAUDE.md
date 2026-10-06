@@ -352,3 +352,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   die anderen Steildach-Teile: je Fläche wird der Bereich, in dem diese Ebene unter allen Ebenen des anderen Teils
   liegt (Halbebenen, konvex), per `minusConvex` abgezogen; Traufen-/Giebelstücke im anderen Teil entfallen. Unter
   Gauben ist die Fläche ausgespart (`hole`), bei `window: openings` bis über den Überstand.
+- Eigene Modelle (0.37.0): `src/usermodels.js` – deklarativ (Grundformen -> PartCollector, eigener kleiner Parser für
+  `$param`-Ausdrücke, kein eval) oder glTF (beim Laden geparst, Geometrie mit Materialfarbe, ohne Texturen, damit die
+  Teile in die zusammengefassten Meshes passen). `registerUserModels` trägt sie zur Laufzeit in CATALOG/FURNITURE/LAMPS
+  ein (`user: true`, Gruppe „Eigene“), eingebaute IDs haben Vorrang. Geladen werden die IDs aus `models` und aus
+  Objekten mit unbekanntem Modell; das eingebettete Demo-Haus lässt ihre Objekte weg. GLTFLoader macht das Bundle
+  ~100 kB größer (1,0 MB).

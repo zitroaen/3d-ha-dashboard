@@ -618,6 +618,54 @@ Hinweise:
 - Wandmodelle (`sconce`, `wall_box`, `picture`, `tv`, `radiator`, `curtain`): `pos` liegt an der Wand, `rot` zeigt in
   den Raum.
 
+## Eigene Modelle (`models/<id>.yaml`)
+
+Fehlt ein Modell im Katalog, lässt es sich als eigene Datei im Datenordner beschreiben: `models/<id>.yaml` neben
+`model.yaml` (Schema: `schema/model-part.schema.json`). Das Panel lädt sie mit `model.yaml` – alle, die ein Objekt
+benutzt (`model: <id>`), dazu die in der Liste `models: [<id>, …]` von `model.yaml` (so erscheinen auch noch
+ungenutzte im Katalog). Im Editor stehen sie in der Gruppe **Eigene** mit Vorschaubild. Ein fehlerhaftes Modell lädt
+als magentafarbener Platzhalter-Quader mit Hinweis; `npm run validate` prüft die Dateien (eine ID wie ein
+eingebautes Modell ist ein Fehler). Der Dev-Server, `deploy.sh` und die Integration (Datenordner `data_url`)
+liefern den Ordner `models/` mit aus; der Export im Editor betrifft nur `model.yaml`.
+
+| Feld | Pflicht | Standard | Bedeutung |
+|---|---|---|---|
+| `id` | ja | | wie der Dateiname, `[a-z0-9_]` |
+| `name` | nein | id | Name im Katalog |
+| `category` | nein | `furniture` | `furniture`, `device`, `lamp`, `plant` |
+| `capabilities` | nein | | `[light]` = Leuchte (dann `light` nötig) |
+| `params` | nein | | Standardwerte; in Teilen als `$name` und in Ausdrücken (`"$breite / 2 - 0.1"`, + − × ÷, Klammern); je Objekt über `params` änderbar |
+| `materials` | nein | | Name → Palettenfarbe, `#rrggbb`, `surf:<Oberfläche>[:farbe]` (Oberflächen des Hauses) oder `$param` |
+| `parts` | ja* | | Grundformen (siehe unten), alle Maße in Metern, Ursprung = Mitte der Unterkante, +y oben |
+| `light` | bei Leuchten | | `at` (Lichtquelle, liegt über dem Ankerpunkt des Objekts), `mount`, `range`, `direction` |
+| `file` | ja* | | statt `parts`: glTF-Datei (`.glb`/`.gltf`, relativ zu `models/`), mit `scale`, `offset`, `glow_materials` (Materialnamen, die leuchten); Texturen entfallen, die Materialfarben bleiben |
+
+Grundformen (je Eintrag genau eine, jeweils mit `material` und optional `glow: true` – leuchtet mit der Leuchte):
+`box` (`size`, `at` = Mitte, `rot` in Grad, `radius` für runde Kanten), `beam` (Balken `from` → `to`, Querschnitt
+`size: [b, h]`), `rod` (Stab `from` → `to`, `radius`), `cylinder` (stehend mit `at` und `height`, oder `from` → `to`;
+`radius`, `radius_back` = Radius oben bzw. am Ende), `sphere` (`radius`, `at`, `scale` für Ellipsoide), `tube` (weiches
+Rohr durch `points`, `radius`). Größe und Treffer-Fläche ergeben sich aus den Teilen; `size[0]` eines Objekts
+skaliert das Modell gleichmäßig (Faktor aus der Breite).
+
+Beispiel: Schreibtischleuchte mit Gelenkarm (`models/arbeitsleuchte.yaml`; das Demo-Haus hat `bogenleuchte` und
+`wandregal` in `examples/demo/models/`):
+
+```yaml
+id: arbeitsleuchte
+name: Arbeitsleuchte
+category: lamp
+capabilities: [light]
+params: { farbe: "#2f5d8a", arm: 0.35 }
+materials: { metall: $farbe, fuss: black_matte }
+parts:
+  - cylinder: { radius: 0.08, height: 0.02, at: [0, 0, -0.25], material: fuss }
+  - rod: { from: [0, 0.02, -0.25], to: [0, "$arm + 0.05", -0.3], radius: 0.008, material: metall }
+  - rod: { from: [0, "$arm + 0.05", -0.3], to: [0, "$arm", 0], radius: 0.007, material: metall }
+  - sphere: { radius: 0.07, at: [0, "$arm", 0], scale: [1, 0.7, 1], material: metall }
+  - cylinder: { radius: 0.06, height: 0.005, at: [0, "$arm - 0.05", 0], material: "#fff4dc", glow: true }
+light: { at: [0, "$arm - 0.05", 0], mount: table, range: 1.5 }
+```
+
 ## Versionen und Migration
 
 - `version` ist eine ganze Zahl. Jede **inkompatible** Änderung am Format erhöht sie.
@@ -797,6 +845,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.37.0, abwärtskompatibel):** eigene Modelle `models/<id>.yaml` (Grundformen oder glTF), Liste
+  `models` in `model.yaml`; Schema `schema/model-part.schema.json`.
 - **Version 2, Ergänzung (0.36.0, abwärtskompatibel):** Gauben `window: openings` (bis zur Traufe); Dachteile
   durchdringen sich (vorher bestimmte der niedrigste Teil die Wandhöhe). Werkzeuge: `view.at` mit Höhe.
 - **Version 2, Ergänzung (0.35.0, abwärtskompatibel):** `elevation` auch für Leuchten; Katalog `desk_lamp`;
