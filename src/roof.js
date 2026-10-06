@@ -134,19 +134,24 @@ export function dormerFrame(d, s) {
   // Unterseite des Gaubendachs (ohne Dachstärke) über dem Punkt (x entlang, sUp hinauf)
   const roofAt = (x, sUp) => (type === 'gable' ? h0 + fh + pd * Math.max(0, w / 2 - Math.abs(x)) : h0 + fh + pd * sUp);
   const openings = d.window === 'openings';
+  // Abstand der Front von der Traufe (Wandlinie): steht sie weiter oben (Kniestock), bleiben Traufe und Dach davor
+  const dist = h0 / k, atEave = dist <= 0.6;
+  // Wände vor der Front reichen nur dann bis unters Gaubendach, wenn sie zwischen Traufe und Front liegen (die Wand,
+  // die die Front bildet); eine Fassade weiter vorn endet unter der Dachfläche und verdeckt die Fenster nicht
+  const margin = dist <= 0.38 ? dist + 0.03 : 0.03;
   return {
-    d, fn, e, k, u, n, w, fh, type, pd, h0, sEnd, L, local, roofAt, openings,
+    d, fn, e, k, u, n, w, fh, type, pd, h0, sEnd, L, local, roofAt, openings, dist, atEave,
     /** Grundriss unter der Gaube (Front bis Ende), vorn um front Meter verlängert (Wanddicke) */
-    covers(p, front = 0.35) {
+    covers(p, front = margin) {
       const [x, sUp] = local(p);
       return Math.abs(x) <= w / 2 + 1e-6 && sUp >= -front && sUp <= sEnd;
     },
     /**
-     * Aussparung in der Dachfläche: Grundriss der Gaube (bis knapp vor ihr Ende auf der Fläche); bis zur Traufe auch
-     * Traufe und Überstand davor
+     * Aussparung in der Dachfläche: Grundriss der Gaube (bis knapp vor ihr Ende auf der Fläche); steht eine Gaube mit
+     * window: openings an der Traufe, auch Traufe und Überstand davor
      */
     hole(ov) {
-      const front = openings ? -(ov + 0.6) : 0, back = sEnd - 0.02;
+      const front = openings && atEave ? -(dist + ov + 0.05) : 0, back = sEnd - 0.02;
       return ccwPoly([L(-w / 2, front), L(w / 2, front), L(w / 2, back), L(-w / 2, back)]);
     },
   };
@@ -193,8 +198,8 @@ function dormer(d, s, off, idx, b, yb) {
     fac.triUV(P3(fl, h0 + fh), P3(fr0, h0 + fh), P3(L(0, 0), yRidge), [0, 0], [w, 0], [w / 2, yRidge - h0 - fh], idx);
     fac.triUV(P3(fl, h0 + fh), P3(L(0, 0), yRidge), P3(fr0, h0 + fh), [0, 0], [w / 2, yRidge - h0 - fh], [w, 0], idx);
   }
-  // Wangen: von der Front bis auf die Dachfläche
-  const yLow = fr.openings ? Math.max(h0 - 0.05, yb) : h0 - 0.05;
+  // Wangen: von der Dachfläche an der Front bis unters Gaubendach (auch bei Gauben niedriger als die Etage)
+  const yLow = h0 - 0.05;
   for (const x of [-w / 2, w / 2]) {
     const a = P3(L(x, 0), yLow), c = P3(L(x, 0), h0 + fh), z = P3(L(x, sEnd), main(sEnd));
     fac.triUV(a, c, z, [0, 0], [0, fh], [sEnd, fh], idx);

@@ -583,6 +583,34 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const door = { hinge: [0.18, 3.5], end: [0.18, 4.4] };
   check('Tür: passt in die Gaube bis zur Traufe, ohne Gaube auf die Wandhöhe begrenzt',
     !doorUnderRoof(door, 2.05, Cd).top && doorUnderRoof(door, 2.05, C).top === 1.5);
+
+  // Wandkappe einer L-förmigen Wand, deren Ecke unter der Gaube liegt: jede Teilfläche folgt der Dachfläche (außer
+  // den wenige Zentimeter schmalen Stufen an der Gaubenkante)
+  const { FloorModel } = await import('../src/house.js');
+  const capB = collect();
+  const lwall = [[0, 1], [0.3, 1], [0.3, 4.0], [3, 4.0], [3, 4.3], [0, 4.3]];
+  FloorModel.prototype._cutCap.call({ ceilingAt: Cd, floor: { roofCut: [{ shape: main, eaves: 1, dormers: [d] }] } }, capB, lwall, 0);
+  const worst = capB.pos.reduce((m, [a, b, c]) => {
+    const g = [(a[0] + b[0] + c[0]) / 3, (a[2] + b[2] + c[2]) / 3];
+    const long = Math.max(...[[a, b], [b, c], [c, a]].map(([p, q]) => Math.hypot(q[0] - p[0], q[2] - p[2])));
+    return long > 0.1 ? Math.max(m, Math.abs((a[1] + b[1] + c[1]) / 3 - Cd(g))) : m;
+  }, 0);
+  check('Wandkappe (L-Form, Ecke unter der Gaube): kein Keil durchs Dach, Teilflächen folgen der Dachfläche', capB.pos.length > 4 && worst < 0.03, `${worst} ${capB.pos.length}`);
+
+  // Gaube mit window: openings an der Kniestockwand (nicht an der Traufe): Aussparung nur ab der Front, Traufe bleibt;
+  // Fassade 25 cm davor reicht nicht bis unters Gaubendach
+  const dk = { pos: [1.5, 4], width: 1.4, height: 1.0, type: 'flat', window: 'openings' };
+  const frk = dormerFrame(dk, main), hole = frk.hole(0.3);
+  const minUp = Math.min(...hole.map((p) => frk.local(p)[1]));
+  const Ck = ceilingFn([{ shape: main, eaves: 1, dormers: [dk] }], 5);
+  check('Gaube an der Kniestockwand: Dach unter der Front bleibt, Wand davor endet unter der Dachfläche, Wand der Front darunter',
+    !frk.atEave && minUp > -1e-6 && Math.abs(Ck([1.25, 4]) - 2.25) < 1e-6 && Ck([1.52, 4]) > 2.5 && fr.atEave && Math.min(...fr.hole(0.3).map((p) => fr.local(p)[1])) < -0.3,
+    `${minUp} ${Ck([1.25, 4])} ${Ck([1.52, 4])}`);
+  // niedrige Gaube (Oberkante unter der Etagenhöhe): Wangen stehen auf der Dachfläche, keine umgeklappten Spitzen
+  const bk = mk(), facade = collect();
+  buildPitchedRoof({ roof: { shape: main, dormers: [dk] }, elevation: 0 }, 1, { ...bk, facade }, 4);
+  const wangeOk = facade.pos.every((tri) => tri.every((v) => v[1] <= frk.h0 + frk.fh + 1e-6));
+  check('Gaube niedriger als die Etage: Wangen reichen nicht über das Gaubendach', facade.pos.length >= 4 && wangeOk);
 }
 
 // Bibliothek: Oberflächen sowie Fenster- und Türarten (Beispiele der Engine, Instanz ergänzt/ändert, base erbt)

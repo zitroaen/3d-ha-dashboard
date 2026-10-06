@@ -479,8 +479,26 @@ export class FloorModel {
   _cutCap(caps, poly, y0) {
     const C = this.ceilingAt, cut = this.floor.roofCut;
     if (poly.length !== 4) {
-      // Sonderform: Ecken auf die Dachfläche (Näherung)
-      caps.polyT(poly, poly.map((p) => Math.max(y0, C(p))), 0);
+      // Sonderform (L, T, Wandring): in Dreiecke zerlegen und jedes an der längsten Seite teilen, solange die
+      // Dachfläche von der Ebene durch die Ecken abweicht (sonst spannte eine Ecke unter einer Gaube einen Keil auf)
+      const Y = (p) => Math.max(y0, C(p));
+      const tri = (a, b, c) => {
+        const v = [a, b, c].map((p) => [p[0], Y(p), p[1]]);
+        caps.triUV(v[0], v[1], v[2], [0, 0], [0, 0], [0, 0], 0, true);
+      };
+      const split = (a, b, c, depth) => {
+        const e = [[a, b, c], [b, c, a], [c, a, b]].map(([p, q, r]) => ({ p, q, r, l: Math.hypot(q[0] - p[0], q[1] - p[1]) }));
+        const { p, q, r, l } = e.reduce((m, x) => (x.l > m.l ? x : m));
+        const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+        const g = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3];
+        const off = Math.max(Math.abs(Y(m) - (Y(p) + Y(q)) / 2), Math.abs(Y(g) - (Y(a) + Y(b) + Y(c)) / 3));
+        if (depth < 12 && l > 0.02 && off > 0.004) {
+          split(p, m, r, depth + 1);
+          split(m, q, r, depth + 1);
+        } else tri(a, b, c);
+      };
+      const tris = THREE.ShapeUtils.triangulateShape(poly.map(([x, z]) => new THREE.Vector2(x, z)), []);
+      for (const [i, j, k] of tris) split(poly[i], poly[j], poly[k], 0);
       return;
     }
     // Rechteck: an der längeren Seite entlang, gegenüberliegende Seite parallel
