@@ -393,6 +393,15 @@ export const FURNITURE = {
   },
 
   speaker(P, it) {
+    if (it.style === 'compact') {
+      // Kompaktlautsprecher (z. B. fürs Regal): abgerundeter Korpus in params.color, Stoffbespannung vorne
+      const [W, D, H] = it.size || [0.12, 0.12, 0.16];
+      const c = it.color || 'black_matte';
+      P.rbox(c, W, H, D, Math.min(W, D) * 0.18, 0, 0, 0);
+      P.rbox('fabric_dark', W * 0.94, H * 0.94, 0.012, 0.005, 0, H * 0.03, D / 2 - 0.004);
+      P.box(c, W * 0.3, 0.004, D * 0.3, 0, H, 0); // Bedienfeld oben
+      return;
+    }
     const [W, D, H] = it.size || [0.22, 0.3, 1.0];
     P.box('black_matte', W, H, D, 0, 0, 0);
     P.cyl('steel_dark', 0.06, 0.06, 0.01, 0, H - 0.25, D / 2, { rot: new THREE.Euler(Math.PI / 2, 0, 0), seg: 14 });
@@ -1519,13 +1528,43 @@ export const LAMPS = {
     P.cyl('bulb', r * 0.95, r * 0.95, 0.004, 0, h - sh / 2 + 0.01, 0, { kind: 'glow', seg: 24 });
   },
 
+  /**
+   * Schreibtischleuchte: runder Fuß hinten, zwei Gelenkarme, runder Schirmkopf über dem Lichtpunkt (h = Unterkante
+   * des Kopfes). params.color (Metall, Standard schwarz), params.head_deg (Kopf nach vorn neigen, Standard 20°),
+   * params.reach (Abstand Fuß -> Kopf, Standard 0.3 m). Fuß nach hinten = −z.
+   */
+  desk_lamp(P, l, { roomIdx, lampIdx }) {
+    const h = Math.max(0.2, l.height), c = l.params?.color || 'black_matte';
+    const reach = l.params?.reach ?? 0.3, tilt = THREE.MathUtils.degToRad(l.params?.head_deg ?? 20), rh = 0.075;
+    P.idx = roomIdx;
+    const base = [0, 0, -reach], elbow = [0, h + 0.18, -reach * 0.8], head = [0, h + rh * 0.6, 0];
+    P.cyl(c, 0.075, 0.085, 0.022, base[0], 0, base[2], { seg: 24 });
+    P.sphere(c, 0.018, base[0], 0.03, base[2], { seg: 10 });
+    P.rod(c, [base[0], 0.03, base[2]], elbow, 0.008, { seg: 6 });
+    P.sphere(c, 0.016, ...elbow, { seg: 10 });
+    P.rod(c, elbow, [head[0], head[1] + rh * 0.5, head[2] - 0.03], 0.007, { seg: 6 });
+    // Schirm: Halbkugel, Öffnung nach unten, um tilt nach vorn (+z) geneigt
+    const rot = new THREE.Matrix4().makeRotationX(tilt);
+    const shade = new THREE.SphereGeometry(rh, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    P.add(shade, c, 'lit', new THREE.Matrix4().makeTranslation(...head).multiply(rot));
+    P.idx = lampIdx;
+    P.add(new THREE.CircleGeometry(rh * 0.9, 20).rotateX(Math.PI / 2), 'bulb', 'glow', new THREE.Matrix4().makeTranslation(...head).multiply(rot).multiply(new THREE.Matrix4().makeTranslation(0, 0.005, 0)));
+    P.idx = roomIdx;
+  },
+
   /** Stehleuchte: hohe Plissee-Säule auf drei schlanken Beinen; h = Mitte der Säule. */
   floor_column(P, l, { roomIdx, lampIdx }) {
     const h = l.height, r = l.radius ?? 0.16, ch = l.column ?? 1.1, y0 = h - ch / 2;
     P.idx = roomIdx;
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2 + 0.3;
-      P.rod('black_matte', [Math.cos(a) * r * 1.4, 0, Math.sin(a) * r * 1.4], [Math.cos(a) * r * 0.6, y0 + 0.02, Math.sin(a) * r * 0.6], 0.008, { seg: 4 });
+    if (l.params?.base === 'disc') {
+      // runder Standfuß mit Mittelstab statt drei Beinen
+      P.cyl('black_matte', r * 1.25, r * 1.3, 0.02, 0, 0, 0, { seg: 28 });
+      P.rod('black_matte', [0, 0.02, 0], [0, y0 + 0.02, 0], 0.012, { seg: 8 });
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + 0.3;
+        P.rod('black_matte', [Math.cos(a) * r * 1.4, 0, Math.sin(a) * r * 1.4], [Math.cos(a) * r * 0.6, y0 + 0.02, Math.sin(a) * r * 0.6], 0.008, { seg: 4 });
+      }
     }
     // Plissee: Mantel mit abwechselnd vor- und zurückspringenden Falten
     const g = new THREE.CylinderGeometry(r, r, ch, 48, 1, true);

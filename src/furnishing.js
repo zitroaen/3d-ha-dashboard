@@ -17,6 +17,8 @@ const GLOW_OFF = { shade: 0x8f897d, bulb: 0x7d786f, disc: 0x1f1e1c };
 const glowOff = (key) => GLOW_OFF[key] ?? (/#[0-9a-f]{6}$/i.test(key) ? Number.parseInt(key.slice(-6), 16) : 0x777777);
 
 // Kein Kontaktschatten: liegt flach am Boden oder hängt an der Wand
+/** Modelle, die `elevation` selbst auswerten (Standardhöhe ohne Angabe, z. B. TV 0,95 m) */
+const OWN_ELEVATION = new Set(['box', 'tv', 'picture', 'curtain', 'wall_clock', 'radiator']);
 const NO_CONTACT = new Set(['rug', 'picture', 'curtain', 'tv', 'radiator', 'flowers', 'solar_panels', 'garage_door', 'wall_clock', 'fence', 'power_line', 'hedge', 'balustrade']);
 
 /** Weicher Kontaktschatten (Alpha-Verlauf, Rechteck mit runden Ecken), einmal pro Szene */
@@ -159,18 +161,21 @@ export class FurnishingLayer {
       return null;
     }
     const target = skip ? new PartCollector() : P;
-    target.begin(at.x, at.z, at.rot, this._roomIdx(it.room), at.y - (it.elevation ?? 0));
+    // elevation: Modelle mit eigener Höhe (Bild, TV …) bekommen den Boden als Ursprung und setzen sich selbst; alle
+    // anderen stehen so viel höher (Lautsprecher auf dem Sideboard)
+    const own = OWN_ELEVATION.has(it.kind) ? it.elevation ?? 0 : 0;
+    target.begin(at.x, at.z, at.rot, this._roomIdx(it.room), at.y - own);
     target.objId = it.id;
     const room = this.floorModel.rooms.get(it.room)?.room;
     // Gelände unter einem Punkt des Objekts (lokal, relativ zum Anker) – für lange Objekte am Hang (Hecke)
     const terrain = this.shared.ground?.terrain;
     const follows = terrain && this.floorModel.floor.outdoor && (it.room === 'aussen' || room?.follow);
     // (Lage aus dem Objekt selbst, auch im Einzelaufbau des Editors mit Ursprung im Anker)
-    const real = anchorOf('item', it), y0 = real.y - (it.elevation ?? 0);
+    const real = anchorOf('item', it), y0 = real.y - own;
     const r = -THREE.MathUtils.degToRad(real.rot || 0), c = Math.cos(r), s = Math.sin(r);
     const groundAt = follows ? (lx, lz) => terrain.height([real.x + lx * c + lz * s, real.z - lx * s + lz * c]) - y0 : () => 0;
     make(target, it, { ceiling: this.floorModel.ceilingAt?.([at.x, at.z]) ?? room?.ceiling ?? this.floorModel.floor.ceiling, groundAt });
-    return target.bounds.clone().translate(new THREE.Vector3(0, -(it.elevation ?? 0), 0));
+    return target.bounds.clone().translate(new THREE.Vector3(0, -own, 0));
   }
 
   _buildLamp(P, lamp, at, skip = false) {
@@ -183,10 +188,14 @@ export class FurnishingLayer {
       model = 'disc';
     }
     const target = skip ? new PartCollector() : P;
-    target.begin(at.x, at.z, at.rot, this._roomIdx(lamp.room), at.y - lamp.height);
+    // elevation: das Modell steht erhöht (Tisch, Sideboard) – es sieht nur die Höhe darüber; die Lichtquelle bleibt
+    // auf light.height über dem Boden des Bereichs
+    const el = Math.min(lamp.elevation || 0, lamp.height - 0.05);
+    target.begin(at.x, at.z, at.rot, this._roomIdx(lamp.room), at.y - lamp.height + el);
     target.objId = lamp.id;
-    LAMPS[model](target, lamp, { ceiling, roomIdx: this._roomIdx(lamp.room), lampIdx: lamp.idx });
-    return target.bounds.clone().translate(new THREE.Vector3(0, -lamp.height, 0));
+    const l = el ? { ...lamp, height: lamp.height - el } : lamp;
+    LAMPS[model](target, l, { ceiling: ceiling - el, roomIdx: this._roomIdx(lamp.room), lampIdx: lamp.idx });
+    return target.bounds.clone().translate(new THREE.Vector3(0, -l.height, 0));
   }
 
   /**
