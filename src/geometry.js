@@ -16,7 +16,7 @@ export function signedArea(poly) {
   return a / 2;
 }
 
-function distToSegment([px, py], [ax, ay], [bx, by]) {
+export function distToSegment([px, py], [ax, ay], [bx, by]) {
   const dx = bx - ax, dy = by - ay;
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
   return Math.hypot(px - ax - t * dx, py - ay - t * dy);

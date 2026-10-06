@@ -102,9 +102,9 @@ buildings:
           - { sill: 0.9, top: 2.1, rect: [1.2, 0, 2.4, 0.3], room: wohnen, transom: 0.7 }
           - { sill: 0.9, top: 2.1, rect: [2.6, 0, 3.8, 0.3], room: wohnen, transom: 0.7 }
           - { sill: 1, top: 2.1, rect: [7, 0, 8.2, 0.3], room: kueche }
-          - { sill: 0.9, top: 2.1, rect: [6.5, 7.7, 7.5, 8], room: schlafen }
+          - { sill: 0.9, top: 2.1, rect: [6.5, 7.7, 7.5, 8], room: schlafen, style: shutters_panels }
           - { sill: 0.9, top: 2.1, rect: [0, 2, 0.3, 4], room: wohnen, sashes: 4 }
-          - { sill: 0.9, top: 2.1, rect: [9.7, 1.2, 10, 2.4], room: kueche }
+          - { sill: 0.9, top: 2.1, rect: [9.7, 1.2, 10, 2.4], room: kueche, style: wood_shutters }
           - { sill: 1.4, top: 2.1, rect: [9.7, 5, 10, 5.8], room: bad }
         doors:
           - hinge: [2, 7.85]
@@ -541,6 +541,14 @@ objects:
     pos: [1.7, 8.06]
     light: { height: 2.1, range: 3.5, facing: [0, 1] }
     ha: { entities: { power: light.demo_terrasse } }
+  - id: briefkasten
+    name: Briefkasten
+    model: box
+    space: haus/eg
+    pos: [8.25, -0.08]
+    elevation: 0.95
+    size: [0.38, 0.14, 0.34]
+    params: { color: "#3b3f44" }
   - id: wandregal_studio
     name: Wandregal
     model: wandregal
@@ -808,7 +816,12 @@ objects:
     size: [3, 0.2, 2.1]
     params: { glass: true }
     ha: { entities: { power: cover.demo_garagentor }, tap: toggle }
-  - { id: gartentor, name: Gartentor, model: gartentor, pos: [3.25, 11.3], params: { breite: 1.1, hoehe: 0.9 }, ha: { entities: { power: cover.demo_gartentor }, tap: toggle } }
+  - id: gartentor
+    name: Gartentor
+    model: gartentor
+    pos: [3.25, 11.3]
+    params: { breite: 1.1, hoehe: 0.9 }
+    ha: { entities: { power: cover.demo_gartentor }, tap: toggle }
   - id: balkonkraftwerk
     name: Balkonkraftwerk
     model: solar_panels

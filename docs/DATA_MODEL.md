@@ -368,7 +368,7 @@ legt sein Modell im [Katalog](#katalog) fest.
 | `id` | ja | | eindeutig |
 | `name` | nein | Modellname | Anzeigename (Editor, Meldungen) |
 | `model` | ja | | Modell aus dem Katalog |
-| `space` | nein | | Bereich (Raum oder Außenbereich), in dem das Objekt steht. Ohne `space`: freies Gelände. Bestimmt Etage, Höhenbezug und Licht |
+| `space` | nein | | Bereich (Raum oder Außenbereich), in dem das Objekt steht, oder `<Gebäude-ID>/<Etage-ID>` = außen an diesem Gebäude (Fassade). Ohne `space`: freies Gelände. Bestimmt Etage, Höhenbezug und Licht |
 | `pos` | ja | | Position `[x, y]` (Mittelpunkt bzw. Befestigungspunkt, siehe Katalog) |
 | `rot` | nein | 0 | Drehung |
 | `elevation` | nein | 0 | Unterkante über dem Boden des Bereichs (Bilder, TV, Heizkörper, Wandgeräte) |
@@ -383,7 +383,15 @@ legt sein Modell im [Katalog](#katalog) fest.
 auf `light.height` über dem Boden des Bereichs.
 
 **Höhenbezug:** `elevation` und `light.height` zählen ab dem Boden des Bereichs: Raum → `elevation` der Etage;
-Außenbereich → dessen `elevation`; ohne `space` → 0.
+Außenbereich → dessen `elevation`; außen am Gebäude (`space: haus/eg`) → Fußboden der Etage; ohne `space` → Gelände.
+
+**An der Fassade:** Briefkasten, Hausnummer oder Außenleuchte hängen an der Außenwand – mit `space: <Gebäude-ID>/<Etage-ID>`
+zählt `elevation` ab dem Fußboden dieser Etage (nicht ab dem Gelände), das Objekt ist sichtbar wie die Etage und
+leuchtet als Außenleuchte. Die Prüfung erwartet die Position außerhalb der Räume, höchstens 1 m von einer Wand.
+
+```yaml
+- { id: briefkasten, model: box, space: haus/eg, pos: [9.3, -0.12], elevation: 0.9, size: [0.4, 0.15, 0.35] }
+```
 
 **Objekte anlegen, einlagern, löschen:** Ein Objekt ist ein Eintrag in `objects` – wer ein Modell automatisch
 erstellt (z. B. ein Agent), setzt Möbel, Leuchten und Geräte direkt mit `model`, `space`, `pos` (und `rot`, `size`,
@@ -688,7 +696,8 @@ light: { at: [0, "$arm - 0.05", 0], mount: table, range: 1.5 }
 3. Verweise: `space`, `windows[].room`, `doors[].rooms`, Modelle aus dem Katalog, `light` genau bei Leuchten,
    Oberflächen (`surface`, `edge`, `facade.type` …), Fenster-/Türarten (`style`, `styles`) samt `base`, Bilder eigener
    Oberflächen,
-4. Lage: jedes Objekt mit `space` liegt in dessen Polygon; Leuchten unter der Raumhöhe,
+4. Lage: jedes Objekt mit `space` liegt in dessen Polygon (außen am Gebäude: außerhalb der Räume, ≤ 1 m von einer
+   Wand); Leuchten unter der Raumhöhe,
 5. Entity-IDs syntaktisch gültig, Texturen (auch das Luftbild) vorhanden,
 6. Steildächer: Fenster über der Dachfläche (werden gekürzt oder weggelassen – Gaube anlegen?), Wände der obersten
    Etage ohne Dachteil darüber,

@@ -120,8 +120,18 @@ buildings:
 
 Fenster: `frame` (Blendrahmen, m), `depth` (Bautiefe), `sash` (Flügelrahmen), `offset` (Lage in der Wand, Anteil
 nach außen), `color`, `sash_color`, `board` (Fensterbank: Farbe oder `false`), `bars: [Spalten, Reihen]` (Sprossen je
-Flügel), `bar` (Sprossenbreite), `fixed: true` (Festverglasung). Flügelzahl und Kämpfer bleiben am Fenster
-(`sashes`, `transom`). Beispiele: `standard`, `wood`, `bars`, `wood_bars`, `anthracite`, `fixed`.
+Flügel), `bar` (Sprossenbreite), `fixed: true` (Festverglasung), `shutters` (Klappläden, s. u.). Flügelzahl und
+Kämpfer bleiben am Fenster (`sashes`, `transom`). Beispiele: `standard`, `wood`, `bars`, `wood_bars`, `anthracite`,
+`fixed`, `wood_shutters`, `shutters_panels`.
+
+Klappläden: `shutters: { style: louvers | panels, color, open: true }` – zwei Flügel je halbe Fensterbreite, so hoch
+wie die Öffnung, außen vor der Fassade (nur an Außenwänden, Seite ohne Raum). `louvers` = Lamellen, `panels` =
+zwei Füllungen; `open: false` = geschlossen vor dem Fenster. Standardfarbe Braun.
+
+```yaml
+window_styles:
+  laeden_gruen: { base: wood_shutters, shutters: { style: panels, color: '#3f5a3c' } }
+```
 
 Türen: `kind` (`interior` mit Zarge und Türblatt, `exterior` mit Rahmen), `leaf` (`panel` Füllung, `flush` glatt,
 `glass` Glas mit Friesen, `solid` Haustür), `panels` (Füllungen übereinander), `glass` (Haustür: Glasfelder),

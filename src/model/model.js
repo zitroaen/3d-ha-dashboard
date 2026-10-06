@@ -47,6 +47,9 @@ export function spacesOf(model) {
       for (const r of f.rooms) {
         out.set(r.id, { kind: 'room', building: b, floor: f, floorKey: floorKey(b, f), room: r, base: f.elevation || 0, height: r.height ?? f.height });
       }
+      // außen an diesem Gebäude (Briefkasten, Hausnummer, Außenleuchte): `space: <Gebäude-ID>/<Etage-ID>`, Höhe ab dem
+      // Fußboden der Etage, sichtbar wie die Etage
+      out.set(floorKey(b, f), { kind: 'facade', building: b, floor: f, floorKey: floorKey(b, f), room: { id: floorKey(b, f), polygon: [] }, base: f.elevation || 0, height: f.height });
     }
   }
   for (const b of model.buildings || []) {
@@ -352,7 +355,7 @@ export function toScene(model) {
     const sp = o.space ? spaces.get(o.space) : null;
     // Ohne Bereich (oder unbekannter Bereich): freies Gelände auf Ebene 0
     const floor = sp ? sp.floorKey : OUTDOOR_FLOOR;
-    const room = sp ? o.space : OPEN_GROUND;
+    const room = sp ? (sp.kind === 'facade' ? OPEN_GROUND : o.space) : OPEN_GROUND;
     // Außenbereiche liegen auf der Außen-Etage (Höhe 0): ihre eigene Höhe kommt zu den Objekthöhen dazu
     // freies Gelände: auf dem Höhenraster, falls vorhanden
     const base = sp?.kind === 'outdoor' ? outdoorHeightAt(sp.room, o.pos, terrain) : sp?.kind === 'roof' ? roofHeightAt(sp.room, o.pos)
@@ -373,7 +376,7 @@ export function toScene(model) {
         range: l.range ?? CATALOG[o.model]?.lightRange ?? 3,
         color: l.color,
         facing: l.facing,
-        outdoor: !sp || sp.kind === 'outdoor' || sp.kind === 'roof',
+        outdoor: !sp || sp.kind === 'outdoor' || sp.kind === 'roof' || sp.kind === 'facade',
         entity: roleEntities(o, 'power'),
       });
     } else {

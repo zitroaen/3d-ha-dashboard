@@ -58,9 +58,10 @@ const windows = [
   { rect: [1.2, 0, 2.4, EXT], room: 'wohnen', transom: 0.7 },
   { rect: [2.6, 0, 3.8, EXT], room: 'wohnen', transom: 0.7 },
   { rect: [7.0, 0, 8.2, EXT], room: 'kueche', sill: 1.0 },
-  { rect: [6.5, 8 - EXT, 7.5, 8], room: 'schlafen' },
+  // Klappläden aus der Bibliothek (library/openings.yaml): Füllungsläden bzw. Holzfenster mit Lamellenläden
+  { rect: [6.5, 8 - EXT, 7.5, 8], room: 'schlafen', style: 'shutters_panels' },
   { rect: [0, 2.0, EXT, 4.0], room: 'wohnen', sashes: 4 },
-  { rect: [10 - EXT, 1.2, 10, 2.4], room: 'kueche' },
+  { rect: [10 - EXT, 1.2, 10, 2.4], room: 'kueche', style: 'wood_shutters' },
   { rect: [10 - EXT, 5.0, 10, 5.8], room: 'bad', sill: 1.4 },
 ].map((w) => ({ sill: 0.9, top: 2.1, ...w, rect: w.rect.map(r3) }));
 

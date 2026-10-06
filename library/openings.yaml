@@ -10,6 +10,9 @@ windows:
   wood_bars: { label: Holz-Sprossenfenster, base: wood, bars: [2, 3] }
   anthracite: { label: Alufenster anthrazit, frame: 0.05, depth: 0.07, sash: 0.04, color: '#3b3f44', board: '#9a9a96' }
   fixed: { label: Festverglasung, base: anthracite, fixed: true }
+  # Klappläden außen (nur an Außenwänden): Lamellen oder Füllung, geöffnet flach neben dem Fenster
+  wood_shutters: { label: Holzfenster mit Klappläden, base: wood, shutters: { style: louvers, color: '#4f6b4a', open: true } }
+  shutters_panels: { label: Fenster mit Füllungsläden, base: standard, shutters: { style: panels, color: '#5b3a29', open: true } }
 
 doors:
   interior: { label: Innentür mit Füllung, leaf: panel, panels: 1 }

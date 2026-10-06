@@ -5,7 +5,10 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Ajv from 'ajv/dist/2020.js';
 import { DATA_DIR, ENGINE_ROOT } from './lib/config.mjs';
-import { pointInPoly } from '../src/geometry.js';
+import { pointInPoly, distToSegment } from '../src/geometry.js';
+
+/** Abstand eines Punkts zum Rand eines Polygons (0 innen) */
+const distToPoly = (p, poly) => (pointInPoly(p, poly) ? 0 : Math.min(...poly.map((a, i) => distToSegment(p, a, poly[(i + 1) % poly.length]))));
 import { CATALOG, hasCapability } from '../src/model/catalog.js';
 import { parseModel, spacesOf, roleEntities, roofParts, toScene } from '../src/model/model.js';
 import { ceilingFn, windowUnderRoof, doorUnderRoof } from '../src/roof.js';
@@ -166,7 +169,13 @@ for (const o of model.objects || []) {
     const sp = spaces.get(o.space);
     if (!sp) errors.push(`Objekt ${o.id}: Bereich "${o.space}" gibt es nicht`);
     else {
-      if (!pointInPoly(o.pos, sp.room.polygon)) errors.push(`Objekt ${o.id}: pos ${JSON.stringify(o.pos)} liegt nicht in ${o.space}`);
+      if (sp.kind === 'facade') {
+        // außen am Gebäude: nicht in einem Raum der Etage, höchstens 1 m von einer Wand entfernt
+        const inRoom = sp.floor.rooms.find((r) => pointInPoly(o.pos, r.polygon));
+        const d = Math.min(Infinity, ...(sp.floor.walls || []).map((w) => distToPoly(o.pos, w.polygon)));
+        if (inRoom) errors.push(`Objekt ${o.id}: pos ${JSON.stringify(o.pos)} liegt im Raum ${inRoom.id} – außen an ${o.space} erwartet`);
+        else if (d > 1) errors.push(`Objekt ${o.id}: pos ${JSON.stringify(o.pos)} liegt ${d.toFixed(2)} m von der Außenwand von ${o.space} entfernt (höchstens 1 m)`);
+      } else if (!pointInPoly(o.pos, sp.room.polygon)) errors.push(`Objekt ${o.id}: pos ${JSON.stringify(o.pos)} liegt nicht in ${o.space}`);
       if (isLight && sp.kind === 'room' && o.light?.height > sp.height) errors.push(`Objekt ${o.id}: light.height ${o.light.height} über der Raumhöhe (${sp.height})`);
     }
   }

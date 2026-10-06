@@ -68,6 +68,9 @@ const garten = sc.devices.find((d) => d.id === 'gartenstrahler');
 check('Szene: Leuchte im Außenbereich liegt auf der Außen-Etage mit dessen Höhe', garten.floor === OUTDOOR_FLOOR && garten.outdoor && garten.base === -0.04, JSON.stringify({ f: garten.floor, b: garten.base }));
 const free = toScene({ ...base(), objects: [{ id: 'x', model: 'box', pos: [1, 1] }] }).items[0];
 check('Szene: Objekt ohne Bereich steht auf freiem Gelände', free.floor === OUTDOOR_FLOOR && free.room === OPEN_GROUND);
+const bk = sc.items.find((i) => i.id === 'briefkasten');
+check('Szene: Objekt außen am Gebäude (space: haus/eg) gehört zur Etage, Höhe ab ihrem Fußboden statt Gelände',
+  bk && bk.floor === 'haus/eg' && bk.room === OPEN_GROUND && bk.base === 0 && bk.elevation === 0.95, JSON.stringify(bk && { f: bk.floor, r: bk.room, b: bk.base }));
 
 // --- Gelände: Höhe je Eckpunkt (ältere Form), Objekte stehen auf dem Hang
 {

@@ -202,6 +202,44 @@ export function buildWindow(fm, win, B, st = {}) {
   if (hasBoard(win, st) && bd > 0.02) {
     box(centerAlong, (boardFrom + boardTo) / 2, len + 0.06, bd, sill - BOARD, sill, B.tint('board', st.board));
   }
+
+  // Klappläden: nur an Außenwänden (Seite ohne Raum), zwei Flügel je halbe Breite, Höhe der Öffnung
+  const outer = roomSide > 0 ? depthLo : depthHi;
+  if (st.shutters && !fm.roomAt(at(centerAlong, outer - roomSide * 0.3))) shutters(box, st.shutters, along0, len, outer - roomSide * 0.04, sill, top, B);
+}
+
+/**
+ * Zwei Fensterläden (Lamellen oder Füllung) an der Fassade: geöffnet flach links und rechts neben der Öffnung,
+ * geschlossen davor. t = Ebene der Läden (quer zur Wand, außen vor der Fassade).
+ */
+function shutters(box, sh, along0, len, t, y0, y1, B) {
+  const mat = B.tint('pvc', sh.color || '#5b3a29');
+  const w = len / 2, D = 0.03, F = Math.min(0.07, w * 0.15), open = sh.open !== false;
+  const lefts = open ? [along0 - w - 0.01, along0 + len + 0.01] : [along0 + 0.005, along0 + w + 0.005];
+  const ww = open ? w : w - 0.01;
+  for (const s0 of lefts) {
+    const c = s0 + ww / 2;
+    // Rahmen (Friese)
+    box(s0 + F / 2, t, F, D, y0, y1, mat);
+    box(s0 + ww - F / 2, t, F, D, y0, y1, mat);
+    box(c, t, ww - 2 * F, D, y1 - F, y1, mat);
+    box(c, t, ww - 2 * F, D, y0, y0 + F, mat);
+    if (sh.style === 'panels') {
+      // zwei Füllungen übereinander, leicht zurückgesetzt, Mittelfries
+      box(c, t, ww - 2 * F, D * 0.5, y0 + F, y1 - F, mat);
+      const m = (y0 + y1) / 2;
+      box(c, t, ww - 2 * F, D, m - F / 2, m + F / 2, mat);
+    } else {
+      // Lamellen: schräg gestellte Brettchen, dahinter dunkel (Rückwand)
+      box(c, t, ww - 2 * F, D * 0.3, y0 + F, y1 - F, mat);
+      const n = Math.max(3, Math.round((y1 - y0 - 2 * F) / 0.07));
+      const step = (y1 - y0 - 2 * F) / n;
+      for (let i = 0; i < n; i++) {
+        const ya = y0 + F + i * step;
+        box(c, t, ww - 2 * F, D * 0.8, ya + step * 0.15, ya + step * 0.75, mat);
+      }
+    }
+  }
 }
 
 /**

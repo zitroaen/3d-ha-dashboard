@@ -344,7 +344,11 @@
         "offset": { "type": "number" }, "color": { "$ref": "#/$defs/hex" }, "sash_color": { "$ref": "#/$defs/hex" },
         "board": { "oneOf": [{ "$ref": "#/$defs/hex" }, { "const": false }] },
         "bars": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 2, "maxItems": 2 }, "bar": { "type": "number", "exclusiveMinimum": 0 },
-        "fixed": { "type": "boolean" }
+        "fixed": { "type": "boolean" },
+        "shutters": {
+          "type": "object", "additionalProperties": false, "description": "Klappläden außen (nur Außenwände)",
+          "properties": { "style": { "enum": ["louvers", "panels"] }, "color": { "$ref": "#/$defs/hex" }, "open": { "type": "boolean" } }
+        }
       }
     },
     "doorStyle": {
@@ -384,7 +388,7 @@
         "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string" },
         "model": { "type": "string" },
-        "space": { "$ref": "#/$defs/id" },
+        "space": { "type": "string", "pattern": "^[a-z0-9_]+(/[a-z0-9_]+)?$", "description": "Bereich-ID oder <Gebäude-ID>/<Etage-ID> (außen am Gebäude)" },
         "pos": { "$ref": "#/$defs/pos" },
         "rot": { "type": "number" },
         "elevation": { "type": "number" },
