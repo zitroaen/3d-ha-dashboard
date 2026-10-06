@@ -1,5 +1,19 @@
 # Änderungen
 
+## 0.28.0
+
+- **Garten-Katalog:** Schaukel (`swing`), Rutsche (`slide`), Spielturm mit Rutsche (`climbing_frame`), Trampolin mit
+  Netz (`trampoline`), Sandkasten (`sandbox`), Hochbeet aus Holz (`raised_bed`), Komposter (`compost`), Zaun
+  (`fence`: Lattenzaun, Maschendraht, Stabgitter – entlang einer Linie oder eines Pfads) und Freileitung
+  (`power_line`: Holzmasten mit durchhängenden Seilen). Zaun und Freileitung folgen dem Gelände; alle mit
+  Katalog-Vorschau. Möglichst vorhandene Materialien (Leistungsbudget).
+- Demo-Haus: Spielwiese östlich der Garage, Lattenzaun, Freileitung am Feldweg.
+- **Weiter hineinzoomen:** Die Zoomgrenze richtet sich nach dem Bildausschnitt statt fest beim Fünffachen –
+  hinein bis etwa 2,4 m Bildhöhe (ein Sessel füllt das Bild), egal wie groß Haus und Grundstück sind. Gezoomt wird
+  auf die Stelle unter dem Mauszeiger bzw. zwischen den Fingern.
+- Standardansicht: Die Kamerafahrt kommt auch an, wenn der Browser keine Bilder rechnet (verdeckter Tab, dunkles
+  Wand-Tablet) – vorher blieb die Kamera dann am Start stehen.
+
 ## 0.27.0
 
 - **Mehr Bereiche:** Die Lichttabelle wächst mit dem Haus (Spalten = Bereiche bzw. Leuchten, in 64er-Schritten, bis

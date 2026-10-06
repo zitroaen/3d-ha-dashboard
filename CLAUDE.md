@@ -280,6 +280,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   und passt den Bildausschnitt bewusst nicht neu ein (sonst verschöbe `_fitFrustum` die Ansicht); ohne Standard
   `resetView()` (Startansicht). Kompass: zweites Tippen binnen 350 ms = Standardansicht. Inaktivität: `pointerdown`/
   `wheel`/`keydown` im Shadow-DOM starten den Zeitgeber neu; im Editor und bei offenen Fenstern wird verschoben.
+- Kamerafahrten (`setView`, `faceNorth`) enden spätestens nach Dauer + 250 ms per Zeitgeber (`_animFallback`):
+  ohne Bildtakt (verdeckter Tab, dunkles Wand-Tablet, überlastete CI-Grafik) blieb die Kamera sonst am Start stehen –
+  Ursache des wackligen Standardansicht-Tests, der jetzt ohne `requestAnimationFrame` prüft.
 - Katalog-Vorschau (0.16.0): `preview.js` rechnet jedes Modell einmal mit dem vorhandenen Renderer in ein
   Render-Target (eigene Mini-Szene, kein zweiter WebGL-Kontext), liest die Pixel und speichert eine data-URL; das
   Panel füllt die Bilder nach und nach (eins pro Durchgang).
@@ -316,3 +319,10 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   `uLights` (die Shader lesen per texelFetch, unabhängig von der Breite). Der Pseudo-Raum `aussen` ist
   `scene.outdoorIdx` = Zahl der Bereiche + 1 (vorher fest 64 – kollidierte ab 64 Bereichen). 12 Leuchten je Bereich
   bleiben die Schleifengrenze im Shader.
+- Garten-Katalog (0.28.0): prozedural in `src/models.js`; lange Objekte (`fence`, `power_line`, `hedge`) entlang
+  `linePath()` (gerade oder `path`) und mit `groundAt` aus furnishing.js auf dem Gelände, ohne Kontaktschatten.
+  Farben bewusst aus vorhandenen Materialien (Eiche hell, Regentonnen-Grün, Alu dunkel, Laub) – Ebene 2 des
+  Demo-Hauses liegt damit genau am Budget (145; neu ist nur das Netz des Trampolins). Weitere Modelle: erst Material
+  teilen oder zusammenfassen.
+- Zoomgrenze (0.28.0): `controls.maxZoom` = Bildausschnitt-Halbhöhe / `ZOOM_MIN_HALF` (1,2 m), mindestens 5, neu nach
+  jedem `_fitFrustum` und jeder `setView`-Fahrt (`_zoomLimit`); `zoomToCursor` zoomt auf den Zeiger bzw. die Fingermitte.

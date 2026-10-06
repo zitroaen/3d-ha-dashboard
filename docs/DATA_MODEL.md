@@ -505,10 +505,13 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `ceiling_fan` | Gerät | | 1.2 | `color` (Flügel) – Animation: Flügel drehen sich, Tempo aus `percentage`; hängt an der Decke des Raums |
 | `chair` | Möbel | | | `guitar` |
 | `chest_table` | Möbel | | 0.8 × 0.6 × 0.48 | |
+| `climbing_frame` | Möbel | | 1.5 × 1.5 × 2.9 | `color` (Dach), `slide` (Rutsche, Standard an) – Spielturm mit Plattform, Geländer, Leiter und Satteldach |
+| `compost` | Möbel | | 1 × 1 × 0.85 | Komposter aus Latten |
 | `console` | Möbel | | 1.2 × 0.35 × 0.8 | `color` (Standard weiß) – Konsolentisch mit Fächern und Körben |
 | `corner_cabinet` | Möbel | | 0.7 × 0.7 × 1.9 | `glass`, `color` – Eckschrank, Rückwände an −x und −z, gerundete Front |
 | `curtain` | Möbel | | | `color` |
 | `dining_table` | Möbel | | 1.8 × 0.9 × 0.75 | `color` (Holz), `legs` (`wood` oder `metal`) – Esstisch |
+| `fence` | Möbel | | 6 × 0.1 × 1 | `style` (`wood` Lattenzaun, `chain_link` Maschendraht, `bars` Stabgitter), `color`, `path` (Punkte relativ zur Position; sonst gerade entlang der lokalen x-Achse, Länge = `size[0]`) – folgt dem Gelände |
 | `floor_fan` | Gerät | | 0.42 × 0.42 × 1.15 | `color` (Rotor) – Animation: Rotor dreht sich, Tempo aus `percentage` |
 | `flowers` | Pflanze | | 1.5 × 0.8 × 0.35 | `color` |
 | `fridge` | Gerät | | 0.6 × 0.65 × 1.85 | `glass` (Getränkekühlschrank mit Glastür und Flaschen), `color` |
@@ -525,17 +528,23 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `marker` | Gerät | | 0.12 | `color` |
 | `picnic_table` | Möbel | | 0.9 × 0.9 × 0.5 | `color` (Kinder-Picknicktisch) |
 | `picture` | Möbel | | | `frame`, `mat`, `color`, `texture` |
+| `power_line` | Möbel | | 60 × 1 × 8 | `span` (Mastabstand, 30 m), `wires` (Seile, 3), `path` – Freileitung: Holzmasten mit Querträgern, durchhängende Seile; folgt dem Gelände |
 | `radiator` | Möbel | | | |
+| `raised_bed` | Möbel | | 2 × 0.8 × 0.7 | `color` (Holz) – Hochbeet aus Brettern mit Eckpfosten und Erde |
 | `robot_vacuum` | Gerät | | 0.36 × 0.75 × 0.42 | `color` – Saugroboter mit Absaugstation (Station hinten, −z an die Wand); Animation: fährt Runden, solange er saugt (`vacuum`: cleaning), danach wieder in der Station |
 | `rug` | Möbel | | 2.0 × 3.0 | `color` |
+| `sandbox` | Möbel | | 1.5 × 1.5 × 0.3 | Sandkasten mit Holzrahmen und Sitzbrettern |
 | `shrub` | Pflanze | | 1.2 × 1.0 × 1.0 | `color` – als Instanz gezeichnet (siehe Bäume) |
 | `sideboard` | Möbel | | 1.2 × 0.45 × 0.6 | |
+| `slide` | Möbel | | 3 × 0.55 × 1.5 | `color` – Rutsche mit Leiter (hinten, −x), Höhe = Plattform |
 | `sofa_u` | Möbel | | 3.5 × 2.4 × 0.82 | `seat_depth`, `left`, `right`, `color` |
 | `solar_panels` | Gerät | | 2.29 × 1.72 × 0.1 | `panels` (2), `cable_to` (`[x, z]` Kabel bis zum Dachrand), `drop` (Kabel hinunter, m), `peak` (800 W) – Balkonkraftwerk flach; Animation: Energiefluss im Kabel, solange Leistung ≥ 1 W (Tempo aus Leistung/`peak`) |
 | `speaker` | Möbel | | 0.22 × 0.3 × 1.0 | |
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
+| `swing` | Möbel | | 2.4 × 1.6 × 2.2 | `seats` (1–3, Standard 2), `color` (Sitze) – Schaukel mit A-Gestell |
 | `toy_storage` | Möbel | | | `columns` |
+| `trampoline` | Möbel | | 3 × 3 × 0.8 | `net` (Sicherheitsnetz, Standard an) – `size[0]` = Durchmesser |
 | `tree` | Pflanze | | 3 × 3 × 5 | `shape` (`round` Laubbaum, `fruit` Obstbaum, `conifer`, `column`, `birch`), `color`, `stakes` (Dreibock aus Baumpfählen) – `size` = [Kronendurchmesser, –, Höhe] |
 | `tv` | Gerät | | 1.45 × 0.06 × 0.84 | |
 | `wall_clock` | Möbel | | 0.35 | `color` (Rahmen) – Wanduhr, `elevation` = Mitte (Standard 1,9 m) |
@@ -738,6 +747,9 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.28.0, abwärtskompatibel):** Katalog `swing`, `slide`, `climbing_frame`, `trampoline`,
+  `sandbox`, `raised_bed`, `compost`, `fence` (Holz, Maschendraht, Stabgitter; Linie oder `path`), `power_line`
+  (Masten und durchhängende Seile); lange Objekte (Zaun, Hecke, Freileitung) folgen dem Gelände.
 - **0.27.0 (ohne Formatänderung):** mehr Bereiche – die Lichttabelle wächst mit der Zahl der Bereiche und Leuchten
   (vorher höchstens 64 Räume bzw. 128 Bereiche und Leuchten); Prüfung meldet die Grenzen.
 - **Version 2, Ergänzung (0.26.0, abwärtskompatibel, ohne neue Felder):** Fenster unter Dachschrägen werden gekürzt

@@ -536,6 +536,15 @@ objects:
     pos: [-2.6, 16.3]
     size: [2.4, 2.4, 6.5]
     params: { shape: conifer }
+  - { id: schaukel, name: Schaukel, model: swing, pos: [20.5, 4], rot: 90 }
+  - { id: rutsche, name: Rutsche, model: slide, pos: [23.5, 9], rot: 180 }
+  - { id: sandkasten, name: Sandkasten, model: sandbox, pos: [20.5, 9.2] }
+  - { id: trampolin, name: Trampolin, model: trampoline, pos: [21.5, 14.5] }
+  - { id: spielturm, name: Spielturm, model: climbing_frame, pos: [23.2, 1], rot: 90 }
+  - { id: hochbeet_holz, name: Hochbeet, model: raised_bed, pos: [19.5, -4], rot: 90 }
+  - { id: komposter, name: Komposter, model: compost, pos: [19.5, -7.5] }
+  - { id: zaun_ost, name: Zaun, model: fence, pos: [17.6, 4], rot: 90, size: [28, 0.1, 1] }
+  - { id: freileitung, name: Freileitung, model: power_line, pos: [-8.6, 5], rot: 90, size: [38, 1, 8], params: { span: 19 } }
   - { id: strauch_1, name: Strauch, model: shrub, space: garten, pos: [10.1, 12.6] }
   - { id: strauch_2, name: Strauch, model: shrub, space: garten, pos: [-2.9, 12.5], size: [1.4, 1.1, 1.2] }
   - { id: strauch_3, name: Strauch, model: shrub, space: garten, pos: [5.4, 17], size: [1.6, 1.2, 1.1] }
