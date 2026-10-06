@@ -8,7 +8,7 @@ import { DATA_DIR, ENGINE_ROOT } from './lib/config.mjs';
 import { pointInPoly } from '../src/geometry.js';
 import { CATALOG, hasCapability } from '../src/model/catalog.js';
 import { parseModel, spacesOf, roleEntities, roofParts, toScene } from '../src/model/model.js';
-import { ceilingFn, windowUnderRoof } from '../src/roof.js';
+import { ceilingFn, windowUnderRoof, doorUnderRoof } from '../src/roof.js';
 import { LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from '../src/roomlight.js';
 import { FURNITURE, LAMPS } from '../src/models.js';
 
@@ -94,6 +94,10 @@ for (const o of model.objects || []) {
       if (fit.dormer) continue; // unter einer Gaube: deren Fenster ersetzt es
       if (fit.omit) warnings.push(`${f.id}: Fenster ${fmt(w.rect)} liegt über der Dachfläche (Wand dort ${fit.wallTop.toFixed(2)} m hoch) – wird weggelassen; Gaube anlegen?`);
       else if (fit.top != null) warnings.push(`${f.id}: Fenster ${fmt(w.rect)} liegt über der Dachfläche (Wand dort ${fit.wallTop.toFixed(2)} m hoch) – wird auf ${fit.top} m gekürzt; Gaube anlegen?`);
+    }
+    for (const d of f.doors) {
+      const fit = doorUnderRoof(d, Math.max(d.height || 0, 2.05), C);
+      if (fit.top != null) warnings.push(`${f.id}: Tür ${fmt(d.hinge)}–${fmt(d.end)} ragt über die Dachfläche (Wand dort ${fit.wallTop.toFixed(2)} m hoch) – wird auf ${fit.top} m begrenzt; Gaube bis zur Traufe (window: openings)?`);
     }
     // Wände unter keinem Dachteil (weder Steildach noch flach): ragen bis zur Etagenhöhe aus dem Dach
     const b = model.buildings.find((x) => f.id.startsWith(`${x.id}/`));

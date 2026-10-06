@@ -16,7 +16,7 @@ import { LightTable, LIGHT_TABLE_MAX } from '../src/roomlight.js';
 import { toYaml, yamlHeader } from '../src/model/yaml.js';
 import { applyOverrides, objectOverride } from '../src/store.js';
 import { roofShape, minusConvex } from '../src/roofshape.js';
-import { ceilingFn } from '../src/roof.js';
+import { ceilingFn, dormerFrame, doorUnderRoof, buildPitchedRoof } from '../src/roof.js';
 
 let failed = 0;
 const check = (name, cond, info = '') => {
@@ -235,8 +235,8 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const roof = sc.house.floors.find((f) => f.id === 'haus/__dach');
   const og = sc.house.floors.find((f) => f.id === 'haus/og');
   const ids = roof?.rooms.map((r) => r.id).join();
-  check('Haus: Hauptdach, Anbau und Dachterrasse als Bereiche', ids === 'haus_dach,haus_anbau,dachterrasse' && sc.spaces.get('dachterrasse')?.kind === 'roof', ids);
-  check('Haus: Hauptdach (nicht der Anbau) schneidet die Wände des Obergeschosses (Kniestock)', og?.roofCut?.length === 1 && roof.rooms[0].roof.shape.type === 'half_hip');
+  check('Haus: Hauptdach, Zwerchdach, Anbau und Dachterrasse als Bereiche', ids === 'haus_dach,haus_zwerch,haus_anbau,dachterrasse' && sc.spaces.get('dachterrasse')?.kind === 'roof', ids);
+  check('Haus: Haupt- und Zwerchdach (nicht der Anbau) schneiden die Wände des Obergeschosses (Kniestock)', og?.roofCut?.length === 2 && roof.rooms[0].roof.shape.type === 'half_hip');
   check('Gartenhaus: abgesetztes Pultdach (zwei Pultflächen, nördliche höher)',
     sc.house.floors.find((f) => f.id === 'gartenhaus/__dach')?.rooms.map((r) => r.roof?.eaves).join() === '2,2.9');
 }
@@ -553,6 +553,36 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const shortWin = windowUnderRoof({ rect: [1.6, 0, 2.4, 0.3], sill: 0.9, top: 2.1 }, C);
   check('Fenster unter der Schräge: gekürzt auf die niedrigste Stelle minus 5 cm, ohne Dach unverändert',
     shortWin.top === 1.75 && !windowUnderRoof({ rect: [0, 0, 1, 0.3] }, null).top && typeof cf === 'function', JSON.stringify(shortWin));
+}
+
+// Kreuzdach und Gauben: Decke = höchster Dachteil, unter Gauben deren Dach, Flächen nur wo sichtbar
+{
+  const main = roofShape({ type: 'gable', polygon: [[0, 0], [6, 0], [6, 8], [0, 8]], pitch: 45, ridge: 'y', overhang: 0 });
+  const cross = roofShape({ type: 'gable', polygon: [[3, 3], [6, 3], [6, 5], [3, 5]], pitch: 45, ridge: 'x', overhang: 0 });
+  // bei x = 5.5, y = 4: Hauptdach 0.5 hoch (0.5 m von der Ostkante), Zwerchdach 1 hoch (1 m von der Nord-/Südkante)
+  const C = ceilingFn([{ shape: main, eaves: 1, dormers: [] }, { shape: cross, eaves: 1, dormers: [] }], 5);
+  check('Kreuzdach: Wand darunter endet am höheren Dachteil (Vereinigung statt Minimum)', Math.abs(C([5.5, 4]) - 2) < 1e-6 && Math.abs(C([5.5, 1]) - 1.5) < 1e-6, `${C([5.5, 4])} ${C([5.5, 1])}`);
+  // Dachflächen: das Hauptdach verschwindet dort, wo das Zwerchdach höher liegt
+  const collect = () => { const b = { pos: [], uv: [], room: [] }; return { ...b, triUV(a, c, d) { this.pos.push([a, c, d]); }, skirt() {}, quadV() {}, polyH() {} }; };
+  const mk = () => ({ surf: collect(), under: collect(), edge: collect(), walls: collect(), glass: collect(), pvc: collect(), chimney: collect() });
+  const b1 = mk(), b2 = mk();
+  buildPitchedRoof({ roof: { shape: main }, elevation: 0 }, 1, b1, -1);
+  buildPitchedRoof({ roof: { shape: main }, elevation: 0 }, 1, b2, -1, [{ shape: cross, off: 0 }]);
+  const covers = (tri, p) => {
+    const s = (a, b) => (b[0] - a[0]) * (p[1] - a[2]) - (b[2] - a[2]) * (p[0] - a[0]);
+    const d = [s(tri[0], tri[1]), s(tri[1], tri[2]), s(tri[2], tri[0])];
+    return d.every((v) => v >= -1e-9) || d.every((v) => v <= 1e-9);
+  };
+  const inside = (b) => b.surf.pos.some((tri) => covers(tri, [5.5, 4]));
+  check('Kreuzdach: Hauptdach-Fläche unter dem Zwerchdach entfällt (Kehle), sonst bleibt sie', inside(b1) && !inside(b2) && b2.surf.pos.length > 0);
+  // Gauben: Wand unter der Gaube reicht bis unter ihr Dach; Gaube bis zur Traufe mit Tür
+  const d = { pos: [0.02, 4], width: 1.4, height: 1.5, type: 'shed', window: 'openings' };
+  const fr = dormerFrame(d, main);
+  const Cd = ceilingFn([{ shape: main, eaves: 1, dormers: [d] }], 5);
+  check('Gaube: Wand darunter bis zur Unterseite des Gaubendachs, daneben die Schräge', fr && Math.abs(Cd([0.2, 4]) - (1 + fr.roofAt(0, 0.18))) < 1e-3 && Math.abs(Cd([0.2, 2]) - 1.2) < 1e-6, `${Cd([0.2, 4])} ${Cd([0.2, 2])}`);
+  const door = { hinge: [0.18, 3.5], end: [0.18, 4.4] };
+  check('Tür: passt in die Gaube bis zur Traufe, ohne Gaube auf die Wandhöhe begrenzt',
+    !doorUnderRoof(door, 2.05, Cd).top && doorUnderRoof(door, 2.05, C).top === 1.5);
 }
 
 // Zustandsanzeige: Werte auswählen, Bedingungen; Medienplayer

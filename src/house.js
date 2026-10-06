@@ -6,7 +6,7 @@ import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
 import { parquetTexture, plankTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture, flagstoneTexture } from './textures.js';
 import { buildWindow, buildDoor, hasBoard, BOARD, DOOR_TOP, doorArch, buildArchOpening } from './openings.js';
-import { buildPitchedRoof, ceilingFn, ceilingProfile, windowUnderRoof } from './roof.js';
+import { buildPitchedRoof, ceilingFn, ceilingProfile, windowUnderRoof, doorUnderRoof } from './roof.js';
 import { GROUND_Y } from './ground.js';
 import { clipTerrain } from './terrain.js';
 import { buildRailing, beam } from './railing.js';
@@ -219,15 +219,22 @@ export class FloorModel {
     }
 
     // --- Türen: Sturz über der Öffnung (volle Laibungstiefe); Außentüren bekommen ein Türblatt
-    for (const d of floor.doors) {
+    for (let d of floor.doors) {
       const [hx, hy] = d.hinge, [ex, ey] = d.end;
       const len = Math.hypot(ex - hx, ey - hy);
       const nx = -(ey - hy) / len, ny = (ex - hx) / len;
       const [j0, j1] = d.jamb;
       const off = (p, t) => [p[0] + nx * t, p[1] + ny * t];
       const rect = [off(d.hinge, j0), off(d.end, j0), off(d.end, j1), off(d.hinge, j1)];
-      const arch = doorArch(d, len);
-      const top = arch ? Math.min(arch.crown, H) : Math.max(d.height || 0, DOOR_TOP);
+      let arch = doorArch(d, len);
+      let top = arch ? Math.min(arch.crown, H) : Math.max(d.height || 0, DOOR_TOP);
+      // unter einer Dachschräge: Tür nicht durchs Dach (auf die Wandhöhe begrenzt, die Prüfung warnt)
+      const fitD = doorUnderRoof(d, top, this.ceilingAt);
+      if (fitD.top != null) {
+        top = fitD.top;
+        d = { ...d, height: top, arch: false, top: undefined };
+        arch = null;
+      }
       if (top < H - 0.01) prism(rect, top, H);
       // Rundbogen: Zwickel zwischen Kämpfer und Scheitel, gewölbte Laibung
       if (arch) {
@@ -405,7 +412,10 @@ export class FloorModel {
       walls,
       glass: B.glass,
       pvc: B.pvc,
-    }, -(this.floor.roofThickness ?? 0.2));
+    }, -(this.floor.roofThickness ?? 0.2),
+    // andere Steildach-Teile des Gebäudes: Durchdringung (Kreuzdach, Anbau mit höherem First)
+    [...this.rooms.values()].filter((o) => o !== r && o.room.roof?.pitched && o.room.roof.shape)
+      .map((o) => ({ shape: o.room.roof.shape, off: o.room.elevation || 0 })));
     // Dachfläche in den gemeinsamen Builder des Belags übernehmen, eigene Kopie als Treffer-Fläche
     const fb = (floors[kind] ??= new Builder());
     fb.pos.push(...surf.pos);

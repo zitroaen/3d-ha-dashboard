@@ -168,11 +168,21 @@ buildings:
           - { polygon: [[3.4, 0], [6.06, 0], [6.06, 0.3], [3.4, 0.3]] }
           - { polygon: [[0, 7.7], [2, 7.7], [2, 8], [0, 8]] }
           - { polygon: [[3.6, 7.7], [6.06, 7.7], [6.06, 8], [3.6, 8]] }
-          - { polygon: [[0, 0.3], [0.3, 0.3], [0.3, 7.7], [0, 7.7]] }
+          - { polygon: [[0, 0.3], [0.3, 0.3], [0.3, 1.2], [0, 1.2]] }
+          - { polygon: [[0, 2.1], [0.3, 2.1], [0.3, 7.7], [0, 7.7]] }
           - { polygon: [[5.94, 0.3], [6.06, 0.3], [6.06, 7.7], [5.94, 7.7]] }
         windows:
           - { sill: 0.9, top: 2, rect: [2, 0, 3.4, 0.3], room: studio }
           - { sill: 0.5, top: 2, rect: [2, 7.7, 3.6, 8], room: studio }
+        doors:
+          - hinge: [0.15, 1.2]
+            end: [0.15, 2.1]
+            swing: 1
+            jamb: [-0.15, 0.15]
+            type: exterior
+            leaf: glass
+            rooms: [studio]
+            height: 2.05
     facade: { type: plaster, color: "#ece5d8", flush: true, plinth: { height: 0.45, material: stone } }
     roof:
       - type: half_hip
@@ -180,8 +190,19 @@ buildings:
         pitch: 40
         eaves: 1
         overhang: 0.4
-        dormers: [{ pos: [0.9, 4], width: 1.8, height: 1.3, type: shed }]
-        chimneys: [{ pos: [4.3, 2.4], size: [0.5, 0.5], height: 0.7 }]
+        dormers:
+          - { pos: [0.9, 4], width: 1.8, height: 1.3, type: shed }
+          - { pos: [0.9, 6.3], width: 1.2, height: 1.1, type: flat }
+          - { pos: [0.02, 1.65], width: 1.4, height: 1.5, type: shed, window: openings }
+        chimneys: [{ pos: [4.3, 1.6], size: [0.5, 0.5], height: 0.7 }]
+      - id: haus_zwerch
+        name: Zwerchdach
+        type: gable
+        ridge: x
+        polygon: [[2.8, 2.6], [6, 2.6], [6, 5.4], [2.8, 5.4]]
+        pitch: 40
+        eaves: 1
+        overhang: 0.3
       - id: haus_anbau
         name: Dach Anbau
         type: hip
@@ -430,7 +451,14 @@ objects:
     rot: 90
     size: [0.2, 0.22, 0.95]
     ha: { entities: { power: media_player.demo_wohnzimmer }, badge: false }
-  - { id: lautsprecher_kompakt, name: Kompaktlautsprecher, model: speaker, space: wohnen, pos: [5.72, 3.92], rot: 90, elevation: 0.58, params: { style: compact, color: black_matte } }
+  - id: lautsprecher_kompakt
+    name: Kompaktlautsprecher
+    model: speaker
+    space: wohnen
+    pos: [5.72, 3.92]
+    rot: 90
+    elevation: 0.58
+    params: { style: compact, color: black_matte }
   - id: tischleuchte
     name: Schreibtischleuchte
     model: desk_lamp
@@ -439,7 +467,7 @@ objects:
     rot: 90
     elevation: 0.58
     params: { color: rug_red }
-    light: { height: 1.0, range: 1.5 }
+    light: { height: 1, range: 1.5 }
   - { id: tv, model: tv, space: wohnen, pos: [5.9, 3.4], rot: 90, elevation: 0.95, size: [1.3, 0.05, 0.75] }
   - { id: ofenplatte, model: hearth, space: wohnen, pos: [5.48, 4.6], rot: 90, size: [0.8, 0.9] }
   - { id: ofen, model: stove, space: wohnen, pos: [5.66, 4.6], rot: 90, size: [0.6, 0.5, 1.5] }
@@ -561,9 +589,27 @@ objects:
   - { id: sandkasten, name: Sandkasten, model: sandbox, pos: [20.5, 9.2] }
   - { id: trampolin, name: Trampolin, model: trampoline, pos: [21.5, 14.5] }
   - { id: saeule_west, name: Säule, model: column, space: terrasse, pos: [0.3, 10.2], size: [0.3, 0.3, 2.4] }
-  - { id: saeule_ost, name: Säule, model: column, space: terrasse, pos: [6.2, 10.2], size: [0.3, 0.3, 2.4], params: { shape: square } }
-  - { id: bruestung_terrasse, name: Brüstung, model: balustrade, space: terrasse, pos: [6.3, 9.1], rot: 90, size: [1.9, 0.25, 0.8], params: { material: stone } }
-  - { id: treppe_garage, name: Treppe aufs Garagendach, model: stairs, pos: [16, 3.3], size: [0.8, 3.4, 2.5], params: { open: true, railing: right } }
+  - id: saeule_ost
+    name: Säule
+    model: column
+    space: terrasse
+    pos: [6.2, 10.2]
+    size: [0.3, 0.3, 2.4]
+    params: { shape: square }
+  - id: bruestung_terrasse
+    name: Brüstung
+    model: balustrade
+    space: terrasse
+    pos: [6.3, 9.1]
+    rot: 90
+    size: [1.9, 0.25, 0.8]
+    params: { material: stone }
+  - id: treppe_garage
+    name: Treppe aufs Garagendach
+    model: stairs
+    pos: [16, 3.3]
+    size: [0.8, 3.4, 2.5]
+    params: { open: true, railing: right }
   - { id: spielturm, name: Spielturm, model: climbing_frame, pos: [23.2, 1], rot: 90 }
   - { id: hochbeet_holz, name: Hochbeet, model: raised_bed, pos: [19.5, -4], rot: 90 }
   - { id: komposter, name: Komposter, model: compost, pos: [19.5, -7.5] }

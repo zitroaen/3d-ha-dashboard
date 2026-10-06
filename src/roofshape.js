@@ -10,7 +10,7 @@ const EPS = 1e-7;
 const rad = (d) => (d * Math.PI) / 180;
 
 /** Umriss gegen den Uhrzeigersinn im Plan (x nach rechts, y nach unten: Fläche positiv) */
-function ccwPoly(poly) {
+export function ccwPoly(poly) {
   let a = 0;
   for (let i = 0; i < poly.length; i++) {
     const p = poly[i], q = poly[(i + 1) % poly.length];
@@ -182,6 +182,16 @@ export function insideConvex(poly, p) {
     if ((p[0] - a[0]) * m[0] + (p[1] - a[1]) * m[1] < -1e-6) return false;
   }
   return true;
+}
+
+/** Konvexes Polygon geschnitten mit einem konvexen Bereich (gegen den Uhrzeigersinn) */
+export function clipToConvex(poly, region) {
+  let out = poly;
+  for (let i = 0; i < region.length && out.length >= 3; i++) {
+    const a = region[i], b = region[(i + 1) % region.length], m = inward(a, b);
+    out = clipHalf(out, -m[0], -m[1], m[0] * a[0] + m[1] * a[1]);
+  }
+  return out.length >= 3 && area(out) > 1e-6 ? out : [];
 }
 
 /** Konvexes Polygon minus konvexes Loch -> disjunkte konvexe Stücke */
