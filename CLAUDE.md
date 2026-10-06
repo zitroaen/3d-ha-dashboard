@@ -338,3 +338,11 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   gesucht, Enden per Halbierung genau an der Grenze) und die Kanten der Geschossdecke (`_houseOutline`). Keine neue
   Geometrie in house.js, kein zusätzlicher Zeichenaufruf (gleiches Material wie die Fassade, `_mergeLevels`).
   Außenwände unter Dachschrägen bekommen oben die Fassade statt der dunklen Schnittfläche.
+- Türen (0.33.0): Rundbogen ohne neue Materialien – `buildArchOpening()` (openings.js) zeichnet Zwickel und Laibung
+  in Streifen mit `triN` (Wicklung nach gewünschter Normale), Bogenfelder als `archBand` (Kreisring/-scheibe in
+  senkrechter Ebene, auch Viertel für Doppeltüren). Der Sturz darüber bleibt das normale Prisma (auch unter Dachschrägen).
+  Leistungsbudget 145 -> 150 Zeichenaufrufe: bewegliche Teile (Animationsgruppen) werden nicht zusammengefasst, jedes
+  Material darin kostet einen Aufruf (Fensterreihe des Garagentors, Glas wie beim Kaminofen).
+- Lampenlicht und Tageslicht (0.33.0): Uniform `uLampDay` (roomlight.js) = lerp(1, `LAMP_DAY` 0,3, daylight) aus
+  `setSky`; skaliert `roomIrradiance` und (quadriert) den additiven Lichtschein. Sonst wirkte „Tag“ mit abends
+  eingeschalteten HA-Lampen milchig. Die Leuchtkörper selbst bleiben unverändert.

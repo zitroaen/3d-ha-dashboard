@@ -134,6 +134,8 @@ const QUALITY = {
 
 // Warmweiß ~2700 K
 const DEFAULT_LIGHT = new THREE.Color().setRGB(1.0, 0.8, 0.6, THREE.SRGBColorSpace);
+/** Anteil des Lampenlichts auf den Flächen bei vollem Tageslicht */
+const LAMP_DAY = 0.3;
 const LAMP_INTENSITY = { ceiling: 1.7, pendant: 1.6, floor: 1.2, table: 0.9, wall: 1.1, spot: 1.0 };
 
 export class HouseScene {
@@ -622,6 +624,8 @@ export class HouseScene {
 
     const day = THREE.MathUtils.smoothstep(elev, -6, 8);
     this.daylight = day;
+    // Lampen bei Tageslicht nur schwach (die Leuchtkörper selbst bleiben sichtbar)
+    lightUniforms.uLampDay.value = THREE.MathUtils.lerp(1, LAMP_DAY, day);
     const L = (a, b) => a + (b - a) * day;
     const mix = (a, b) => new THREE.Color(a).lerp(new THREE.Color(b), day);
 

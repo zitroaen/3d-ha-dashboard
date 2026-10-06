@@ -5,13 +5,12 @@ import * as THREE from 'three';
 import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
 import { parquetTexture, plankTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture, flagstoneTexture } from './textures.js';
-import { buildWindow, buildDoor, hasBoard, BOARD } from './openings.js';
+import { buildWindow, buildDoor, hasBoard, BOARD, DOOR_TOP, doorArch, buildArchOpening } from './openings.js';
 import { buildPitchedRoof, ceilingFn, ceilingProfile, windowUnderRoof } from './roof.js';
 import { GROUND_Y } from './ground.js';
 import { clipTerrain } from './terrain.js';
 import { buildRailing, beam } from './railing.js';
 
-const DOOR_HEIGHT = 2.05;
 // Jeder Raumboden liegt minimal höher als der vorige: Raumpolygone überlappen in den Türöffnungen,
 // ohne Versatz flackern die Böden dort (Z-Fighting).
 const FLOOR_STEP = 0.0008;
@@ -227,8 +226,15 @@ export class FloorModel {
       const [j0, j1] = d.jamb;
       const off = (p, t) => [p[0] + nx * t, p[1] + ny * t];
       const rect = [off(d.hinge, j0), off(d.end, j0), off(d.end, j1), off(d.hinge, j1)];
-      const top = Math.max(d.height || 0, DOOR_HEIGHT);
+      const arch = doorArch(d, len);
+      const top = arch ? Math.min(arch.crown, H) : Math.max(d.height || 0, DOOR_TOP);
       if (top < H - 0.01) prism(rect, top, H);
+      // Rundbogen: Zwickel zwischen Kämpfer und Scheitel, gewölbte Laibung
+      if (arch) {
+        const P = (s, t) => [d.hinge[0] + ((ex - hx) / len) * s + nx * t, d.hinge[1] + ((ey - hy) / len) * s + ny * t];
+        buildArchOpening(this, P, [(ex - hx) / len, (ey - hy) / len], [nx, ny], len, d.jamb, { ...arch, crown: top },
+          (room) => (!room && fac ? fac : walls));
+      }
       buildDoor(this, d, B);
     }
 

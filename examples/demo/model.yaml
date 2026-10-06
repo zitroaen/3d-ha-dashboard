@@ -129,14 +129,16 @@ buildings:
             type: exterior
             leaf: solid
             rooms: [kueche]
-            height: 2
-          - hinge: [6, 1.4]
-            end: [6, 2.3]
+            arch: true
+          - hinge: [6, 1.2]
+            end: [6, 2.5]
             swing: 1
             jamb: [-0.06, 0.06]
             type: interior
             rooms: [wohnen, kueche]
-            height: 2
+            height: 2.5
+            arch: true
+            leaves: 2
           - hinge: [6, 5.2]
             end: [6, 6.1]
             swing: 1
@@ -726,6 +728,7 @@ objects:
     space: garage
     pos: [13.5, 5.79]
     size: [3, 0.2, 2.1]
+    params: { glass: true }
     ha: { entities: { power: cover.demo_garagentor }, tap: toggle }
   - id: balkonkraftwerk
     name: Balkonkraftwerk

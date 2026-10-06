@@ -1,5 +1,19 @@
 # Änderungen
 
+## 0.33.0
+
+- **Rundbogen-Türen:** `doors[].arch: true` (oder `top: arch`) – Bogen über der ganzen Türbreite, Scheitel aus
+  `height` (sonst Kämpfer auf Türhöhe). Die Wand hat Zwickel und eine gewölbte Laibung; Haustür und Türblatt mit
+  Bogenfeld, Glastür mit Oberlicht im Bogen.
+- **Doppeltüren:** `doors[].leaves: 2` – zwei Türblätter (auch mit Rundbogen), Glastür mit Mittelpfosten.
+- **Garagentor mit Fenstern:** `garage_door` mit `params.glass: true` (Fensterreihe in der zweitobersten Lamelle,
+  fährt mit), Farbe wie bisher über `params.color`.
+- Demo-Haus: Küchentür mit Rundbogen, zweiflügelige Rundbogentür zwischen Wohnzimmer und Küche, Garagentor mit
+  Fenstern.
+- **Tageszeit „Tag“ am Abend (Fehler):** Eingeschaltete Lampen hellten bei vollem Tageslicht alle Flächen auf, dazu
+  Lichtschein auf dem Boden und vor Fenstern – das Bild wirkte milchig. Lampenlicht wirkt jetzt je nach Tageslicht
+  schwächer (bei Sonne 30 %, Lichtschein fast nicht); nachts unverändert.
+
 ## 0.32.0
 
 - **Bündige Fassade:** `buildings[].facade.flush: true` – die Außenseite des Erdgeschosses läuft über die
