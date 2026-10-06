@@ -25,7 +25,7 @@ export const CATALOG = {
   rug: { label: 'Teppich', category: 'furniture', size: [2.0, 3.0], params: ['color'] },
   sideboard: { label: 'Sideboard', category: 'furniture', size: [1.2, 0.45, 0.6], params: [] },
   sofa_u: { label: 'Wohnlandschaft', category: 'furniture', size: [3.5, 2.4, 0.82], params: ['seat_depth', 'left', 'right', 'color'] },
-  speaker: { label: 'Standlautsprecher', category: 'furniture', size: [0.22, 0.3, 1.0], params: [] },
+  speaker: { label: 'Lautsprecher', category: 'furniture', size: [0.22, 0.3, 1.0], params: ['style', 'color'] },
   storage_cube: { label: 'Würfelregal', category: 'furniture', params: [] },
   stove: { label: 'Kaminofen', category: 'furniture', params: [] },
   toy_storage: { label: 'Spielzeugregal', category: 'furniture', params: ['columns'] },
@@ -77,7 +77,8 @@ export const CATALOG = {
   chandelier_candles: { label: 'Kerzenkronleuchter', category: 'lamp', capabilities: ['light'], params: ['arms'] },
   chandelier_tulip: { label: 'Tulpenkronleuchter', category: 'lamp', capabilities: ['light'], params: ['arms'] },
   chandelier_crystal: { label: 'Kristallkronleuchter', category: 'lamp', capabilities: ['light'], params: ['radius'] },
-  floor_column: { label: 'Stehleuchte (Plissee-Säule)', category: 'lamp', capabilities: ['light'], params: ['radius', 'column'] },
+  floor_column: { label: 'Stehleuchte (Plissee-Säule)', category: 'lamp', capabilities: ['light'], params: ['radius', 'column', 'base'] },
+  desk_lamp: { label: 'Schreibtischleuchte', category: 'lamp', capabilities: ['light'], params: ['color', 'head_deg', 'reach'] },
   paper_lantern: { label: 'Papierlampe', category: 'lamp', capabilities: ['light'], params: ['radius'] },
   pendant_drum: { label: 'Pendelleuchte (Stoffschirm)', category: 'lamp', capabilities: ['light'], params: ['color', 'radius'] },
   disc: { label: 'Deckenleuchte', category: 'lamp', capabilities: ['light'], params: [] },
@@ -97,7 +98,7 @@ export const hasCapability = (model, cap) => !!CATALOG[model]?.capabilities?.inc
 export const DEFAULT_LIGHT_HEIGHT = { ceiling: 2.35, pendant: 2.0, floor: 0.15, table: 0.6, wall: 1.8, spot: 0.15 };
 
 /** Standard-Lichthöhe je Leuchtenmodell (überschreibt die Montage) */
-export const MODEL_LIGHT_HEIGHT = { floor_spots: 1.5, string_lights: 2.4, bollard: 0.55, ball: 0.15, spike_spot: 0.15, floor_column: 0.95, chandelier_crystal: 1.9 };
+export const MODEL_LIGHT_HEIGHT = { floor_spots: 1.5, string_lights: 2.4, bollard: 0.55, ball: 0.15, spike_spot: 0.15, floor_column: 0.95, chandelier_crystal: 1.9, desk_lamp: 0.42 };
 
 /** Bodenbeläge und Oberflächen (`surface`) */
 export const SURFACES = ['parquet', 'planks', 'parquet_cube', 'tiles', 'concrete', 'lawn', 'paving', 'gravel', 'soil', 'wood', 'water', 'slabs', 'stone', 'roof', 'roof_tiles', 'flagstone'];
@@ -112,4 +113,4 @@ export const ROLES = ['power', 'info'];
 export const ACTIONS = ['toggle', 'more-info', 'service', 'navigate', 'none'];
 
 /** Standard-Montage je Leuchtenmodell (wenn `light.mount` fehlt) */
-export const DEFAULT_MOUNT = { bollard: 'floor', spike_spot: 'floor', string_lights: 'pendant', ball: 'floor', chandelier_candles: 'pendant', chandelier_tulip: 'pendant', disc: 'ceiling', floor_spots: 'floor', sconce: 'wall', wall_box: 'wall', chandelier_crystal: 'pendant', pendant_drum: 'pendant', floor_column: 'floor', paper_lantern: 'pendant' };
+export const DEFAULT_MOUNT = { bollard: 'floor', spike_spot: 'floor', string_lights: 'pendant', ball: 'floor', chandelier_candles: 'pendant', chandelier_tulip: 'pendant', disc: 'ceiling', floor_spots: 'floor', sconce: 'wall', wall_box: 'wall', chandelier_crystal: 'pendant', pendant_drum: 'pendant', floor_column: 'floor', paper_lantern: 'pendant', desk_lamp: 'table' };

@@ -367,6 +367,8 @@ export function toScene(model) {
         params: o.params,
         kind: l.mount || DEFAULT_MOUNT[o.model] || 'ceiling',
         height: l.height ?? 2.2,
+        // Leuchte steht erhöht (Tischleuchte auf dem Sideboard): das Modell beginnt dort, light.height bleibt ab Boden
+        elevation: o.elevation || 0,
         range: l.range ?? 3,
         color: l.color,
         facing: l.facing,
