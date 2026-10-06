@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import * as yaml from 'js-yaml';
 import { ENGINE_ROOT } from './lib/config.mjs';
 import { migrate, MODEL_VERSION, ModelVersionError } from '../src/model/migrate.js';
+import { badgeSpec, badgeEntities, conditionMet, playerSpec } from '../src/model/model.js';
 import { parseModel, toScene, writeBack, gestureAction, setRole, cleanHa, showsBadge, outdoorHeightAt, activityOf, terrainOf, OUTDOOR_FLOOR, OPEN_GROUND } from '../src/model/model.js';
 import { terrainGrid, clipTerrain, terrainShade, aerialTransform } from '../src/terrain.js';
 import { readTiff, readXyz, readWorldFile, sampleRaster, georef } from '../scripts/lib/geodata.mjs';
@@ -552,6 +553,27 @@ check('Animation: Messwert (Leistung) aktiv ab 1, Tempo im Verhältnis zur Spitz
   const shortWin = windowUnderRoof({ rect: [1.6, 0, 2.4, 0.3], sill: 0.9, top: 2.1 }, C);
   check('Fenster unter der Schräge: gekürzt auf die niedrigste Stelle minus 5 cm, ohne Dach unverändert',
     shortWin.top === 1.75 && !windowUnderRoof({ rect: [0, 0, 1, 0.3] }, null).top && typeof cf === 'function', JSON.stringify(shortWin));
+}
+
+// Zustandsanzeige: Werte auswählen, Bedingungen; Medienplayer
+{
+  const states = {
+    'sensor.t': { state: '26.5', attributes: {} }, 'sensor.h': { state: '55', attributes: {} },
+    'vacuum.v': { state: 'docked', attributes: {} }, 'media_player.m': { state: 'playing', attributes: { volume_level: 0.3 } },
+  };
+  const o = { ha: { entities: { info: ['sensor.t', 'sensor.h'] }, badge: { entities: ['sensor.t'], when: { above: 25 } } } };
+  check('Anzeige: nur ausgewählte Werte, Bedingung „größer als“ auf der ersten angezeigten Entity',
+    badgeEntities(o).join() === 'sensor.t' && showsBadge(o) && conditionMet(o.ha.badge.when, states, 'sensor.t') && !conditionMet({ above: 30 }, states, 'sensor.t'));
+  check('Bedingung: state/not_state (auch Liste), attribute, fehlende Entity = nicht erfüllt',
+    conditionMet({ not_state: 'docked' }, states, 'vacuum.v') === false && conditionMet({ state: ['cleaning', 'docked'] }, states, 'vacuum.v')
+      && conditionMet({ entity: 'media_player.m', attribute: 'volume_level', below: 0.5 }, states) && !conditionMet({ state: 'on' }, states, 'sensor.x'));
+  const empty = { ha: { entities: { power: 'vacuum.v', info: 'sensor.h' }, badge: { entities: [] } } };
+  check('Anzeige: leere Auswahl = keine Werte (nur An/Aus), Kurzform true/false bleibt', badgeEntities(empty).length === 0
+    && badgeSpec({ ha: { badge: false } }).show === false && badgeSpec({}).entities === null);
+  check('Medienplayer: automatisch bei media_player (Standard „spielt“), abschaltbar, eigene Bedingung',
+    playerSpec({ ha: { entities: { power: 'media_player.m' } } })?.when.state === 'playing' && playerSpec({ ha: { entities: { power: 'media_player.m' }, player: false } }) === null
+      && playerSpec({ ha: { entities: { power: 'switch.x' } } }) === null && playerSpec({ ha: { entities: { power: 'media_player.m' }, player: { when: { state: ['playing', 'paused'] } } } }).when.state.length === 2);
+  check('cleanHa behält player', cleanHa({ entities: {}, player: false }).player === false);
 }
 
 // Magicplan-Import: Etagen drehen, Raum-IDs eindeutig, Räume teilen (Python, ohne PDF)

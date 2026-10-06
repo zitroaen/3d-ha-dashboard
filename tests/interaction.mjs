@@ -502,11 +502,41 @@ try {
     mh.states = { ...mh.states, 'vacuum.demo_saugroboter': { entity_id: 'vacuum.demo_saugroboter', state: 'docked', attributes: {} } };
     window.panel.hass = mh;
     r.home = a()?.angle === 0;
+    // Anzeige nur unterwegs (badge.when: not_state docked)
+    r.badgeDocked = [...window.panel.shadowRoot.querySelectorAll('.badge')].some((b) => b.ref.id === 'saugroboter');
     window.panel._applyPrefs({ ...window.panel.prefs, animations: 'off' });
     return r;
   });
-  ok(robot.moving && robot.home && robot.badge === 'Saugt', 'Saugroboter: fährt, solange vacuum.* saugt, angedockt wieder in der Station',
+  ok(robot.moving && robot.home && robot.badge === 'Saugt' && robot.badgeDocked === false,
+    'Saugroboter: fährt, solange vacuum.* saugt, angedockt wieder in der Station; Anzeige nur unterwegs (Bedingung)',
     `Saugroboter: ${JSON.stringify(robot)}`);
+
+  // ---------------- Medienplayer über dem Lautsprecher, solange Musik spielt ----------------
+  const mp = await page.evaluate(() => {
+    const mh = window.mockHass, id = 'media_player.demo_wohnzimmer';
+    const set = (state, attributes = {}) => {
+      mh.states = { ...mh.states, [id]: { entity_id: id, state, attributes: { friendly_name: 'Lautsprecher Wohnzimmer', ...attributes } } };
+      window.panel.hass = mh;
+    };
+    const find = () => [...window.panel.shadowRoot.querySelectorAll('.player')].find((p) => p.ref.id === 'lautsprecher_wohnen');
+    const anyBadge = () => [...window.panel.shadowRoot.querySelectorAll('.badge')].some((b) => b.ref.id === 'lautsprecher_wohnen');
+    set('idle');
+    const idle = { player: !!find(), badge: anyBadge() };
+    set('playing', { media_title: 'Testlied', media_artist: 'Testband' });
+    const el = find();
+    const shown = { title: el?.querySelector('.meta b')?.textContent, artist: el?.querySelector('.meta small')?.textContent,
+      buttons: [...(el?.querySelectorAll('button') || [])].map((b) => b.getBoundingClientRect().height) };
+    const calls = mh.calls.length;
+    el?.querySelector('[data-mp="next"]').click();
+    const call = mh.calls.slice(calls).find((c) => c.domain === 'media_player');
+    set('paused');
+    const paused = !!find();
+    return { idle, shown, call, paused };
+  });
+  ok(!mp.idle.player && !mp.idle.badge && mp.shown.title === 'Testlied' && mp.shown.artist === 'Testband' && mp.shown.buttons.length === 3
+      && mp.shown.buttons.every((h) => h >= 48) && mp.call?.service === 'media_next_track' && mp.call.data.entity_id === 'media_player.demo_wohnzimmer' && !mp.paused,
+    'Medienplayer: erscheint über dem Lautsprecher, solange Musik spielt (Titel, Interpret, Knöpfe ≥ 48 px, Weiter ruft HA); sonst keine Anzeige (badge: false)',
+    `Medienplayer: ${JSON.stringify(mp)}`);
 
   // ---------------- Garagentor und Balkonkraftwerk ----------------
   const door = await page.evaluate(async () => {

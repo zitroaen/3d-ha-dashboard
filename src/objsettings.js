@@ -1,7 +1,7 @@
 // Einstellungen eines Objekts im Editor (docs/DATA_MODEL.md → ha): Entities nach Rolle (Schalten, Anzeigen), was
 // Antippen, Doppeltippen und langes Drücken tun, und ob der Zustand über dem Objekt angezeigt wird.
 // Entities wählt die Entity-Auswahl (picker.js); dieser Bildschirm hält nur die Übersicht.
-import { GESTURES, defaultAction, normAction, roleEntities, showsBadge } from './model/model.js';
+import { GESTURES, defaultAction, normAction, roleEntities, showsBadge, badgeSpec, playerSpec } from './model/model.js';
 
 export const ROLE_LABEL = { power: 'Schalten', info: 'Anzeigen' };
 const ROLE_HINT = {
@@ -37,7 +37,8 @@ export class ObjectSettings {
     root.addEventListener('change', (e) => {
       const g = e.target.closest('[data-g]')?.dataset.g;
       if (g) this._setGesture(g);
-      if (e.target.dataset.badge != null) this._setBadge(e.target.value);
+      if (e.target.closest('[data-badge-sec]')) this._setBadge();
+      if (e.target.dataset.player != null) this._setPlayer(e.target.value);
     });
   }
 
@@ -93,10 +94,39 @@ export class ObjectSettings {
     this.onChange?.(ha);
   }
 
-  _setBadge(v) {
+  /** Zustandsanzeige aus den Bedienelementen: Kurzform true/false, sonst { show, entities, when } */
+  _setBadge() {
+    const sec = this.root.querySelector('[data-badge-sec]');
+    const v = sec.querySelector('[data-badge]').value;
+    const entities = [...sec.querySelectorAll('input[data-show]:checked')].map((c) => c.value);
+    const all = [...sec.querySelectorAll('input[data-show]')].map((c) => c.value);
+    const op = sec.querySelector('[data-when-op]')?.value || '';
+    const val = sec.querySelector('[data-when-val]')?.value.trim() ?? '';
+    const ent = sec.querySelector('[data-when-entity]')?.value || '';
     const ha = this.ha;
-    if (v === '') delete ha.badge;
-    else ha.badge = v === 'true';
+    const out = {};
+    if (v !== '') out.show = v === 'true';
+    // nur eine echte Auswahl speichern (alle info-Entities angehakt = Standard)
+    const info = roleEntities(this.entry, 'info');
+    const isDefault = entities.length === info.length && entities.every((x) => info.includes(x));
+    if (all.length && !isDefault) out.entities = entities;
+    if (op) {
+      const when = {};
+      if (ent) when.entity = ent;
+      if (op === 'state' || op === 'not_state') when[op] = val.includes(',') ? val.split(',').map((x) => x.trim()).filter(Boolean) : val;
+      else when[op] = Number(val.replace(',', '.')) || 0;
+      out.when = when;
+    }
+    if (!Object.keys(out).length) delete ha.badge;
+    else if (Object.keys(out).length === 1 && 'show' in out) ha.badge = out.show;
+    else ha.badge = out;
+    this.onChange?.(ha);
+  }
+
+  _setPlayer(v) {
+    const ha = this.ha;
+    if (v === '') delete ha.player;
+    else ha.player = v === 'true';
     this.onChange?.(ha);
   }
 
@@ -124,7 +154,6 @@ export class ObjectSettings {
       if (a && a.action !== 'none') extra.push(`<input name="confirm" placeholder="Rückfrage vorher (leer = keine)" value="${esc(a.confirm)}" autocomplete="off">`);
       return `<div class="gesture" data-g="${g}"><label>${GESTURE_LABEL[g]}<select aria-label="${GESTURE_LABEL[g]}">${opts}</select></label>${extra.join('')}</div>`;
     }).join('');
-    const badge = e.ha?.badge;
     // Animation ohne Entity: fester Zustand (z. B. Ventilator dreht sich immer)
     const linked = roleEntities(e, 'power').length > 0;
     const stateSec = this.anim ? `<section><h3>Animation</h3>
@@ -139,12 +168,39 @@ export class ObjectSettings {
         ${roles}
         ${stateSec}
         <section><h3>Gesten</h3>${gestures}</section>
-        <section><h3>Zustand über dem Objekt</h3>
-          <select data-badge aria-label="Zustand anzeigen">
-            <option value="" ${badge == null ? 'selected' : ''}>Automatisch (${showsBadge({ ha: { ...e.ha, badge: undefined } }, this.light) ? 'anzeigen' : 'nicht anzeigen'})</option>
-            <option value="true" ${badge === true ? 'selected' : ''}>Anzeigen</option>
-            <option value="false" ${badge === false ? 'selected' : ''}>Nicht anzeigen</option>
-          </select></section>
+        ${this._badgeSection(e, st)}
       </div>`;
+  }
+
+  /** Zustand über dem Objekt: anzeigen ja/nein, welche Werte, unter welcher Bedingung; Medienplayer */
+  _badgeSection(e, st) {
+    const spec = badgeSpec(e);
+    const linked = [...roleEntities(e, 'power'), ...roleEntities(e, 'info')];
+    const shown = spec.entities ?? roleEntities(e, 'info');
+    const name = (id) => st[id]?.attributes?.friendly_name || id;
+    const checks = linked.length ? `<p class="hint">Welche Werte? (ohne Haken: Zustand der Schalt-Entity, z. B. An/Aus)</p>
+      <div class="checks">${linked.map((id) => `<label class="check"><input type="checkbox" data-show value="${esc(id)}" ${shown.includes(id) ? 'checked' : ''}>
+        <span>${esc(name(id))}<small>${esc(id)}${st[id] ? ` · ${esc(st[id].state)}` : ''}</small></span></label>`).join('')}</div>` : '';
+    const w = spec.when || {};
+    const op = ['state', 'not_state', 'above', 'below'].find((k) => w[k] != null) || '';
+    const val = op ? [].concat(w[op]).join(', ') : '';
+    const ops = [['', 'Immer'], ['state', 'Zustand ist'], ['not_state', 'Zustand ist nicht'], ['above', 'Wert größer als'], ['below', 'Wert kleiner als']]
+      .map(([k, l]) => `<option value="${k}" ${op === k ? 'selected' : ''}>${l}</option>`).join('');
+    const when = linked.length ? `<label>Nur anzeigen, wenn<select data-when-op aria-label="Bedingung">${ops}</select></label>
+      ${op ? `<div class="when"><select data-when-entity aria-label="Entity der Bedingung"><option value="">erste angezeigte Entity</option>${
+        linked.map((id) => `<option value="${esc(id)}" ${w.entity === id ? 'selected' : ''}>${esc(name(id))}</option>`).join('')}</select>
+        <input data-when-val placeholder="${op === 'above' || op === 'below' ? 'Zahl, z. B. 25' : 'z. B. playing, on, cleaning'}" value="${esc(val)}" autocomplete="off" spellcheck="false"></div>` : ''}` : '';
+    const auto = showsBadge({ ha: { ...e.ha, badge: undefined } }, this.light) ? 'anzeigen' : 'nicht anzeigen';
+    const pl = linked.some((id) => id.startsWith('media_player.')) ? `<section><h3>Medienplayer</h3>
+      <p class="hint">Kleiner Player über dem Objekt (Titel, Zurück, Pause, Weiter), solange Musik spielt.</p>
+      <select data-player aria-label="Medienplayer"><option value="" ${e.ha?.player == null ? 'selected' : ''}>Automatisch (${playerSpec(e) ? 'an' : 'aus'})</option>
+        <option value="true" ${e.ha?.player === true ? 'selected' : ''}>Anzeigen, wenn Musik spielt</option>
+        <option value="false" ${e.ha?.player === false ? 'selected' : ''}>Nicht anzeigen</option></select></section>` : '';
+    return `<section data-badge-sec><h3>Zustand über dem Objekt</h3>
+      <select data-badge aria-label="Zustand anzeigen">
+        <option value="" ${spec.show == null ? 'selected' : ''}>Automatisch (${auto})</option>
+        <option value="true" ${spec.show === true ? 'selected' : ''}>Anzeigen</option>
+        <option value="false" ${spec.show === false ? 'selected' : ''}>Nicht anzeigen</option>
+      </select>${spec.show === false ? '' : checks + when}</section>${pl}`;
   }
 }

@@ -326,3 +326,7 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   teilen oder zusammenfassen.
 - Zoomgrenze (0.28.0): `controls.maxZoom` = Bildausschnitt-Halbhöhe / `ZOOM_MIN_HALF` (1,2 m), mindestens 5, neu nach
   jedem `_fitFrustum` und jeder `setView`-Fahrt (`_zoomLimit`); `zoomToCursor` zoomt auf den Zeiger bzw. die Fingermitte.
+- Zustandsanzeige und Medienplayer (0.30.0): `badgeSpec`/`badgeEntities`/`conditionMet`/`playerSpec` in model.js
+  (ohne three.js, getestet); `ha.badge` bleibt als Kurzform true/false gültig. Der Player ist ein HTML-Element in der
+  Schild-Ebene (`.player`, eigene pointer-events, stoppt Zeiger-Ereignisse, damit die Kamera nicht dreht) und ersetzt
+  das Schild, solange seine Bedingung gilt (Standard: playing). Keine Laufzeit-Animation, keine externen Bilder.

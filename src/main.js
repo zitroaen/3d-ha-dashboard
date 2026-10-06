@@ -7,7 +7,7 @@ import { loadData, loadShared, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
 import { LayoutStore, DEMO_USER_DATA_KEY, MODEL_FILE, SHARED_WS, applyOverrides, download } from './store.js';
-import { toScene, writeBack, gestureAction, roleEntities, showsBadge, GESTURES, activityOf } from './model/model.js';
+import { toScene, writeBack, gestureAction, roleEntities, showsBadge, badgeSpec, badgeEntities, conditionMet, playerSpec, GESTURES, activityOf } from './model/model.js';
 import { CATALOG, hasCapability, DEFAULT_MOUNT, DEFAULT_LIGHT_HEIGHT, MODEL_LIGHT_HEIGHT } from './model/catalog.js';
 import { CatalogPanel } from './catalogpanel.js';
 import { modelPreview } from './preview.js';
@@ -217,13 +217,30 @@ button.menu { display: none; width: 48px; height: 48px; border: 0; border-radius
   font: inherit; font-size: 16px; user-select: text; -webkit-user-select: text; }
 .objcfg label select { flex: 1; }
 .objcfg > .body > section > select { width: 100%; }
+.objcfg .checks { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.objcfg .check { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 8px; border-radius: var(--r-item); background: var(--g-well); cursor: pointer; }
+.objcfg .check input { width: 22px; height: 22px; min-height: 0; padding: 0; flex: none; }
+.objcfg .check span { display: flex; flex-direction: column; min-width: 0; }
+.objcfg .check small { opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.objcfg .when { display: flex; gap: 6px; margin-top: 6px; }
+.objcfg .when > * { flex: 1; min-width: 0; min-height: 48px; }
 /* Zustand über Objekten (Waschmaschine: Restzeit …): folgt der Kamera, lässt Taps durch */
 .badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 :host([editing]) .badges { display: none; }
 .badge { position: absolute; left: 0; top: 0; padding: 3px 9px; border-radius: 6px; background: var(--g-bg); border: 1px solid var(--g-line);
   font-size: 12px; font-weight: 600; white-space: nowrap; will-change: transform; }
 .badge.on { background: var(--g-accent); color: var(--g-accent-fg); border-color: var(--g-accent); }
-.badge[hidden] { display: none; }
+.badge[hidden], .player[hidden] { display: none; }
+/* Mini-Medienplayer über einem Lautsprecher, solange Musik spielt: Titel, Interpret, Zurück/Pause/Weiter */
+.player { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 4px; max-width: 280px; padding: 4px 4px 4px 10px;
+  border-radius: var(--r-item); background: var(--g-panel); border: 1px solid var(--g-line); backdrop-filter: var(--g-blur);
+  -webkit-backdrop-filter: var(--g-blur); color: var(--g-fg); pointer-events: auto; will-change: transform; }
+.player .meta { display: flex; flex-direction: column; min-width: 0; flex: 1; padding-right: 4px; line-height: 1.2; }
+.player .meta b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player .meta small { font-size: 11px; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player button { width: 48px; height: 48px; flex: none; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.player button:active { background: var(--g-hover); }
+.player button svg { width: 22px; height: 22px; fill: currentColor; }
 /* Rückfrage vor einer Aktion */
 .confirm { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #0008; }
 .confirm.show { display: flex; }
@@ -1104,7 +1121,11 @@ class Ha3dDashboard extends HTMLElement {
 
   // ------------------------------------------------------------------ Zustandsanzeige
 
-  /** Zustand über Objekten (info-Werte, An/Aus geschalteter Geräte) – nur Text, keine Animation */
+  /**
+   * Zustand über Objekten (info-Werte, An/Aus geschalteter Geräte) – nur Text, keine Animation. Welche Werte und unter
+   * welcher Bedingung: `ha.badge` (badgeSpec). Lautsprecher mit media_player bekommen, solange sie spielen, statt des
+   * Schilds einen kleinen Player (`ha.player`).
+   */
   _updateBadges() {
     const box = this.shadowRoot.querySelector('.badges');
     this._badges ??= new Map();
@@ -1114,14 +1135,26 @@ class Ha3dDashboard extends HTMLElement {
     for (const [type, list] of [['item', d?.items || []], ['lamp', d?.devices || []]]) {
       for (const e of list) {
         const light = type === 'lamp';
+        const ref = { type, id: e.id }, name = e.name || e.id;
+        const power = this._live(roleEntities(e, 'power'));
+        // Medienplayer, solange er spielt (bzw. die eigene Bedingung gilt)
+        const pl = playerSpec(e);
+        const mp = pl && this._live([pl.entity])[0];
+        if (mp && states[mp] && conditionMet(pl.when, states, mp)) {
+          want.set(`player:${type}:${e.id}`, { ref, player: mp, name, state: states[mp] });
+          continue;
+        }
         if (!showsBadge(e, light)) continue;
-        const info = this._live(roleEntities(e, 'info')), power = this._live(roleEntities(e, 'power'));
+        const spec = badgeSpec(e);
+        const info = this._live(badgeEntities(e));
+        // Bedingung (z. B. Temperatur über 25 °C, Musik läuft): ohne eigene Entity gilt die erste angezeigte
+        if (spec.when && !conditionMet(spec.when, states, info[0] || power[0])) continue;
         const on = power.some((id) => isOn(states[id]));
         // Tore/Rollläden und Saugroboter: Zustandstext (Offen, Zu, Öffnet …, Saugt, Station) statt An/Aus
         const covers = power.length && power.every((id) => /^(cover|vacuum)\./.test(id));
         const text = info.length ? info.map((id) => stateText(states[id])).join(' · ')
           : covers ? stateText(states[power[0]]) : power.length ? (on ? 'An' : 'Aus') : null;
-        if (text != null) want.set(`${type}:${e.id}`, { ref: { type, id: e.id }, text, on, name: e.name || e.id });
+        if (text != null) want.set(`${type}:${e.id}`, { ref, text, on, name });
       }
     }
     for (const [k, el] of this._badges) {
@@ -1132,17 +1165,54 @@ class Ha3dDashboard extends HTMLElement {
     for (const [k, b] of want) {
       let el = this._badges.get(k);
       if (!el) {
-        el = document.createElement('span');
-        el.className = 'badge';
+        el = document.createElement(b.player ? 'div' : 'span');
+        el.className = b.player ? 'player' : 'badge';
         el.ref = b.ref;
+        if (b.player) {
+          el.innerHTML = `<div class="meta"><b></b><small></small></div>${[['prev', 'Zurück', 'M6 6h2v12H6zm3.5 6 8.5 6V6z'],
+            ['play', 'Wiedergabe/Pause', 'M6 19h4V5H6v14zm8-14v14h4V5h-4z'], ['next', 'Weiter', 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z']]
+            .map(([a, l, d]) => `<button data-mp="${a}" aria-label="${l}"><svg viewBox="0 0 24 24"><path d="${d}"/></svg></button>`).join('')}`;
+          // Bedienen ohne die Kamera zu drehen bzw. den Raum zu schalten
+          for (const ev of ['pointerdown', 'pointerup', 'click', 'wheel']) el.addEventListener(ev, (x) => x.stopPropagation());
+          el.addEventListener('click', (x) => {
+            const btn = x.target.closest('button[data-mp]');
+            if (btn) this._mediaControl(el.entity, btn.dataset.mp);
+            else if (el.entity) this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: el.entity }, bubbles: true, composed: true }));
+          });
+        }
         box.append(el);
         this._badges.set(k, el);
       }
-      if (el.textContent !== b.text) el.textContent = b.text;
       el.title = b.name;
+      if (b.player) {
+        const a = b.state.attributes || {};
+        el.entity = b.player;
+        const title = a.media_title || a.friendly_name || b.name, artist = a.media_artist || a.media_album_name || a.source || '';
+        const [t, sub] = el.querySelectorAll('.meta b, .meta small');
+        if (t.textContent !== title) t.textContent = title;
+        if (sub.textContent !== artist) sub.textContent = artist;
+        const playing = b.state.state === 'playing';
+        const play = el.querySelector('[data-mp="play"]');
+        play.setAttribute('aria-label', playing ? 'Pause' : 'Wiedergabe');
+        play.querySelector('path').setAttribute('d', playing ? 'M6 19h4V5H6v14zm8-14v14h4V5h-4z' : 'M8 5v14l11-7z');
+        continue;
+      }
+      if (el.textContent !== b.text) el.textContent = b.text;
       el.classList.toggle('on', b.on);
     }
     this._placeBadges();
+  }
+
+  /** Medienplayer bedienen: prev, play (Wiedergabe/Pause), next */
+  async _mediaControl(entity, act) {
+    if (!entity || !this._hass) return;
+    const service = { prev: 'media_previous_track', play: 'media_play_pause', next: 'media_next_track' }[act];
+    try {
+      await this._hass.callService('media_player', service, { entity_id: entity });
+    } catch (e) {
+      console.error('ha-3d-dashboard:', e);
+      this._toast(`Fehlgeschlagen: ${e.message || e}`);
+    }
   }
 
   /** Anzeigen der Kamera nachführen (nach jedem Bild) */

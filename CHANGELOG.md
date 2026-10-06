@@ -1,5 +1,14 @@
 # Änderungen
 
+## 0.30.0
+
+- **Zustandsanzeige wählbar:** Je Objekt lässt sich im Editor festlegen, welche verknüpften Werte über dem Objekt
+  stehen (Haken je Entity) und unter welcher Bedingung (Zustand ist / ist nicht, Wert größer / kleiner als) – z. B. den
+  Saugroboter antippen und starten, ohne dass ständig sein Zustand angezeigt wird, oder die Temperatur nur über 25 °C.
+- **Mini-Medienplayer:** Über einem Lautsprecher mit `media_player` (z. B. Sonos) erscheint, solange Musik spielt, ein
+  kleiner Player mit Titel, Interpret und Zurück / Pause / Weiter; Antippen des Titels öffnet den HA-Dialog.
+- Demo-Haus: Lautsprecher im Wohnzimmer, Saugroboter zeigt seinen Zustand nur unterwegs.
+
 ## 0.29.0
 
 - **Screenshot-Ansichten:** `views.json` kennt `view.tilt` (Neigung der Kamera über dem Horizont, z. B. 25° für eine

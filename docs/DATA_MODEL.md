@@ -412,7 +412,8 @@ ha:
 | `tap` | siehe Standards | Aktion beim Antippen |
 | `double_tap` | `none` | Aktion beim Doppeltippen |
 | `hold` | `more-info` | Aktion beim langen Drücken (½ s) |
-| `badge` | siehe Standards | Zustand über dem Objekt anzeigen (`true`/`false`) |
+| `badge` | siehe Standards | Zustand über dem Objekt: `true`/`false` oder `{ show, entities, when }` (siehe unten) |
+| `player` | automatisch | Mini-Medienplayer über dem Objekt: `true`/`false` oder `{ entity, when }` (siehe unten) |
 
 **Rollen:**
 
@@ -446,6 +447,36 @@ mehrere durch „·“ getrennt) oder – ohne `info` – „An“/„Aus“ der
 `power`-Entity an ist. Als „an“ gilt jeder Zustand außer `off`, `idle`, `standby`, `closed`, `locked`, `docked`,
 `not_home`, `unavailable`, `unknown` und `0`. Standard: angezeigt bei `info`-Entities oder bei geschalteten Objekten,
 die keine Leuchte sind (Leuchten zeigen ihren Zustand durch ihr Licht). Keine Animationen.
+
+Ausführlich als Objekt:
+
+| Feld | Standard | Bedeutung |
+|---|---|---|
+| `show` | wie oben | anzeigen (`true`/`false`) |
+| `entities` | alle `info`-Entities | nur die Werte dieser Entities zeigen (beliebige verknüpfte, auch `power`); `[]` = keine Werte, nur An/Aus |
+| `when` | immer | nur anzeigen, solange die **Bedingung** gilt |
+
+**Bedingung** (`when`, wie bei HA-Karten; alle angegebenen Teile müssen gelten): `entity` (Standard: die erste
+angezeigte Entity, sonst die `power`-Entity), `attribute` (statt des Zustands ein Attribut), `state` / `not_state`
+(Wert oder Liste), `above` / `below` (Zahl).
+
+```yaml
+ha:
+  entities: { power: vacuum.robi, info: sensor.robi_akku }
+  tap: toggle                                   # Antippen startet den Sauger
+  badge: { entities: [], when: { not_state: docked } }   # Zustand nur, solange er unterwegs ist
+---
+ha:
+  entities: { info: [sensor.bad_temperatur, sensor.bad_feuchte] }
+  badge: { entities: [sensor.bad_temperatur], when: { above: 25 } }   # nur über 25 °C, nur die Temperatur
+```
+
+**Medienplayer** (`player`): Ist eine verknüpfte Entity ein `media_player` (z. B. Sonos), erscheint über dem Objekt
+ein kleiner Player – Titel, Interpret, Zurück / Wiedergabe-Pause / Weiter (Knöpfe 48 px, rufen
+`media_player.media_previous_track`, `media_play_pause`, `media_next_track`); Antippen des Titels öffnet den HA-Dialog.
+Standard: sichtbar, solange er spielt (`when: { state: playing }`); solange er sichtbar ist, ersetzt er das Schild.
+`player: false` schaltet ihn ab, `{ entity: media_player.x, when: { state: [playing, paused] } }` wählt Entity und
+Bedingung. Einstellbar im Editor (Objekt → Einstellungen).
 
 **Räume** schalten beim Antippen alle `power`-Entities der Leuchten im Raum (alle an bzw. alle aus).
 
@@ -750,6 +781,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.30.0, abwärtskompatibel):** `ha.badge` auch als `{ show, entities, when }` (Werte
+  auswählen, Bedingung), `ha.player` (Mini-Medienplayer über media_player-Objekten).
 - **0.29.0 (Werkzeuge):** `views.json` mit `view.tilt` (Kameraneigung) und ohne `view.at`; eingebaute Ansicht `schraeg`.
 - **Version 2, Ergänzung (0.28.0, abwärtskompatibel):** Katalog `swing`, `slide`, `climbing_frame`, `trampoline`,
   `sandbox`, `raised_bed`, `compost`, `fence` (Holz, Maschendraht, Stabgitter; Linie oder `path`), `power_line`

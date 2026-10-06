@@ -193,10 +193,62 @@ export function defaultAction(obj, gesture, light = false) {
   return { action: 'none' };
 }
 
-/** Zustandsanzeige über dem Objekt? (`ha.badge`, Standard: bei info-Entities oder geschalteten Nicht-Leuchten) */
+/**
+ * Einstellungen der Zustandsanzeige (`ha.badge`): `true`/`false` (Kurzform) oder { show, entities, when }.
+ * Liefert { show: true|false|null (null = Standard), entities: Liste|null (null = Standard: info-Entities; leer = nur
+ * der Zustand der Schalt-Entity), when: Bedingung|null }.
+ */
+export function badgeSpec(obj) {
+  const b = obj.ha?.badge;
+  if (b == null) return { show: null, entities: null, when: null };
+  if (typeof b !== 'object') return { show: !!b, entities: null, when: null };
+  return { show: b.show ?? null, entities: b.entities == null ? null : list(b.entities).filter(Boolean), when: b.when || null };
+}
+
+/** Zustandsanzeige über dem Objekt? (Standard: bei info-Entities oder geschalteten Nicht-Leuchten) */
 export function showsBadge(obj, light = false) {
-  if (obj.ha?.badge != null) return obj.ha.badge;
+  const spec = badgeSpec(obj);
+  if (spec.show != null) return spec.show;
+  if (spec.entities?.length) return true;
   return roleEntities(obj, 'info').length > 0 || (!light && roleEntities(obj, 'power').length > 0);
+}
+
+/** Entities, deren Wert die Anzeige zeigt: ausgewählte (`badge.entities`, leer = keine), sonst alle info-Entities */
+export function badgeEntities(obj) {
+  const spec = badgeSpec(obj);
+  return spec.entities ?? roleEntities(obj, 'info');
+}
+
+/**
+ * Bedingung über einen HA-Zustand (wie bei HA-Karten): { entity, attribute, state, not_state, above, below } – alle
+ * angegebenen Teile müssen gelten; `state`/`not_state` auch als Liste. Ohne `entity` gilt `fallback`.
+ */
+export function conditionMet(cond, states, fallback = null) {
+  if (!cond) return true;
+  const s = states?.[cond.entity || fallback];
+  if (!s) return false;
+  const value = cond.attribute ? s.attributes?.[cond.attribute] : s.state;
+  const str = String(value ?? '');
+  if (cond.state != null && !list(cond.state).map(String).includes(str)) return false;
+  if (cond.not_state != null && list(cond.not_state).map(String).includes(str)) return false;
+  const num = Number(value);
+  if (cond.above != null && !(Number.isFinite(num) && num > Number(cond.above))) return false;
+  if (cond.below != null && !(Number.isFinite(num) && num < Number(cond.below))) return false;
+  return true;
+}
+
+/**
+ * Mini-Medienplayer über dem Objekt (`ha.player`): true/false oder { entity, when }. Standard: an, wenn eine
+ * verknüpfte Entity ein media_player ist; sichtbar, solange er spielt (`when` Standard: state playing).
+ * Liefert { entity, when } oder null.
+ */
+export function playerSpec(obj) {
+  const p = obj.ha?.player;
+  if (p === false) return null;
+  const ents = [...roleEntities(obj, 'power'), ...roleEntities(obj, 'info')];
+  const entity = (typeof p === 'object' && p?.entity) || ents.find((id) => id.startsWith('media_player.'));
+  if (!entity || (p == null && !entity.startsWith('media_player.'))) return null;
+  return { entity, when: (typeof p === 'object' && p?.when) || { state: 'playing' } };
 }
 
 /** `ha` aufräumen: leere Rollen und leere Angaben entfernen; nichts übrig -> undefined */
@@ -211,6 +263,7 @@ export function cleanHa(ha) {
   if (Object.keys(ents).length) out.entities = ents;
   for (const g of GESTURES) if (ha[g] != null) out[g] = ha[g];
   if (ha.badge != null) out.badge = ha.badge;
+  if (ha.player != null) out.player = ha.player;
   return Object.keys(out).length ? out : undefined;
 }
 
