@@ -341,3 +341,6 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   senkrechter Ebene, auch Viertel für Doppeltüren). Der Sturz darüber bleibt das normale Prisma (auch unter Dachschrägen).
   Leistungsbudget 145 -> 150 Zeichenaufrufe: bewegliche Teile (Animationsgruppen) werden nicht zusammengefasst, jedes
   Material darin kostet einen Aufruf (Fensterreihe des Garagentors, Glas wie beim Kaminofen).
+- Bauteile (0.34.0): `column`, `balustrade`, `stairs` prozedural; `params.material` = Haus-Oberfläche über den Schlüssel
+  `surf:<name>[:farbe]` (furnishing.js nimmt `shared.mat`, die Vorschau eine Ersatzfarbe; `planarUV` setzt UV in
+  Metern nach der Normalen). Standard bleibt ein Palettenmaterial (kein zusätzlicher Zeichenaufruf).
