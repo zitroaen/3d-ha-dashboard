@@ -1,5 +1,17 @@
 # Änderungen
 
+## 0.35.0
+
+- **`elevation` für alle Objekte:** Jedes Möbel und Gerät lässt sich höher stellen (Lautsprecher auf dem Sideboard),
+  nicht mehr nur Bild, TV, Vorhang, Uhr, Heizkörper und Quader. Leuchten auch: das Modell steht erhöht, die
+  Lichtquelle bleibt auf `light.height` über dem Boden des Bereichs.
+- **Schreibtischleuchte** (`desk_lamp`): runder Fuß, Gelenkarm, runder Kopf; `params.color`, Kopf neigbar
+  (`params.head_deg`), Ausladung (`params.reach`).
+- **Plissee-Stehleuchte** mit rundem Standfuß: `floor_column` mit `params.base: disc`.
+- **Kompaktlautsprecher:** `speaker` mit `params.style: compact` (abgerundeter Korpus, Stoffbespannung, Farbe aus
+  `params.color`).
+- Demo-Haus: Schreibtischleuchte und Kompaktlautsprecher auf dem Sideboard, Plissee-Leuchte im Studio mit Standfuß.
+
 ## 0.34.0
 
 - **Säulen** (`column`): rund oder eckig (`params.shape`), mit Fuß und Kapitell (abschaltbar).

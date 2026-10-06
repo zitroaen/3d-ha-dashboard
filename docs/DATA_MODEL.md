@@ -363,6 +363,9 @@ legt sein Modell im [Katalog](#katalog) fest.
 | `state` | nein | `off` | fester Zustand ohne Entity für Modelle mit Animation (`on` = bewegt sich immer, z. B. Ventilator) |
 | `stored` | nein | false | eingelagert: bleibt mit allen Verknüpfungen im Modell, steht aber nicht in der Welt (Editor → Katalog → Lager) |
 
+**Leuchten mit `elevation`:** Das Modell steht so viel höher (Tischleuchte auf dem Sideboard); die Lichtquelle bleibt
+auf `light.height` über dem Boden des Bereichs.
+
 **Höhenbezug:** `elevation` und `light.height` zählen ab dem Boden des Bereichs: Raum → `elevation` der Etage;
 Außenbereich → dessen `elevation`; ohne `space` → 0.
 
@@ -577,7 +580,7 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `slide` | Möbel | | 3 × 0.55 × 1.5 | `color` – Rutsche mit Leiter (hinten, −x), Höhe = Plattform |
 | `sofa_u` | Möbel | | 3.5 × 2.4 × 0.82 | `seat_depth`, `left`, `right`, `color` |
 | `solar_panels` | Gerät | | 2.29 × 1.72 × 0.1 | `panels` (2), `cable_to` (`[x, z]` Kabel bis zum Dachrand), `drop` (Kabel hinunter, m), `peak` (800 W) – Balkonkraftwerk flach; Animation: Energiefluss im Kabel, solange Leistung ≥ 1 W (Tempo aus Leistung/`peak`) |
-| `speaker` | Möbel | | 0.22 × 0.3 × 1.0 | |
+| `speaker` | Möbel | | 0.22 × 0.3 × 1.0 | `style` (`compact`: Kompaktlautsprecher, abgerundeter Korpus mit Stoffbespannung, Standardgröße 0.12 × 0.12 × 0.16), `color` (Korpus, nur `compact`) – sonst Standlautsprecher |
 | `storage_cube` | Möbel | | | |
 | `stove` | Möbel | | | |
 | `swing` | Möbel | | 2.4 × 1.6 × 2.2 | `seats` (1–3, Standard 2), `color` (Sitze) – Schaukel mit A-Gestell |
@@ -592,7 +595,8 @@ Die Liste unten ist mit `src/model/catalog.js` abgeglichen (`npm run validate` p
 | `chandelier_crystal` | Leuchte | `light` | | `radius` (0.28) – Kristallkorb an einer Kette, die Kristalle leuchten mit |
 | `chandelier_tulip` | Leuchte | `light` | | `arms` |
 | `disc` | Leuchte | `light` | | |
-| `floor_column` | Leuchte | `light` | | `radius` (0.16), `column` (Säulenhöhe 1.1) – hohe Plissee-Säule auf drei Beinen, `light.height` = Mitte der Säule |
+| `floor_column` | Leuchte | `light` | | `radius` (0.16), `column` (Säulenhöhe 1.1), `base` (`disc`: runder Standfuß statt drei Beinen) – hohe Plissee-Säule, `light.height` = Mitte der Säule |
+| `desk_lamp` | Leuchte | `light` | | `color` (Metall), `head_deg` (Kopf nach vorn geneigt, 20), `reach` (Fuß hinter dem Kopf, 0.3) – Schreibtischleuchte mit Gelenkarm und rundem Kopf, `light.height` = Kopf; auf Möbeln mit `elevation` (Standard-Montage `table`) |
 | `floor_spots` | Leuchte | `light` | | |
 | `paper_lantern` | Leuchte | `light` | | `radius` – Papierkugel; Montage `pendant` (Standard), `floor` oder `table` |
 | `pendant_drum` | Leuchte | `light` | | `color` (Stoff), `radius` (0.25) – Pendelleuchte mit Stoffschirm-Zylinder |
@@ -788,6 +792,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.35.0, abwärtskompatibel):** `elevation` auch für Leuchten; Katalog `desk_lamp`;
+  `floor_column` mit `params.base: disc`; `speaker` mit `params.style: compact` und `params.color`.
 - **Version 2, Ergänzung (0.34.0, abwärtskompatibel):** Katalog `column`, `balustrade`, `stairs`; Materialien
   gemauerter Bauteile als Oberfläche des Hauses (`params.material`).
 - **Version 2, Ergänzung (0.33.0, abwärtskompatibel):** `doors[].arch` (bzw. `top: arch`), `doors[].leaves`;

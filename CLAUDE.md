@@ -344,3 +344,6 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Bauteile (0.34.0): `column`, `balustrade`, `stairs` prozedural; `params.material` = Haus-Oberfläche über den Schlüssel
   `surf:<name>[:farbe]` (furnishing.js nimmt `shared.mat`, die Vorschau eine Ersatzfarbe; `planarUV` setzt UV in
   Metern nach der Normalen). Standard bleibt ein Palettenmaterial (kein zusätzlicher Zeichenaufruf).
+- `elevation` für alle Objekte (0.35.0): furnishing.js hebt den Ursprung an, außer bei `OWN_ELEVATION` (Modelle mit
+  eigener Standardhöhe wie TV, Bild). Leuchten: Ursprung auf Boden + elevation, das Modell bekommt `height − elevation`
+  (und die Decke entsprechend), die Lichtquelle (LightTable) bleibt auf `light.height`.
