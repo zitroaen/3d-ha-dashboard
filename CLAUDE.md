@@ -324,6 +324,8 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   Farben bewusst aus vorhandenen Materialien (Eiche hell, Regentonnen-Grün, Alu dunkel, Laub) – Ebene 2 des
   Demo-Hauses liegt damit genau am Budget (145; neu ist nur das Netz des Trampolins). Weitere Modelle: erst Material
   teilen oder zusammenfassen.
+- Zoomgrenze (0.28.0): `controls.maxZoom` = Bildausschnitt-Halbhöhe / `ZOOM_MIN_HALF` (1,2 m), mindestens 5, neu nach
+  jedem `_fitFrustum` und jeder `setView`-Fahrt (`_zoomLimit`); `zoomToCursor` zoomt auf den Zeiger bzw. die Fingermitte.
 - Zustandsanzeige und Medienplayer (0.30.0): `badgeSpec`/`badgeEntities`/`conditionMet`/`playerSpec` in model.js
   (ohne three.js, getestet); `ha.badge` bleibt als Kurzform true/false gültig. Der Player ist ein HTML-Element in der
   Schild-Ebene (`.player`, eigene pointer-events, stoppt Zeiger-Ereignisse, damit die Kamera nicht dreht) und ersetzt
@@ -341,6 +343,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   senkrechter Ebene, auch Viertel für Doppeltüren). Der Sturz darüber bleibt das normale Prisma (auch unter Dachschrägen).
   Leistungsbudget 145 -> 150 Zeichenaufrufe: bewegliche Teile (Animationsgruppen) werden nicht zusammengefasst, jedes
   Material darin kostet einen Aufruf (Fensterreihe des Garagentors, Glas wie beim Kaminofen).
+- Lampenlicht und Tageslicht (0.33.0): Uniform `uLampDay` (roomlight.js) = lerp(1, `LAMP_DAY` 0,3, daylight) aus
+  `setSky`; skaliert `roomIrradiance` und (quadriert) den additiven Lichtschein. Sonst wirkte „Tag“ mit abends
+  eingeschalteten HA-Lampen milchig. Die Leuchtkörper selbst bleiben unverändert.
 - Bauteile (0.34.0): `column`, `balustrade`, `stairs` prozedural; `params.material` = Haus-Oberfläche über den Schlüssel
   `surf:<name>[:farbe]` (furnishing.js nimmt `shared.mat`, die Vorschau eine Ersatzfarbe; `planarUV` setzt UV in
   Metern nach der Normalen). Standard bleibt ein Palettenmaterial (kein zusätzlicher Zeichenaufruf).
