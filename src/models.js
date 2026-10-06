@@ -976,7 +976,8 @@ export const FURNITURE = {
     // Torblatt: Lamellen mit Fuge und Sicke – ein Material (ein Zeichenaufruf). Die Szene führt jede Lamelle einzeln
     // die Schiene entlang (Animation 'sectional'); zugeordnet wird über die Höhe der Dreiecke im geschlossenen Tor.
     P.beginAnim({ type: 'sectional', sections: n, height: BH, radius: R, duration: 8 }, [0, 0, z]);
-    // params.glass: die zweitoberste Lamelle als Fensterreihe (Rahmen in Torfarbe, Scheiben je ~75 cm)
+    // params.glass: die zweitoberste Lamelle als Fensterreihe (Rahmen in Torfarbe, Scheiben je ~75 cm; dunkles Glas
+    // des Kaminofens – kein eigenes Material, sonst ein Zeichenaufruf mehr je Ebene)
     const glassRow = it.glass ? Math.max(0, n - 2) : -1;
     for (let i = 0; i < n; i++) {
       const y0 = i * h;
@@ -985,7 +986,7 @@ export const FURNITURE = {
         P.box(c, BW, f, T, 0, y0 + 0.006, z - T / 2);
         P.box(c, BW, f, T, 0, y0 + h - 0.006 - f, z - T / 2);
         for (let j = 0; j <= k; j++) P.box(c, f, gh, T, -BW / 2 + f / 2 + j * (pw + f), y0 + 0.006 + f, z - T / 2);
-        for (let j = 0; j < k; j++) P.box('glass_cab', pw, gh, 0.006, -BW / 2 + f + pw / 2 + j * (pw + f), y0 + 0.006 + f, z - T / 2);
+        for (let j = 0; j < k; j++) P.box('glass_fire', pw, gh, 0.006, -BW / 2 + f + pw / 2 + j * (pw + f), y0 + 0.006 + f, z - T / 2);
         continue;
       }
       P.box(c, BW, h - 0.012, T, 0, y0 + 0.006, z - T / 2);

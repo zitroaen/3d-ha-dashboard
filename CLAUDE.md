@@ -339,3 +339,5 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
 - Türen (0.33.0): Rundbogen ohne neue Materialien – `buildArchOpening()` (openings.js) zeichnet Zwickel und Laibung
   in Streifen mit `triN` (Wicklung nach gewünschter Normale), Bogenfelder als `archBand` (Kreisring/-scheibe in
   senkrechter Ebene, auch Viertel für Doppeltüren). Der Sturz darüber bleibt das normale Prisma (auch unter Dachschrägen).
+  Leistungsbudget 145 -> 150 Zeichenaufrufe: bewegliche Teile (Animationsgruppen) werden nicht zusammengefasst, jedes
+  Material darin kostet einen Aufruf (Fensterreihe des Garagentors, Glas wie beim Kaminofen).
