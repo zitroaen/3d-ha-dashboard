@@ -4,7 +4,9 @@
 // (Stockwerke) bekommen je ein Bild "abend", die Dächer (Ebene über der obersten) ein Bild "dach". Eigene Ansichten
 // (z. B. Zoom auf einen Raum) kommen aus VIEWS:
 //   { "wohnzimmer-abend": { "rooms": ["wohnzimmer"], "outdoor": true, "view": { "at": [3, 7.5], "zoom": 1.9, "az": 0 } } }
-// rooms: Raum-IDs oder "all"; sun: { azimuth, elevation } (sonst Nacht); view.at: Plan-Punkt [x, y].
+// rooms: Raum-IDs oder "all"; sun: { azimuth, elevation } (sonst Nacht); view.at: Plan-Punkt [x, y]; view.az: um die
+// senkrechte Achse schwenken (Grad); view.tilt: Neigung der Kamera über dem Horizont (Grad, z. B. 25 = flache
+// Schrägansicht für Haus und Hang; Standard wie die Startansicht, ~57°); level: Ebene.
 import { mkdir, readFile } from 'node:fs/promises';
 import { parseModel } from '../src/model/model.js';
 import { join } from 'node:path';
@@ -28,6 +30,8 @@ const SCENARIOS = {
   'regen': { rooms: [], outdoor: false, sun: { azimuth: 200, elevation: 30 }, weather: 'rainy' },
   'schnee': { rooms: [], outdoor: false, sun: { azimuth: 200, elevation: 25 }, weather: 'snowy' },
   'nebel': { rooms: firstRooms(2), outdoor: true, sun: { azimuth: 250, elevation: 2 }, weather: 'fog' },
+  // flache Gesamtansicht (Haus und Hang von der Seite)
+  'schraeg': { rooms: [], outdoor: false, sun: { azimuth: 215, elevation: 38 }, view: { at: null, zoom: 1, tilt: 25 } },
   ...(VIEWS ? JSON.parse(await readFile(VIEWS, 'utf8')) : {}),
 };
 const VIEWPORTS = { desktop: { width: 1600, height: 1000 }, tablet: { width: 1024, height: 768 }, phone: { width: 390, height: 844 } };
@@ -76,10 +80,20 @@ try {
         v.controls.target.copy(h.target);
         v.camera.zoom = h.zoom;
         if (sc.view) {
-          const shift = new v.camera.position.constructor(sc.view.at[0], 0, sc.view.at[1]).sub(h.target);
+          // ohne at: Drehpunkt der Ausgangslage
+          const at = sc.view.at || [h.target.x, h.target.z];
+          const shift = new v.camera.position.constructor(at[0], 0, at[1]).sub(h.target);
           v.camera.position.add(shift);
           v.controls.target.add(shift);
           v.camera.zoom = sc.view.zoom || 1;
+          if (sc.view.tilt != null) {
+            // Neigung: Kamera so viel Grad über dem Horizont (z. B. 25 = flache Schrägansicht), Richtung und Abstand bleiben
+            const t = v.controls.target, p = v.camera.position;
+            const dx = p.x - t.x, dy = p.y - t.y, dz = p.z - t.z, r = Math.hypot(dx, dy, dz), hz = Math.hypot(dx, dz) || 1;
+            const el = (Math.max(5, Math.min(89, sc.view.tilt)) * Math.PI) / 180;
+            p.set(t.x + (dx / hz) * r * Math.cos(el), t.y + r * Math.sin(el), t.z + (dz / hz) * r * Math.cos(el));
+            v.camera.lookAt(t);
+          }
           if (sc.view.az) {
             // um die senkrechte Achse durch den Drehpunkt schwenken
             const a = (sc.view.az * Math.PI) / 180, t = v.controls.target, p = v.camera.position;
