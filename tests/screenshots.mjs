@@ -74,11 +74,15 @@ try {
         // Kamera für Detailansichten verschieben (danach wiederherstellen)
         // Ausgangslage je Ebene (der Ebenenwechsel passt den Bildausschnitt neu ein)
         v._homes ??= {};
-        if (!v._homes[level]) v._homes[level] = { pos: v.camera.position.clone(), target: v.controls.target.clone(), zoom: v.camera.zoom };
+        if (!v._homes[level]) v._homes[level] = { pos: v.camera.position.clone(), target: v.controls.target.clone(), zoom: v.camera.zoom, up: v.camera.up.clone(), q: v.camera.quaternion.clone() };
+        // vor jeder Ansicht vollständig auf die Ausgangslage zurück (Position, Ziel, Zoom, Ausrichtung) – sonst wirken
+        // az/tilt relativ zur vorigen Ansicht
         const h = v._homes[level];
         v.camera.position.copy(h.pos);
         v.controls.target.copy(h.target);
         v.camera.zoom = h.zoom;
+        v.camera.up.copy(h.up);
+        v.camera.quaternion.copy(h.q);
         if (sc.view) {
           // ohne at: Drehpunkt der Ausgangslage
           const at = sc.view.at || [h.target.x, h.target.z];

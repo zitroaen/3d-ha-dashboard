@@ -40,6 +40,12 @@ const errors = [];
 try {
   const page = await guardedPage(browser, base, errors, { viewport: { width: 800, height: 600 }, label: 'vorschau' });
   const url = await page.evaluate((ids) => window.panel.previewSheet(ids), ids);
+  const unknown = await page.evaluate(() => window.panel.previewUnknown || []);
+  if (unknown.length) {
+    // häufigster Grund: aus dem Engine-Ordner aufgerufen – dann gilt das Demo-Haus, nicht die Instanz
+    console.warn(`⚠ unbekannt: ${unknown.join(', ')} (Daten: ${DATA_DIR})`);
+    if (DATA_DIR === join(ENGINE_ROOT, 'examples', 'demo')) console.warn('  Eigene Modelle einer Instanz: dort aufrufen – node engine/scripts/preview.mjs <id> …');
+  }
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, Buffer.from(url.split(',')[1], 'base64'));
   console.log(`🖼  ${out} (${ids.length}: ${ids.join(', ')})`);

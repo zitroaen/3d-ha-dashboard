@@ -39,7 +39,8 @@ export function createServer({ dataDir, entities = null, writable = false, log =
       let file;
       if (path.startsWith('/data/')) file = inside(dataDir, path.slice('/data/'.length));
       else if (path === '/reference/entities.txt') {
-        if (!entities) return res.writeHead(404).end();
+        // ohne Export: leer statt 404 (sonst meldet der Browser einen Ladefehler und echte Fehler gehen unter)
+        if (!entities) return res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' }).end('');
         file = entities;
       } else file = inside(ENGINE_ROOT, path.slice(1));
       const body = await readFile(file);

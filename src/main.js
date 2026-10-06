@@ -847,6 +847,7 @@ class Ha3dDashboard extends HTMLElement {
         if (isSurface(id) && surfaceDef(id).image) it.url = surfacePreview(r, this.view.shared.mat[id]);
       }
     }
+    this.previewUnknown = items.filter((it) => it.url === null).map((it) => it.label.split(':')[0]);
     return contactSheet(items);
   }
 
