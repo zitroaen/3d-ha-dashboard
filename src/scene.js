@@ -377,6 +377,7 @@ export class HouseScene {
    */
   setLevel(level, { silent = false } = {}) {
     if (!this.levels.includes(level)) return false;
+    this._clearPivot();
     this._anim?.finish();
     this.level = level;
     this._tops = null;
@@ -775,6 +776,7 @@ export class HouseScene {
 
   /** Frustum so wählen, dass das ganze Haus (inkl. Wandhöhe) mit etwas Rand ins Bild passt. */
   _fitFrustum(aspect) {
+    this._clearPivot();
     const cam = this.camera;
     cam.updateMatrixWorld();
     const inv = cam.matrixWorldInverse;
@@ -829,6 +831,7 @@ export class HouseScene {
 
   /** Aktuelle Ansicht (Standardansicht speichern): Ebene, Drehpunkt, Kamera relativ dazu, Zoom, Bildausschnitt */
   getView() {
+    this._clearPivot(); // Ausschnitt mittig, sonst passte die gespeicherte Ansicht nicht
     const r = (v) => Math.round(v * 1000) / 1000;
     const c = this.controls, cam = this.camera;
     return {
@@ -846,6 +849,7 @@ export class HouseScene {
    */
   setView(v, duration = 800) {
     if (!v?.target || !v?.offset) return false;
+    this._clearPivot();
     this._anim?.finish();
     if (v.level != null && v.level !== this.level && this.levels.includes(v.level)) this.setLevel(v.level, { silent: true });
     const c = this.controls, cam = this.camera;
@@ -894,6 +898,7 @@ export class HouseScene {
   /** Startansicht ohne gespeicherte Standardansicht: Erdgeschoss, Blick wie beim Laden, Bildausschnitt eingepasst */
   resetView() {
     this._anim?.finish();
+    this._clearPivot();
     const l = this.levels.includes(0) ? 0 : this.levels[0];
     if (l !== this.level) this.setLevel(l, { silent: true });
     const c = this.controls, cam = this.camera;
@@ -910,6 +915,7 @@ export class HouseScene {
 
   /** Ansicht einnorden: Kamera um den Drehpunkt schwenken, bis Norden oben ist. */
   faceNorth(duration = 600) {
+    this._clearPivot();
     const c = this.controls;
     const n = this.northVector;
     const target = Math.atan2(-n.x, -n.z); // Kamera steht südlich des Drehpunkts
@@ -1248,6 +1254,46 @@ export class HouseScene {
     this.requestRender();
   }
 
+  /**
+   * Drehpunkt auf einen Punkt legen, ohne dass sich das Bild ändert: Kamera und Ziel wandern zum Punkt, der Bildausschnitt
+   * (orthografisch) wird um denselben Betrag verschoben. _clearPivot() macht das rückgängig (Ausschnitt wieder mittig) –
+   * bei der nächsten Geste und vor Ansichtswechseln, nicht schon beim Loslassen (der Nachlauf dreht noch um den Punkt).
+   */
+  _setPivot(p) {
+    this._clearPivot();
+    const cam = this.camera, c = this.controls;
+    cam.updateMatrixWorld();
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    const d = p.clone().sub(c.target), dist = cam.position.distanceTo(c.target);
+    // three.js verschiebt die Mitte des Ausschnitts nicht mit dem Zoom: Versatz in Weltmetern
+    const ox = d.dot(right), oy = d.dot(up);
+    cam.position.add(d);
+    c.target.copy(p);
+    Object.assign(cam, { left: cam.left - ox, right: cam.right - ox, top: cam.top - oy, bottom: cam.bottom - oy });
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld();
+    this._pivotOff = [ox, oy, p.y - d.y, dist];
+  }
+
+  _clearPivot() {
+    if (!this._pivotOff) return;
+    const [ox, oy, y0, dist] = this._pivotOff, cam = this.camera, c = this.controls;
+    this._pivotOff = null;
+    cam.updateMatrixWorld();
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    const back = right.multiplyScalar(-ox).add(up.multiplyScalar(-oy));
+    cam.position.add(back);
+    c.target.add(back);
+    // Ziel entlang der Blickrichtung zurück auf die frühere Höhe (ändert das Bild nicht)
+    const dir = c.target.clone().sub(cam.position).normalize();
+    if (Math.abs(dir.y) > 0.05) c.target.addScaledVector(dir, (y0 - c.target.y) / dir.y);
+    cam.position.copy(c.target).addScaledVector(dir, -dist); // Abstand wie vorher (Nebel, Tiefenbereich)
+    Object.assign(cam, { left: cam.left + ox, right: cam.right + ox, top: cam.top + oy, bottom: cam.bottom + oy });
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld();
+    this.requestRender();
+  }
+
   _bindPointer() {
     const el = this.renderer.domElement;
     const ray = new THREE.Raycaster();
@@ -1275,9 +1321,19 @@ export class HouseScene {
       }
       return null;
     };
+    // Drehpunkt dort, wo der Finger bzw. die Maus aufsetzt (sonst dreht sich bei starkem Zoom alles aus dem Bild)
+    const pivotAt = (x, y) => {
+      rayAt(x, y);
+      const meshes = [];
+      this.scene.traverseVisible((o) => o.isMesh && meshes.push(o));
+      const hit = ray.intersectObjects(meshes, false)[0];
+      if (hit) this._setPivot(hit.point);
+    };
     el.addEventListener('pointerdown', (e) => {
       pointers++;
       cancelHold();
+      if (pointers === 1 && (e.pointerType !== 'mouse' || e.button === 0) && this.controls.enabled) pivotAt(e.clientX, e.clientY);
+      else this._clearPivot();
       // nur ein Finger zählt als Antippen; ein zweiter Finger macht daraus eine Geste
       down = pointers === 1 ? { x: e.clientX, y: e.clientY, t: performance.now(), touch: e.pointerType !== 'mouse' } : null;
       // langes Drücken nur auf ein Objekt, nur mit der Haupttaste und nicht im Editiermodus
