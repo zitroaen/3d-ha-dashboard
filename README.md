@@ -12,6 +12,10 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
 |---|---|---|
 | ![Tag](docs/screenshot-tag.png) | ![Editor](docs/screenshot-editor.png) | ![Verknüpfen](docs/screenshot-verknuepfen.png) |
 
+| Dächer mit Gauben, Kreuzdach und Dachterrasse | Smartphone |
+|---|---|
+| ![Dach](docs/screenshot-dach.png) | <img src="docs/screenshot-phone.png" alt="Smartphone" width="195"> |
+
 ## Funktionen
 
 - **three.js, ein JS-Bundle, offline:** keine CDNs, keine externen Requests, keine Tokens – das Panel nutzt die
@@ -24,21 +28,26 @@ Farbe leuchten, und ein Editor, mit dem du Möbel und Leuchten direkt im Modell 
   (Umschalten, HA-Dialog, Dienst, Seite, optional mit Rückfrage); ein Schild über dem Objekt zeigt den Zustand
   (z. B. „42 min“).
 - **Dächer:** Flach-, Sattel-, Walm-, Krüppelwalm- und Pultdächer mit Überstand, Gauben und Schornsteinen; mehrere
-  Dachteile je Gebäude (Anbau, Dachterrasse, abgesetztes Pultdach). Dächer erscheinen ab der Ebene darüber (Knopf
-  „Dach“ über der obersten) – samt Objekten darauf wie einem Balkonkraftwerk. Unter einem Steildach zeigen die Wände
-  der obersten Etage Kniestock und Dachschräge.
+  Dachteile je Gebäude (Anbau, Dachterrasse, abgesetztes Pultdach, Kreuzdach und Zwerchhaus mit Kehlen). Gauben mit
+  eigenem Fenster oder bis zur Traufe bzw. an der Kniestockwand, deren Fenster und Türen in der Front sitzen. Dächer
+  erscheinen ab der Ebene darüber (Knopf „Dach“ über der obersten) – samt Objekten darauf wie einem Balkonkraftwerk.
+  Unter einem Steildach zeigen die Wände der obersten Etage Kniestock und Dachschräge.
 - **Fassaden und Geländer:** Putz, Holzschalung (z. B. Schwedenrot mit weißen Ecken), Ziegel, Naturstein, Sockel;
-  Balustraden, Metall- und Glasgeländer für Terrassen, Balkone und Dachterrassen.
+  Fenster- und Türarten als Daten (Sprossen, Farben, Klappläden mit Lamellen oder Füllung); Objekte an der Fassade
+  (Briefkasten, Außenleuchte) mit Höhe ab dem Fußboden; Balustraden, Metall- und Glasgeländer für Terrassen, Balkone
+  und Dachterrassen.
 - **Garten:** Außenbereiche (Terrasse, Beete, Einfahrt) und Gelände als Höhenraster (aus einem LiDAR-Scan oder
   offenen Geodaten: DGM, `scripts/terrain-from-geotiff.mjs`), Luftbild darauf (`scripts/orthophoto-crop.mjs`),
-  dezente Hangschattierung; Bereiche folgen dem Hang; Trockenmauern,
+  dezente Hangschattierung; Bereiche folgen dem Hang; Trocken- und Stützmauern mit gerader Oberkante,
   Hochbeete und Stufen; Bäume (auch Hunderte, als Instanzen; aus einem nDOM: `scripts/trees-from-ndom.mjs`), Hecken, Sträucher, Gräser, Blumen, Spielgeräte, Zäune, Freileitungen, Gartenmöbel und Gartenleuchten (Poller, Strahler,
   Lichterkette) aus dem Katalog.
 - **Wetter:** Wolken, Regen (nasse Flächen), Schnee (weiße Decke) und Nebel aus der HA-Wetter-Entity; Symbol und
   Temperatur oben, antippen zeigt die Vorhersage.
 - **Himmel:** Sonne mit Schatten nach `sun.sun`, nachts Mond; Kompass mit Einnorden (Doppeltippen: Standardansicht).
-- **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten).
-- **Einstellungen (Zahnrad):** Darstellung Hell/Dunkel (Glas-Design, folgt HA), Tageszeit Automatisch/Tag/Nacht, Qualität Automatisch/Hoch/Sparsam, Bearbeiten,
+- **Touch:** für Wand-Tablets und Touchscreens gebaut (große Bedienelemente, Gesten); gedreht wird um den Punkt, an
+  dem der Finger aufsetzt – auch stark vergrößert bleibt das Ziel im Bild.
+- **Einstellungen (Zahnrad):** Darstellung Hell/Dunkel (Glas-Design, folgt HA), Tageszeit Automatisch/Tag/Nacht,
+  Wetter Automatisch/fest (zum Testen), Qualität Automatisch/Hoch/Sparsam, Animationen, Bearbeiten,
   Link-Check, Version.
 - **Realistisch und trotzdem flüssig:** Spiegelungen, Oberflächenstruktur, weiche Schatten. Gerechnet wird nur,
   wenn sich etwas ändert.

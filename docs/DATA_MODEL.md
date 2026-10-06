@@ -861,6 +861,11 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.39.0, abwärtskompatibel):** `window_styles.*.shutters` (Klappläden, Beispiele
+  `wood_shutters`, `shutters_panels`); `objects[].space: <Gebäude-ID>/<Etage-ID>` (außen am Gebäude, Höhe ab dem
+  Fußboden der Etage); `outdoor[].edge_top` (Stützmauer mit gerader Oberkante). Wandkappen und Gauben unter dem
+  Dach korrigiert (siehe CHANGELOG).
+
 - **Version 2, Ergänzung (0.38.0, abwärtskompatibel):** Bibliothek als Daten ([LIBRARY.md](LIBRARY.md)): `surfaces`
   (eigene Beläge/Fassaden aus Mustern oder Bildern, Änderungen an Beispielen), `window_styles`/`door_styles`,
   `windows[].style`, `doors[].style`, `buildings[].styles`; `facade.type` und alle `surface`-Felder nehmen jede

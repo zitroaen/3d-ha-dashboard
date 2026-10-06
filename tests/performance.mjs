@@ -14,8 +14,9 @@ if (!IS_DEMO) {
 // (beide Hausetagen, Garage samt Dach mit Balkonkraftwerk, Garten): 155 Zeichenaufrufe sind für Tablets unkritisch
 // (sie schaffen mehrere hundert je Bild); das Budget soll schleichendes Wachstum sichtbar machen. 0.33.0: 145 -> 150,
 // weil bewegliche Teile nicht zusammengefasst werden (Fensterreihe im Garagentor = ein Aufruf mehr); 0.38.0: 150 -> 155
-// für das Demo-Gartentor (eigenes Modell, zwei bewegliche Flügel = je ein Aufruf je Material).
-const BUDGET = { calls: 155, triangles: 120000 };
+// für das Demo-Gartentor (eigenes Modell, zwei bewegliche Flügel = je ein Aufruf je Material); 0.39.0: 155 -> 160 für
+// die Klappläden im Demo-Haus (Holzrahmen, grüne und braune Läden = je eine Farbe, ein Aufruf).
+const BUDGET = { calls: 160, triangles: 120000 };
 
 const { server, base } = await startServer({ dataDir: DATA_DIR, entities: ENTITIES });
 const browser = await launchBrowser();

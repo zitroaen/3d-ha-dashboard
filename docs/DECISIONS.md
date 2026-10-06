@@ -260,3 +260,12 @@ damit das Briefing kurz bleibt; vor Änderungen an einem Bereich den passenden E
   bewegliche Gruppen (`swing`, `slide`, `spin`) haben. Für Agenten token-sparsam: Kurzreferenz `docs/LIBRARY.md`,
   Prüfung in `npm run validate` (auch Doku-Tabelle = Bibliothek), `npm run preview` = ein Kontaktbogen-Bild statt
   Screenshot-Reihe. Leistungsbudget 150 -> 155 (Demo-Gartentor: zwei bewegliche Flügel).
+- 0.39.0: Wandkappen unter dem Dach bei Nicht-Rechtecken: Dreiecke, an der längsten Seite geteilt, solange die
+  Dachfläche abweicht (statt nur die Ecken). Gauben: `dist` = Abstand Front–Traufe; Aussparung bis vor die Traufe und
+  Wände vor der Front bis unters Gaubendach nur, wenn die Front an der Traufe steht (≤ 0,6 m bzw. ≤ 0,38 m).
+- 0.39.0: Fassadenobjekte als Bereich `<Gebäude-ID>/<Etage-ID>` (kind `facade`, Raum = `aussen` fürs Licht) statt
+  neuem Feld `level` – Etage und Höhenbezug in einem. Stützmauern als `edge_top` am Außenbereich statt eigenem
+  Katalogmodell: kein zweiter Geländezuschnitt nötig; Oberkante je Kante eine Gerade über dem Gelände.
+- 0.39.0: Drehpunkt am Aufsetzpunkt: Kamera und Ziel wandern zum getroffenen Punkt, der orthografische Ausschnitt wird
+  verschoben (Bild bleibt gleich); zurückgesetzt bei der nächsten Geste und vor Ansichtswechseln/getView (nicht beim
+  Loslassen, sonst dreht der Nachlauf um die Mitte). Klarer Dunst ab Kameraabstand + Grundstücksradius.

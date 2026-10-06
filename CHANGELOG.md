@@ -1,5 +1,26 @@
 # Änderungen
 
+## 0.39.0
+
+- **Wandkappen unter dem Dach (Fehler):** L-/T-förmige Wände und Wandringe folgen oben der Dachfläche (in Dreiecke
+  zerlegt und verfeinert) – vorher spannte eine Ecke unter einer Gaube einen schrägen Keil durchs Dach.
+- **Gauben (Fehler):** `window: openings` hinter der Traufe (an der Kniestockwand) schneidet das Dach nur bis zur
+  Front auf, Traufe und Dach davor bleiben; Gauben niedriger als die Etage haben keine umgeklappten Wangen mehr;
+  eine Fassade vor der Gaube reicht nicht mehr bis unters Gaubendach (verdeckte die Fenster).
+- **Klares Wetter (Fehler):** kein Dunst mehr über großen Grundstücken – der Grunddunst beginnt erst hinter dem
+  Grundstück (vorher fest ab 45 m vor der Kamera).
+- **Navigation:** Gedreht wird um den Punkt, an dem Finger bzw. Maus aufsetzen (vorher um die Bildmitte – bei
+  starkem Zoom drehte sich alles aus dem Bild).
+- **Klappläden** als Fensterart: `shutters: { style: louvers | panels, color, open }`, Beispiele `wood_shutters`,
+  `shutters_panels` (nur an Außenwänden).
+- **Objekte an der Fassade:** `space: <Gebäude-ID>/<Etage-ID>` – Höhe ab dem Fußboden der Etage statt ab dem Gelände
+  (Briefkasten, Hausnummer, Außenleuchte).
+- **Stützmauern:** `outdoor[].edge_top: terrain_max` (gerade Oberkante je Kante) oder feste Höhe statt Sägezahn
+  entlang der Rasterdreiecke.
+- Werkzeuge: Screenshots setzen die Kamera vor jeder Ansicht vollständig zurück; ohne HA-Export keine 404-Meldung
+  mehr; `npm run preview` weist bei unbekannten IDs auf den Aufruf aus der Instanz hin.
+- Demo-Haus: Klappläden, Briefkasten an der Fassade, Sitzplatz am Hang mit Stützmauer.
+
 ## 0.37.0
 
 - **Eigene Modelle:** Fehlt etwas im Katalog, beschreibt `models/<id>.yaml` im Datenordner ein eigenes Modell aus
