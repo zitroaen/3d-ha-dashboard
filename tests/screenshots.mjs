@@ -4,7 +4,7 @@
 // (Stockwerke) bekommen je ein Bild "abend", die Dächer (Ebene über der obersten) ein Bild "dach". Eigene Ansichten
 // (z. B. Zoom auf einen Raum) kommen aus VIEWS:
 //   { "wohnzimmer-abend": { "rooms": ["wohnzimmer"], "outdoor": true, "view": { "at": [3, 7.5], "zoom": 1.9, "az": 0 } } }
-// rooms: Raum-IDs oder "all"; sun: { azimuth, elevation } (sonst Nacht); view.at: Plan-Punkt [x, y]; view.az: um die
+// rooms: Raum-IDs oder "all"; sun: { azimuth, elevation } (sonst Nacht); view.at: Plan-Punkt [x, y] oder [x, y, Höhe]; view.az: um die
 // senkrechte Achse schwenken (Grad); view.tilt: Neigung der Kamera über dem Horizont (Grad, z. B. 25 = flache
 // Schrägansicht für Haus und Hang; Standard wie die Startansicht, ~57°); level: Ebene.
 import { mkdir, readFile } from 'node:fs/promises';
@@ -82,7 +82,8 @@ try {
         if (sc.view) {
           // ohne at: Drehpunkt der Ausgangslage
           const at = sc.view.at || [h.target.x, h.target.z];
-          const shift = new v.camera.position.constructor(at[0], 0, at[1]).sub(h.target);
+          // dritter Wert: Höhe des Drehpunkts (z. B. Dachansichten), sonst wie die Ausgangslage
+          const shift = new v.camera.position.constructor(at[0], at[2] ?? h.target.y, at[1]).sub(h.target);
           v.camera.position.add(shift);
           v.controls.target.add(shift);
           v.camera.zoom = sc.view.zoom || 1;

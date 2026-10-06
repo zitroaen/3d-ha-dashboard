@@ -1,3 +1,5 @@
+import { ccwPoly, clipHalf, clipToConvex, minusConvex } from './roofshape.js';
+
 // Steildach eines Dachteils zeichnen (Form aus roofshape.js): Dachflächen mit Ziegel-UV entlang der Neigung,
 // Untersicht, Blende an Traufe und Ortgang, Giebelwände über der obersten Etage, Gauben und Schornsteine.
 // Außerdem: Oberkante der Wände der obersten Etage unter einem Steildach (Kniestock, Giebel, Abseiten).
@@ -11,9 +13,33 @@ const P3 = (p, y) => [p[0], y, p[1]];
  * @param yb    Oberkante der obersten Etage in Koordinaten der Dach-Etage (Giebelwände beginnen dort)
  * @returns Builder der Dachflächen (für das Antippen)
  */
-export function buildPitchedRoof(room, idx, b, yb) {
+export function buildPitchedRoof(room, idx, b, yb, others = []) {
   const part = room.roof, s = part.shape, off = room.elevation || 0, t = part.thickness ?? 0.2;
-  const faces = s.faces();
+  // Durchdringung: Flächen nur dort, wo kein anderer Dachteil höher liegt (Kehlen ergeben sich so); Gauben bis zur
+  // Traufe unterbrechen Traufe und Überstand über ihre Breite
+  // unter jeder Gaube keine Dachfläche (sonst sieht man sie durchs Gaubenfenster)
+  const holes = (part.dormers || []).map((d) => dormerFrame(d, s)).filter(Boolean).map((fr) => fr.hole(part.overhang ?? 0));
+  const hidden = (p, h) => holes.some((hole) => insideRegion(hole, p)) || others.some((o) => o.shape.contains(p) && o.off + o.shape.height(p) > h + 1e-3);
+  const faces = [];
+  for (const face of s.faces()) {
+    let pieces = [face.poly];
+    for (const o of others) {
+      const next = [];
+      for (const poly of pieces) {
+        // Bereich, in dem diese Ebene unter allen Ebenen des anderen Teils liegt
+        let under = clipToConvex(poly, o.shape.ext);
+        for (const g of o.shape.fns) {
+          if (under.length < 3) break;
+          under = clipHalf(under, face.fn.f.A - g.f.A, face.fn.f.B - g.f.B, face.fn.f.C + off - g.f.C - o.off + 1e-3);
+        }
+        if (under.length >= 3) next.push(...minusConvex(poly, under));
+        else next.push(poly);
+      }
+      pieces = next;
+    }
+    for (const hole of holes) pieces = pieces.flatMap((poly) => minusConvex(poly, hole));
+    for (const poly of pieces) faces.push({ fn: face.fn, poly });
+  }
   const onLine = (p, a, c) => Math.abs((c[0] - a[0]) * (p[1] - a[1]) - (c[1] - a[1]) * (p[0] - a[0])) / (Math.hypot(c[0] - a[0], c[1] - a[1]) || 1) < 1e-4;
   const boundary = (p, q, poly) => poly.some((a, i) => {
     const c = poly[(i + 1) % poly.length];
@@ -36,7 +62,10 @@ export function buildPitchedRoof(room, idx, b, yb) {
     // Blende rundum (Traufe, Ortgang) und Brüstung an der Aussparung (bis auf die Dachterrasse)
     for (let i = 0; i < poly.length; i++) {
       const p = poly[i], q = poly[(i + 1) % poly.length];
-      if (boundary(p, q, s.ext)) b.edge.skirt(p, y(p) - t, y(p), q, y(q) - t, y(q), idx);
+      const mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      if (boundary(p, q, s.ext)) {
+        if (!hidden(mid, y(mid))) b.edge.skirt(p, y(p) - t, y(p), q, y(q) - t, y(q), idx);
+      }
       else if (s.opening && boundary(p, q, s.opening)) {
         const bottom = part.openingFloor ?? Math.min(y(p), y(q)) - t;
         b.walls.skirt(p, bottom, y(p), q, bottom, y(q), idx);
@@ -58,56 +87,118 @@ export function buildPitchedRoof(room, idx, b, yb) {
         if (A.y < yb) A = m;
         else B = m;
       }
+      // Giebel im anderen Dachteil (Kreuzdach): verdeckt
+      const mid = [(A.p[0] + B.p[0]) / 2, (A.p[1] + B.p[1]) / 2];
+      if (others.some((o) => o.shape.contains(mid) && o.off + o.shape.height(mid) > (A.y + B.y) / 2 + t)) continue;
       (b.facade || b.walls).skirt(A.p, yb, A.y, B.p, yb, B.y, 0);
     }
   }
 
-  for (const d of part.dormers || []) dormer(d, part, s, off, idx, b);
+  for (const d of part.dormers || []) dormer(d, s, off, idx, b, yb);
   for (const c of part.chimneys || []) chimney(c, s, off, idx, b);
 }
 
-/** Gaube: Front mit Fenster, Seitenwangen, eigenes Dach (Schlepp-, Flach- oder Satteldach) bis auf die Dachfläche */
-function dormer(d, part, s, off, idx, b) {
+/** Punkt in einem konvexen Bereich (Reihenfolge beliebig) */
+function insideRegion(poly, p) {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    const v = (c[0] - a[0]) * (p[1] - a[1]) - (c[1] - a[1]) * (p[0] - a[0]);
+    if (Math.abs(v) < 1e-9) continue;
+    if (sign && Math.sign(v) !== sign) return false;
+    sign = Math.sign(v);
+  }
+  return true;
+}
+
+/**
+ * Lage einer Gaube auf ihrem Dachteil (Höhen relativ zur Traufe): Dachebene, Richtungen entlang der Traufe (u) und die
+ * Fläche hinauf (n), Höhe der Front, Ende auf der Dachfläche, Unterseite des Gaubendachs. Gemeinsam für das Zeichnen,
+ * die Wände darunter (ceilingFn) und die Prüfung. null, wenn die Gaube nicht auf eine geneigte Fläche passt.
+ */
+export function dormerFrame(d, s) {
   const P0 = d.pos;
-  if (!P0 || !s.contains(P0)) return;
+  if (!P0 || !s.contains(P0)) return null;
   // Dachebene an der Stelle: die niedrigste (gleiche Regel wie die Fläche)
   const fn = s.fns.reduce((m, x) => (fnAt(x.f, P0) < fnAt(m.f, P0) ? x : m), s.fns[0]);
-  if (fn.edge < 0) return; // auf dem Plateau keine Gaube
+  if (fn.edge < 0) return null; // auf dem Plateau keine Gaube
   const e = s.edges[fn.edge], k = Math.hypot(fn.f.A, fn.f.B);
-  const u = e.dir, n = e.n; // entlang der Traufe, die Fläche hinauf
-  const w = d.width ?? 1.6, fh = d.height ?? 1.4, ov = 0.15, type = d.type || 'shed';
-  const h0 = off + fnAt(fn.f, P0);
-  const L = (x, sUp) => [P0[0] + u[0] * x + n[0] * sUp, P0[1] + u[1] * x + n[1] * sUp];
-  const main = (sUp) => h0 + k * sUp;
+  const u = e.dir, n = e.n;
+  const w = d.width ?? 1.6, fh = d.height ?? 1.4, type = d.type || 'shed';
   const pd = Math.tan(((d.pitch ?? (type === 'gable' ? 40 : type === 'shed' ? 10 : 0)) * Math.PI) / 180);
-  if (type !== 'gable' && k <= pd + 0.05) return; // Gaubendach flacher als das Dach nötig
-  // wo das Gaubendach auf die Dachfläche trifft
+  if (type !== 'gable' && k <= pd + 0.05) return null; // Gaubendach flacher als das Dach nötig
+  const h0 = fnAt(fn.f, P0);
   const sEnd = type === 'gable' ? fh / k : fh / (k - pd);
+  const L = (x, sUp) => [P0[0] + u[0] * x + n[0] * sUp, P0[1] + u[1] * x + n[1] * sUp];
+  const local = (p) => [(p[0] - P0[0]) * u[0] + (p[1] - P0[1]) * u[1], (p[0] - P0[0]) * n[0] + (p[1] - P0[1]) * n[1]];
+  // Unterseite des Gaubendachs (ohne Dachstärke) über dem Punkt (x entlang, sUp hinauf)
+  const roofAt = (x, sUp) => (type === 'gable' ? h0 + fh + pd * Math.max(0, w / 2 - Math.abs(x)) : h0 + fh + pd * sUp);
+  const openings = d.window === 'openings';
+  return {
+    d, fn, e, k, u, n, w, fh, type, pd, h0, sEnd, L, local, roofAt, openings,
+    /** Grundriss unter der Gaube (Front bis Ende), vorn um front Meter verlängert (Wanddicke) */
+    covers(p, front = 0.35) {
+      const [x, sUp] = local(p);
+      return Math.abs(x) <= w / 2 + 1e-6 && sUp >= -front && sUp <= sEnd;
+    },
+    /**
+     * Aussparung in der Dachfläche: Grundriss der Gaube (bis knapp vor ihr Ende auf der Fläche); bis zur Traufe auch
+     * Traufe und Überstand davor
+     */
+    hole(ov) {
+      const front = openings ? -(ov + 0.6) : 0, back = sEnd - 0.02;
+      return ccwPoly([L(-w / 2, front), L(w / 2, front), L(w / 2, back), L(-w / 2, back)]);
+    },
+  };
+}
+
+/**
+ * Gaube: Front mit Fensteröffnung (Brüstung, Sturz, zwei Pfeiler, Glas in der Öffnung), Seitenwangen, eigenes Dach
+ * (Schlepp-, Flach- oder Satteldach) bis auf die Dachfläche. window: false = geschlossene Front; window: openings =
+ * keine eigene Front – die Öffnungen der Wand darunter (Fenster, Tür) sitzen darin, die Wand reicht bis unters
+ * Gaubendach; darüber (oberhalb der Etage) schließt die Gaube die Front.
+ */
+function dormer(d, s, off, idx, b, yb) {
+  const fr = dormerFrame(d, s);
+  if (!fr) return;
+  const { L, w, fh, type, pd, k, sEnd } = fr;
+  const ov = 0.15, h0 = off + fr.h0;
+  const main = (sUp) => h0 + k * sUp;
   const yTop = (sUp) => (type === 'gable' ? h0 + fh : h0 + fh + pd * sUp);
   const yRidge = h0 + fh + (w / 2) * pd, sRidge = (fh + (w / 2) * pd) / k;
+  const fac = b.facade || b.walls;
+  const front = (x0, x1, y0, y1) => y1 > y0 + 1e-3 && fac.skirt(L(x0, 0), y0, y1, L(x1, 0), y0, y1, idx);
 
-  // Front (mit Giebeldreieck) und Wangen
-  const fl = L(-w / 2, 0), fr = L(w / 2, 0);
-  (b.facade || b.walls).skirt(fl, h0 - 0.05, h0 + fh, fr, h0 - 0.05, h0 + fh, idx);
-  if (type === 'gable') (b.facade || b.walls).triUV(P3(fl, h0 + fh), P3(fr, h0 + fh), P3(L(0, 0), yRidge), [0, 0], [w, 0], [w / 2, yRidge - h0 - fh], idx);
-  if (type === 'gable') (b.facade || b.walls).triUV(P3(fl, h0 + fh), P3(L(0, 0), yRidge), P3(fr, h0 + fh), [0, 0], [w / 2, yRidge - h0 - fh], [w, 0], idx);
-  for (const x of [-w / 2, w / 2]) {
-    const a = P3(L(x, 0), h0 - 0.05), c = P3(L(x, 0), h0 + fh), z = P3(L(x, sEnd), main(sEnd));
-    (b.facade || b.walls).triUV(a, c, z, [0, 0], [0, fh], [sEnd, fh], idx);
-    (b.facade || b.walls).triUV(a, z, c, [0, 0], [sEnd, fh], [0, fh], idx);
-  }
-  // Fenster
-  if (d.window !== false) {
-    const ww = Math.min(w - 0.3, d.window_width ?? w - 0.4), wy0 = h0 + 0.18, wy1 = h0 + fh - 0.15, sIn = 0.03;
-    const gl = L(-ww / 2, sIn), gr = L(ww / 2, sIn);
-    b.glass.quadV(gl, gr, wy0, wy1, idx);
-    const fr0 = (x0, x1, y0, y1) => b.pvc.skirt(L(x0, -0.01), y0, y1, L(x1, -0.01), y0, y1, idx);
+  // Front: Wand mit Fensteröffnung (bzw. geschlossen / aus den Öffnungen der Etage darunter)
+  const fl = L(-w / 2, 0), fr0 = L(w / 2, 0);
+  if (fr.openings) front(-w / 2, w / 2, Math.max(h0 - 0.05, yb), h0 + fh);
+  else if (d.window === false) front(-w / 2, w / 2, h0 - 0.05, h0 + fh);
+  else {
+    const ww = Math.min(w - 0.3, d.window_width ?? w - 0.4), wy0 = h0 + 0.18, wy1 = h0 + fh - 0.15;
+    front(-w / 2, w / 2, h0 - 0.05, wy0); // Brüstung
+    front(-w / 2, w / 2, wy1, h0 + fh); // Sturz
+    front(-w / 2, -ww / 2, wy0, wy1); // Pfeiler
+    front(ww / 2, w / 2, wy0, wy1);
+    // Glas in der Öffnung, Rahmen ringsum
+    b.glass.quadV(L(-ww / 2, 0.03), L(ww / 2, 0.03), wy0, wy1, idx);
+    const frame = (x0, x1, y0, y1) => b.pvc.skirt(L(x0, 0.01), y0, y1, L(x1, 0.01), y0, y1, idx);
     const bar = 0.06;
-    fr0(-ww / 2 - bar, ww / 2 + bar, wy0 - bar, wy0);
-    fr0(-ww / 2 - bar, ww / 2 + bar, wy1, wy1 + bar);
-    fr0(-ww / 2 - bar, -ww / 2, wy0, wy1);
-    fr0(ww / 2, ww / 2 + bar, wy0, wy1);
-    if (ww > 1.1) fr0(-bar / 2, bar / 2, wy0, wy1); // Mittelpfosten
+    frame(-ww / 2, ww / 2, wy0, wy0 + bar);
+    frame(-ww / 2, ww / 2, wy1 - bar, wy1);
+    frame(-ww / 2, -ww / 2 + bar, wy0, wy1);
+    frame(ww / 2 - bar, ww / 2, wy0, wy1);
+    if (ww > 1.1) frame(-bar / 2, bar / 2, wy0, wy1); // Mittelpfosten
+  }
+  if (type === 'gable') {
+    fac.triUV(P3(fl, h0 + fh), P3(fr0, h0 + fh), P3(L(0, 0), yRidge), [0, 0], [w, 0], [w / 2, yRidge - h0 - fh], idx);
+    fac.triUV(P3(fl, h0 + fh), P3(L(0, 0), yRidge), P3(fr0, h0 + fh), [0, 0], [w / 2, yRidge - h0 - fh], [w, 0], idx);
+  }
+  // Wangen: von der Front bis auf die Dachfläche
+  const yLow = fr.openings ? Math.max(h0 - 0.05, yb) : h0 - 0.05;
+  for (const x of [-w / 2, w / 2]) {
+    const a = P3(L(x, 0), yLow), c = P3(L(x, 0), h0 + fh), z = P3(L(x, sEnd), main(sEnd));
+    fac.triUV(a, c, z, [0, 0], [0, fh], [sEnd, fh], idx);
+    fac.triUV(a, z, c, [0, 0], [sEnd, fh], [0, fh], idx);
   }
   // Dach der Gaube (Oberseite in Dachdeckung, Unterseite hell)
   const quadUp = (A, B, C, D) => {
@@ -151,10 +242,17 @@ function chimney(c, s, off, idx, b) {
  * Kniestock, Giebel und Dachschrägen ihre Neigung.
  */
 export function ceilingFn(cut, H) {
+  const parts = cut.map((r) => ({ r, frames: (r.dormers || []).map((d) => dormerFrame(d, r.shape)).filter(Boolean) }));
   return (p) => {
-    let c = H;
-    for (const r of cut) if (r.shape.contains(p)) c = Math.min(c, r.eaves + r.shape.height(p));
-    return c;
+    // mehrere Dachteile durchdringen sich: der höchste zählt (Vereinigung); unter einer Gaube ihr Dach
+    let c = -Infinity;
+    for (const { r, frames } of parts) {
+      if (!r.shape.contains(p)) continue;
+      let h = r.shape.height(p);
+      for (const fr of frames) if (fr.covers(p)) h = Math.max(h, fr.roofAt(...fr.local(p)));
+      c = Math.max(c, r.eaves + h);
+    }
+    return c === -Infinity ? H : Math.min(H, c);
   };
 }
 
@@ -209,7 +307,7 @@ export function windowUnderRoof(win, ceilingAt, cut = []) {
 /** Liegt der Punkt (Fenster in der Wand) vor einer Gaube dieses Dachteils? (Breite entlang der Traufe, ≤ 3 m davor) */
 function underDormer(c, r) {
   for (const d of r.dormers || []) {
-    if (!d.pos) continue;
+    if (!d.pos || d.window === 'openings') continue; // die Öffnungen der Wand sind die Fenster der Gaube
     // nächste Kante des Umrisses = Traufe, vor der die Gaube steht
     let best = null, bd = Infinity;
     for (const e of r.shape.edges) {
@@ -223,4 +321,19 @@ function underDormer(c, r) {
     if (along <= (d.width ?? 1.6) / 2 + 0.1 && inward <= 0.2 && inward >= -3) return true;
   }
   return false;
+}
+
+/**
+ * Tür unter einer Dachschräge: niedrigste Wandoberkante über die Türbreite. Reicht sie nicht bis zur Türhöhe, wird die
+ * Tür auf 5 cm darunter begrenzt (mindestens 1,5 m). Liefert { top, wallTop } oder {} (passt).
+ */
+export function doorUnderRoof(d, top, ceilingAt) {
+  if (!ceilingAt) return {};
+  let wallTop = Infinity;
+  for (let k = 0; k <= 6; k++) {
+    const t = k / 6;
+    wallTop = Math.min(wallTop, ceilingAt([d.hinge[0] + (d.end[0] - d.hinge[0]) * t, d.hinge[1] + (d.end[1] - d.hinge[1]) * t]));
+  }
+  if (wallTop >= top + 0.02) return {};
+  return { top: Math.max(1.5, Math.round((wallTop - 0.05) * 1000) / 1000), wallTop };
 }
