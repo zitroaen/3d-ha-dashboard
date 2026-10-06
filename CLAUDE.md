@@ -332,3 +332,9 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   das Schild, solange seine Bedingung gilt (Standard: playing). Keine Laufzeit-Animation, keine externen Bilder.
 - Fischgrätparkett (0.31.0): Gitter (W, W) und (L, −L) mit L = 7 W kachelt lückenlos; Kachel 4 L = 2 m ist ein
   Gitterpunkt, also nahtlos (Stäbe am Rand dreifach gezeichnet). Die alten Dielen heißen `planks`.
+- Bündige Fassade (0.32.0): `facade.flush` baut in `scene._flushFacades()` (nach dem Aufbau aller Etagen) je oberer
+  Etage ein Mesh im Fassadenmaterial: die Außenseiten der Etage darunter (`FloorModel.extSegs`, mit Normale)
+  verlängert bis zum Fußboden, ein waagrechtes Band bis zur zurückliegenden Wand (Tiefe je 25-cm-Stück nach innen
+  gesucht, Enden per Halbierung genau an der Grenze) und die Kanten der Geschossdecke (`_houseOutline`). Keine neue
+  Geometrie in house.js, kein zusätzlicher Zeichenaufruf (gleiches Material wie die Fassade, `_mergeLevels`).
+  Außenwände unter Dachschrägen bekommen oben die Fassade statt der dunklen Schnittfläche.

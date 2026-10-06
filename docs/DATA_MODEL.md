@@ -118,6 +118,7 @@ Wandfarbe.
 | `color` | nein | je Art | Farbe (`#rrggbb`), z. B. `#8e2f22` Schwedenrot (Standard bei `wood_siding`), `#ece5d8` Putz |
 | `corners` | nein | weiß bei `wood_siding` | Farbe der Eckbretter (an Hausecken und Fensterlaibungen); `false` = keine |
 | `plinth` | nein | | Sockel: `{ height (0.4), material (Oberfläche, z. B. stone), color }` – auf der untersten Etage bis auf das Gelände davor |
+| `flush` | nein | `false` | Bündige Fassade: Die Außenseite einer Etage läuft über die Geschossdecke bis zum Fußboden der Etage darüber durch; stehen deren Außenwände (Aufmaß von innen) bis 60 cm weiter innen, schließt ein Band in der Fassadenfarbe die Stufe, Deckenkanten in der Fassade statt dunkel. Für Häuser, deren Etagen getrennt von innen gemessen wurden |
 
 
 **Dach:** Jedes Gebäude bekommt ein Dach über seiner obersten Etage – ohne Angabe ein Flachdach. Es erscheint, sobald
@@ -782,6 +783,8 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.32.0, abwärtskompatibel):** `buildings[].facade.flush` (bündige Fassade über die
+  Geschossdecke). Wände unter Dachschrägen haben oben keine dunkle Schnittfläche mehr, wo sie außen liegen.
 - **Version 2, Ergänzung (0.31.0):** `surface: parquet` ist jetzt echtes Fischgrätparkett (vorher sahen die Böden wie
   Dielen im Versatz aus); die bisherigen Dielen heißen `planks` – wer sie behalten will, stellt `parquet` auf `planks`
   um. Kein Formatwechsel (die Daten bleiben gültig).

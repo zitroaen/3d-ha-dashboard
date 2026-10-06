@@ -144,10 +144,10 @@ export class FloorModel {
     const fac = facade ? (floors[S0.facadeKey(facade)] ??= new Builder()) : null;
     const plinth = facade?.plinth && floor.lowest ? { height: 0.4, ...facade.plinth } : null;
     const plinthB = plinth ? (floors[S0.surface(plinth.material || 'stone', plinth.color)] ??= new Builder()) : null;
-    const extSegs = [];
+    const extSegs = (this.extSegs = []); // Außenseiten (auch für die bündige Fassade der Etage darüber, scene.js)
     /** Außenseite a→b (n nach außen) von y0 bis zur Oberkante tops = [{ p, y }] (gerade oder unter der Dachschräge) */
     const exterior = (a, b, n, y0, tops) => {
-      extSegs.push({ a, b, y0, top: Math.min(...tops.map((t) => t.y)) });
+      extSegs.push({ a, b, n, y0, top: Math.min(...tops.map((t) => t.y)) });
       const out = (p, d) => [p[0] + n[0] * d, p[1] + n[1] * d];
       for (let k = 0; k + 1 < tops.length; k++) {
         const A = tops[k], C = tops[k + 1];
@@ -166,6 +166,7 @@ export class FloorModel {
     // --- Prismen (Wände, Brüstungen, Stürze): Seitenflächen bekommen den Raum, in den sie zeigen
     const prism = (poly, y0, y1, capRoom = 0) => {
       const cut = this.ceilingAt && y1 >= H - 0.01;
+      let outside = false; // Außenwand (eine Seite ohne Raum davor)
       for (let i = 0; i < poly.length; i++) {
         let a = poly[i], b = poly[(i + 1) % poly.length];
         const dx = b[0] - a[0], dz = b[1] - a[1];
@@ -178,6 +179,7 @@ export class FloorModel {
           n = [-n[0], -n[1]];
         }
         const room = this.roomBeside(mid, n);
+        if (!room) outside = true;
         // unter dem Steildach: Oberkante folgt der Dachfläche
         const tops = cut ? ceilingProfile(floor.roofCut, this.ceilingAt, a, b) : [{ p: a, y: y1 }, { p: b, y: y1 }];
         if (fac && !room) exterior(a, b, n, y0, tops);
@@ -189,7 +191,8 @@ export class FloorModel {
         } else walls.quadV(a, b, y0, y1, room);
       }
       // Oben auf Wandhöhe: dunkle Schnittfläche; darunter (Fensterbank): Wandmaterial
-      if (cut) this._cutCap(caps, poly, y0);
+      // unter dem Dach: Außenwände oben nicht dunkel (die Kappe liegt unter der Dachfläche, sichtbar nur in Lücken)
+      if (cut) this._cutCap(outside ? fac || walls : caps, poly, y0);
       else if (y1 >= H - 0.01) caps.polyH(poly, y1, 0);
       else walls.polyH(poly, y1, capRoom);
     };

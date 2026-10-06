@@ -171,7 +171,7 @@ buildings:
         windows:
           - { sill: 0.9, top: 2, rect: [2, 0, 3.4, 0.3], room: studio }
           - { sill: 0.5, top: 2, rect: [2, 7.7, 3.6, 8], room: studio }
-    facade: { type: plaster, color: "#ece5d8", plinth: { height: 0.45, material: stone } }
+    facade: { type: plaster, color: "#ece5d8", flush: true, plinth: { height: 0.45, material: stone } }
     roof:
       - type: half_hip
         ridge: "y"
@@ -552,7 +552,13 @@ objects:
   - { id: hochbeet_holz, name: Hochbeet, model: raised_bed, pos: [19.5, -4], rot: 90 }
   - { id: komposter, name: Komposter, model: compost, pos: [19.5, -7.5] }
   - { id: zaun_ost, name: Zaun, model: fence, pos: [17.6, 4], rot: 90, size: [28, 0.1, 1] }
-  - { id: freileitung, name: Freileitung, model: power_line, pos: [-8.6, 5], rot: 90, size: [38, 1, 8], params: { span: 19 } }
+  - id: freileitung
+    name: Freileitung
+    model: power_line
+    pos: [-8.6, 5]
+    rot: 90
+    size: [38, 1, 8]
+    params: { span: 19 }
   - { id: strauch_1, name: Strauch, model: shrub, space: garten, pos: [10.1, 12.6] }
   - { id: strauch_2, name: Strauch, model: shrub, space: garten, pos: [-2.9, 12.5], size: [1.4, 1.1, 1.2] }
   - { id: strauch_3, name: Strauch, model: shrub, space: garten, pos: [5.4, 17], size: [1.6, 1.2, 1.1] }

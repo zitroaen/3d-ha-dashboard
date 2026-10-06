@@ -1,5 +1,14 @@
 # Änderungen
 
+## 0.32.0
+
+- **Bündige Fassade:** `buildings[].facade.flush: true` – die Außenseite des Erdgeschosses läuft über die
+  Geschossdecke bis zum Fußboden des Obergeschosses durch. Wurden die Etagen getrennt von innen gemessen und stehen die
+  Außenwände oben bis 60 cm weiter innen, schließt ein Band in der Fassadenfarbe die Stufe; Deckenkanten erscheinen in
+  der Fassade statt als dunkler Streifen oder Klotz. Im Demo-Haus aktiv.
+- **Wände unter dem Dach (Fehler):** Außenwände unter einer Dachschräge haben oben keine dunkle Schnittfläche mehr
+  (sie lugte an der Traufe hervor).
+
 ## 0.31.0
 
 - **Fischgrätparkett (Fehler):** `surface: parquet` zeichnet jetzt echtes Fischgrätmuster – Stäbe 7 × 50 cm, um 90°

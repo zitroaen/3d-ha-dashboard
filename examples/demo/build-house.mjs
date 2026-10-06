@@ -112,7 +112,7 @@ const buildings = [
       { id: 'og', name: 'Obergeschoss', level: 1, elevation: OG_EL, height: OG_H, rooms: ogRooms, walls: ogWalls.map((polygon) => ({ polygon })), windows: ogWindows },
     ],
     // Putzfassade in warmem Weiß mit Natursteinsockel
-    facade: { type: 'plaster', color: '#ece5d8', plinth: { height: 0.45, material: 'stone' } },
+    facade: { type: 'plaster', color: '#ece5d8', flush: true, plinth: { height: 0.45, material: 'stone' } },
     // Krüppelwalmdach über dem Obergeschoss (Kniestock 1 m, First Nord–Süd) mit Schleppgaube und Schornstein;
     // über dem eingeschossigen Ostteil ein Walmdach rund um eine Dachterrasse
     roof: [
