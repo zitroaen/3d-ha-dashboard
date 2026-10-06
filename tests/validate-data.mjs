@@ -247,6 +247,17 @@ if (existsSync(doc)) {
   }
 }
 
+// Bibliothek in der Doku = Bibliothek der Engine (Oberflächen, nur im Engine-Repo)
+const libDoc = join(ENGINE_ROOT, 'docs/LIBRARY.md');
+if (existsSync(libDoc)) {
+  const text = readFileSync(libDoc, 'utf8');
+  const table = text.slice(text.indexOf('<!-- oberflaechen:start -->'), text.indexOf('<!-- oberflaechen:end -->'));
+  const documented = new Set([...table.matchAll(/^\| `([a-z0-9_]+)` \|/gm)].map((m) => m[1]));
+  const lib = Object.keys(parseYaml(readFileSync(join(ENGINE_ROOT, 'library/surfaces.yaml'), 'utf8')));
+  for (const id of lib) if (!documented.has(id)) errors.push(`Bibliothek: Oberfläche ${id} fehlt in docs/LIBRARY.md`);
+  for (const id of documented) if (!lib.includes(id)) errors.push(`Bibliothek: docs/LIBRARY.md nennt ${id}, das es nicht gibt`);
+}
+
 const nRooms = buildings.reduce((n, b) => n + (b.floors || []).reduce((m, f) => m + (f.rooms || []).length, 0), 0);
 console.log(`Modell (${file}): ${buildings.length} Gebäude, ${nRooms} Räume, ${(model.outdoor || []).length} Außenbereiche, ${(model.objects || []).length} Objekte`);
 if (warnings.length) console.log(`ℹ ${warnings.join('; ')}`);

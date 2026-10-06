@@ -693,7 +693,7 @@ try {
     return { items: [...r.querySelectorAll('button[data-add]')].map((b) => b.dataset.add).sort().join(), thumbs: r.querySelectorAll('img.thumb[src^="data:image/png"]').length,
       lamp: window.panel.view.furnishingData.devices.some((d) => d.id === 'bogenleuchte' && d.model === 'bogenleuchte') };
   });
-  ok(own.items === 'bogenleuchte,wandregal' && own.thumbs === 2 && own.lamp,
+  ok(own.items === 'bogenleuchte,gartentor,wandregal' && own.thumbs === 3 && own.lamp,
     'Eigene Modelle: Gruppe „Eigene“ im Katalog mit Vorschau, Bogenleuchte als Leuchte im Haus', `Eigene: ${JSON.stringify(own)}`);
   await clickShadow('.catalog button[data-cat=device]');
   await clickShadow('.catalog button[data-add=floor_fan]');
