@@ -13,6 +13,7 @@
     "buildings": { "type": "array", "items": { "$ref": "#/$defs/building" } },
     "outdoor": { "type": "array", "items": { "$ref": "#/$defs/outdoor" } },
     "objects": { "type": "array", "items": { "$ref": "#/$defs/object" } },
+    "surfaces": { "type": "object", "description": "eigene Oberflächen bzw. Änderungen an der Bibliothek (docs/LIBRARY.md)", "propertyNames": { "pattern": "^[a-z0-9_]+$" }, "additionalProperties": { "$ref": "#/$defs/surfaceDef" } },
     "models": { "type": "array", "description": "eigene Modelle (models/<id>.yaml) für den Katalog, auch ungenutzte", "items": { "$ref": "#/$defs/id" } },
     "connections": { "type": "array", "description": "reserviert für spätere Versionen", "maxItems": 0 }
   },
@@ -26,7 +27,36 @@
       "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 3 },
       "minItems": 3
     },
-    "surface": { "enum": ["parquet", "planks", "parquet_cube", "tiles", "concrete", "lawn", "paving", "gravel", "soil", "wood", "water", "slabs", "stone", "roof", "roof_tiles", "flagstone"] },
+    "surface": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Oberfläche aus library/surfaces.yaml oder `surfaces` (docs/LIBRARY.md)" },
+    "surfaceDef": {
+      "type": "object",
+      "description": "Oberfläche: Muster oder Bild (docs/LIBRARY.md)",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "base": { "$ref": "#/$defs/surface" },
+        "pattern": { "enum": ["planks", "herringbone", "chevron", "basket", "tiles", "siding", "roof_tiles", "stone", "flagstone", "speckle", "lawn", "plain"] },
+        "image": { "type": "string" },
+        "size": { "oneOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 1, "maxItems": 2 }] },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "variation": { "type": "number", "minimum": 0, "maximum": 1 },
+        "joint": { "type": "number", "minimum": 0 },
+        "joint_color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "bond": { "oneOf": [{ "type": "number", "minimum": 0, "maximum": 1 }, { "const": "random" }] },
+        "rows": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "angle": { "type": "number" },
+        "strips": { "type": "integer", "minimum": 1 },
+        "spread": { "type": "number", "minimum": 0 },
+        "seed": { "type": "integer" },
+        "res": { "type": "number" },
+        "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "metalness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "relief": { "type": "number", "minimum": 0 },
+        "bump": { "type": "number", "minimum": 0 },
+        "outdoor": { "type": "boolean" },
+        "edge": { "$ref": "#/$defs/surface" }
+      }
+    },
     "entityId": { "type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$" },
     "entityList": {
       "oneOf": [
@@ -115,7 +145,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "type": { "enum": ["plaster", "wood_siding", "brick", "stone"] },
+            "type": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "plaster (Putz) oder eine Oberfläche" },
             "color": { "type": "string" },
             "corners": { "oneOf": [{ "type": "string" }, { "const": false }] },
             "flush": { "type": "boolean" },

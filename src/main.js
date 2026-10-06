@@ -3,6 +3,7 @@
 // Das Modell (model.yaml, docs/DATA_MODEL.md) wird zur Laufzeit geladen – standardmäßig aus
 // demselben Ordner wie dieses Skript, oder aus panel_custom → config → data_url.
 import { HouseScene } from './scene.js';
+import { applyLibrary } from './library.js';
 import { loadData, loadShared, loadUserModels, DataUnavailableError } from './data.js';
 import { loadDemoData } from './demo.js';
 import { Editor } from './editor.js';
@@ -498,11 +499,12 @@ class Ha3dDashboard extends HTMLElement {
         // In HA: im Editor gespeicherte Lage-Änderungen (Benutzerdaten) über die Dateien legen
         // (Demo-Haus: aus eigenen Demo-Benutzerdaten, siehe store)
         applyOverrides(data.model, await this.store.loadOverrides());
+        applyLibrary(data.model);
         const scene = toScene(data.model);
         if (!scene.house.floors.length) throw new Error('Das Modell enthält noch keine Gebäude – Grundriss importieren (docs/SETUP.md)');
         // Was hat sich geändert? Bauwerk -> ganze Szene; nur Objekte -> nur die Einrichtungs-Schicht
-        const { site, buildings, outdoor, objects } = data.model;
-        const keys = { structure: JSON.stringify([site, buildings, outdoor]), objects: JSON.stringify(objects) };
+        const { site, buildings, outdoor, objects, surfaces } = data.model;
+        const keys = { structure: JSON.stringify([site, buildings, outdoor, surfaces]), objects: JSON.stringify(objects) };
         const old = this._keys;
         this._keys = keys;
         this.model = data.model;

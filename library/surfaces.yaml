@@ -1,0 +1,41 @@
+# Beispiel-Bibliothek der Engine: Oberflächen (Bodenbeläge, Fassaden, Dächer, Kanten).
+# Die Instanz ergänzt oder überschreibt sie in model.yaml unter `surfaces` (gleiche ID = Einträge ändern, z. B. nur
+# die Farbe; `base: <id>` = ableiten). Format und Muster: docs/LIBRARY.md.
+# Felder: pattern | image, size (m), color, variation, joint (m), joint_color, roughness, relief, outdoor, edge, label
+
+# --- Parkett und Dielen --------------------------------------------------------------------------------------------
+parquet: { label: Fischgrätparkett Eiche, pattern: herringbone, size: [0.5, 0.0714], color: '#9f7c56', variation: 0.14, roughness: 0.5 }
+parquet_double: { label: Doppeltes Fischgrät, base: parquet, size: [0.6, 0.075], rows: 2 }
+parquet_chevron: { label: Französisches Fischgrät (Chevron), pattern: chevron, size: [0.6, 0.1], angle: 45, color: '#a3805a', variation: 0.12, roughness: 0.5 }
+parquet_strip: { label: Stabparkett wilder Verband, pattern: planks, size: [0.5, 0.07], bond: random, color: '#a58156', variation: 0.14, roughness: 0.5 }
+parquet_ship: { label: Schiffsboden, pattern: planks, size: [1.0, 0.14], bond: 0.33, color: '#b08c62', variation: 0.1, roughness: 0.5 }
+parquet_cube: { label: Würfelparkett, pattern: basket, size: 0.35, strips: 4, color: '#bd8632', variation: 0.1, roughness: 0.4 }
+planks: { label: Landhausdielen Eiche, pattern: planks, size: [1.2, 0.2], bond: 0.33, color: '#a3825c', variation: 0.15, roughness: 0.5 }
+planks_wide: { label: Breite Dielen geölt, pattern: planks, size: [2.2, 0.26], bond: random, color: '#7b5a3c', variation: 0.12, roughness: 0.45 }
+planks_white: { label: Dielen weiß geölt, base: planks, color: '#d9cdb8', variation: 0.06 }
+
+# --- Fliesen, Stein, Estrich ----------------------------------------------------------------------------------------
+tiles: { label: Großformatfliesen, pattern: tiles, size: [0.6, 0.6], color: '#a6a096', joint_color: '#5a5650', joint: 0.004, roughness: 0.3 }
+tiles_small: { label: Fliesen 30 × 30, base: tiles, size: [0.3, 0.3], color: '#c9c4ba' }
+tiles_metro: { label: Metrofliesen, pattern: tiles, size: [0.2, 0.1], bond: 0.5, color: '#eeeeea', joint_color: '#b8b6b0', joint: 0.003, roughness: 0.15 }
+concrete: { label: Beton/Estrich, pattern: plain, color: '#9a968f', roughness: 0.9 }
+flagstone: { label: Polygonalplatten, pattern: flagstone, size: 0.28, color: '#ded6c6', joint_color: '#5f5a52', roughness: 0.7, relief: 0.8 }
+
+# --- Außen ----------------------------------------------------------------------------------------------------------
+lawn: { label: Rasen, pattern: lawn, color: '#26352a', roughness: 1, outdoor: true, edge: soil }
+paving: { label: Pflaster/Platten, pattern: tiles, size: [1.2, 1.2], color: '#949494', joint_color: '#5a5650', roughness: 0.85, relief: 0.8, outdoor: true }
+cobble: { label: Pflaster 20 × 10, pattern: tiles, size: [0.2, 0.1], bond: 0.5, color: '#8a8580', variation: 0.12, joint_color: '#4f4b45', joint: 0.008, roughness: 0.9, outdoor: true }
+slabs: { label: Großformatplatten, pattern: tiles, size: [0.6, 0.3], bond: 0.5, color: '#b1b3b5', joint_color: '#6f7275', joint: 0.006, roughness: 0.75, relief: 0.7, outdoor: true }
+gravel: { label: Kies, pattern: speckle, size: 0.6, color: '#a69d8c', spread: 0.45, seed: 5, roughness: 1, relief: 1, outdoor: true }
+soil: { label: Erde/Beet, pattern: speckle, size: 0.8, color: '#4a3626', spread: 0.35, seed: 9, roughness: 1, relief: 0.8, outdoor: true, edge: soil }
+wood: { label: Holzdeck, pattern: planks, size: [2.4, 0.14], bond: random, color: '#8a6440', joint: 0.006, roughness: 0.7, outdoor: true }
+water: { label: Wasser, pattern: plain, color: '#2f5468', roughness: 0.15, metalness: 0.1, relief: 0 }
+stone: { label: Naturstein (Trockenmauer), pattern: stone, color: '#ada090', roughness: 0.95, outdoor: true }
+
+# --- Dach und Fassade -----------------------------------------------------------------------------------------------
+roof: { label: Dachbahn, pattern: speckle, size: 0.7, color: '#4e5054', spread: 0.25, seed: 13, roughness: 0.95, relief: 0.6, outdoor: true }
+roof_tiles: { label: Dachziegel, pattern: roof_tiles, size: [0.3, 0.3], color: '#a4553b', roughness: 0.8, outdoor: true }
+wood_siding: { label: Holzschalung, pattern: siding, size: 0.15, color: '#8e2f22', roughness: 0.75, outdoor: true }
+brick: { label: Ziegelmauerwerk, pattern: tiles, size: [0.24, 0.08], bond: 0.5, color: '#b05a3c', variation: 0.17, joint_color: '#d8d4cc', joint: 0.01, roughness: 0.85, relief: 0.8, outdoor: true }
+sandstone: { label: Sandstein, base: stone, color: '#cdb48a' }
+granite: { label: Granit, pattern: speckle, size: 0.5, color: '#8d8a86', spread: 0.5, seed: 31, roughness: 0.6, relief: 0.4, outdoor: true }

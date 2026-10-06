@@ -13,6 +13,7 @@ import { LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from '../src/roomlight.js';
 import { FURNITURE, LAMPS } from '../src/models.js';
 import { USER_MODEL_DIR, checkUserModel, registerUserModels } from '../src/usermodels.js';
 import { load as parseYaml } from 'js-yaml';
+import { setSurfaceDefs, checkSurface, isSurface, surfaceDef, surfaceIds } from '../src/surfaces.js';
 
 const errors = [], warnings = [];
 const file = join(DATA_DIR, 'model.yaml');
@@ -70,6 +71,41 @@ if (!ajv.validate(schema, model)) {
   }
   for (const w of registerUserModels(defs)) errors.push(w);
   for (const id of model.models || []) if (!files.includes(`${id}.yaml`)) errors.push(`models: ${id}.yaml fehlt in ${USER_MODEL_DIR}`);
+}
+
+// 1c. Oberflächen: Bibliothek der Engine + `surfaces` der Instanz; alle Verweise müssen bekannt sein
+{
+  setSurfaceDefs(parseYaml(readFileSync(join(ENGINE_ROOT, 'library/surfaces.yaml'), 'utf8')), model.surfaces);
+  for (const id of surfaceIds()) for (const e of checkSurface(id, surfaceDef(id))) errors.push(`Oberfläche ${e}`);
+  for (const [id, d] of Object.entries(model.surfaces || {})) {
+    const img = surfaceDef(id)?.image;
+    if (img && !existsSync(join(DATA_DIR, img))) errors.push(`Oberfläche ${id}: Bild ${img} fehlt im Datenordner`);
+    if (d && typeof d === 'object' && !d.base && !d.pattern && !d.image && !isSurface(id)) errors.push(`Oberfläche ${id}: pattern, image oder base nötig`);
+  }
+  const ref = (where, id) => {
+    if (id != null && id !== false && !isSurface(id)) errors.push(`${where}: Oberfläche „${id}“ unbekannt (Bibliothek oder model.yaml → surfaces)`);
+  };
+  ref('site.ground', model.site?.ground?.surface);
+  for (const b of model.buildings || []) {
+    const ft = b.facade?.type;
+    if (ft && ft !== 'plaster') ref(`${b.id}: facade.type`, ft);
+    if (b.facade?.plinth) ref(`${b.id}: facade.plinth.material`, b.facade.plinth.material);
+    for (const r of [b.roof].flat().filter((x) => x && typeof x === 'object')) ref(`${b.id}: roof.surface`, r.surface);
+    for (const f of b.floors || []) {
+      for (const r of f.rooms || []) {
+        ref(`Raum ${r.id}`, r.surface);
+        for (const z of r.zones || []) ref(`Raum ${r.id}: zones`, z.surface);
+      }
+    }
+  }
+  for (const o of model.outdoor || []) {
+    ref(`Außenbereich ${o.id}`, o.surface);
+    ref(`Außenbereich ${o.id}: edge`, o.edge);
+  }
+  for (const o of model.objects || []) {
+    const m = o.params?.material;
+    if (typeof m === 'string' && m !== 'plaster') ref(`Objekt ${o.id}: params.material`, m);
+  }
 }
 
 // 2. eindeutige IDs

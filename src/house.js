@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { Builder, pointInPoly, heightAt } from './geometry.js';
 import { withRoomLight, lampMaterial, lightUniforms } from './roomlight.js';
-import { parquetTexture, plankTexture, cubeParquetTexture, tileTexture, glowTexture, groundTexture, normalFromCanvas, noiseCanvas, speckleTexture, slabTexture, stoneTexture, roofTileTexture, sidingTexture, brickTexture, flagstoneTexture } from './textures.js';
+import { glowTexture, normalFromCanvas, noiseCanvas } from './textures.js';
+import { isSurface, surfaceDef, surfaceIds, surfaceMaterial } from './surfaces.js';
 import { buildWindow, buildDoor, hasBoard, BOARD, DOOR_TOP, doorArch, buildArchOpening } from './openings.js';
 import { buildPitchedRoof, ceilingFn, ceilingProfile, windowUnderRoof, doorUnderRoof } from './roof.js';
 import { GROUND_Y } from './ground.js';
@@ -16,7 +17,6 @@ import { buildRailing, beam } from './railing.js';
 const FLOOR_STEP = 0.0008;
 export { GROUND_Y } from './ground.js';
 // Weiche Oberflächen: ihre Kante ist Erde; Beläge (Platten, Kies, Stein …) zeigen ihren Belag auch an der Kante
-const SOFT = new Set(['lawn', 'soil']);
 
 /** UV-Koordinaten ab Index start um deg Grad drehen (Verlegerichtung) */
 function rotateUV(uv, start, deg) {
@@ -107,7 +107,7 @@ export class FloorModel {
       if (floor.outdoor && !frags) {
         // Kanten zum Boden bzw. Nachbarbereich daneben (Hügel, Hochbeet, Mauer, Stufe; mit Höhenraster auch zum
         // höheren Hang hin) – Erde wie beim Geländemodell oder `edge` (z. B. Naturstein)
-        const ek = this.shared.mat[r.room.edge] ? r.room.edge : SOFT.has(kind) ? 'soil' : kind;
+        const ek = isSurface(r.room.edge) ? this._surfaceName(r.room.edge) : this._surfaceName(surfaceDef(r.room.floor)?.edge || r.room.floor);
         this._outdoorEdges(r, (floors[ek] ??= new Builder()), y);
       }
       // Belag-Zonen: Teilflächen mit anderem Boden (z. B. Naturstein im Essbereich), 2 mm darüber
@@ -277,7 +277,7 @@ export class FloorModel {
       this.group.add(m);
       return m;
     };
-    for (const [kind, b] of Object.entries(floors)) add(b, S.mat[kind], { cast: kind.startsWith('roof') });
+    for (const [kind, b] of Object.entries(floors)) add(b, S.mat[kind], { cast: !!floor.roof || kind.startsWith('roof') });
     add(walls, S.mat.wall, { cast: true });
     add(caps, S.mat.cap, { cast: true });
     add(B.pvc, S.mat.pvc, { cast: true });
@@ -290,8 +290,7 @@ export class FloorModel {
 
   /** Oberfläche draußen (Außenbereiche, Dach): Variante mit Regen/Schnee, falls es eine gibt (flagstone_out) */
   _surfaceName(name) {
-    const out = this.floor.outdoor || this.floor.roof;
-    return out && this.shared.mat[`${name}_out`] ? `${name}_out` : name;
+    return this.floor.outdoor || this.floor.roof ? this.shared.outName(name) : name;
   }
 
   /**
@@ -591,79 +590,20 @@ export function makeFloorAO(walls, pxPerMeter = 48) {
   return tex;
 }
 
-/** Materialien und Texturen, einmal pro Szene. */
+/**
+ * Materialien, einmal pro Szene. Oberflächen (Beläge, Fassaden, Dächer) kommen aus den Daten (src/surfaces.js) und
+ * werden beim ersten Zugriff angelegt: `mat[id]`, mit Farbe `mat['id:#rrggbb']`, im Freien `mat['id_out']`.
+ */
 export function createSharedMaterials() {
-  const parquet = parquetTexture();
-  const planks = plankTexture();
-  planks.repeat.set(1 / planks.userData.metersPerRepeat, 1 / planks.userData.metersPerRepeat);
-  parquet.repeat.set(1 / parquet.userData.metersPerRepeat, 1 / parquet.userData.metersPerRepeat);
-  const tiles = tileTexture();
-  tiles.repeat.set(1 / tiles.userData.metersPerRepeat, 1 / tiles.userData.metersPerRepeat);
-  const cubes = cubeParquetTexture();
-  cubes.repeat.set(1 / cubes.userData.metersPerRepeat, 1 / cubes.userData.metersPerRepeat);
   const lit = (params, opts = {}) => withRoomLight(new THREE.MeshStandardMaterial(params), opts);
-  const lawn = groundTexture();
-  lawn.repeat.set(1 / lawn.userData.metersPerRepeat, 1 / lawn.userData.metersPerRepeat);
-  // Pflaster: graue Platten (Fliesen-Textur in Steingrau, größeres Raster)
-  const paving = tileTexture(7, [0, 0, 58]);
-  paving.repeat.set(0.5 / paving.userData.metersPerRepeat, 0.5 / paving.userData.metersPerRepeat);
-  // Oberflächenstruktur: Normalen aus der Helligkeit (Fugen und Maserung liegen tiefer), gleiche Wiederholung
-  const relief = (tex, strength) => {
-    const n = normalFromCanvas(tex.userData.source || tex.image, tex.userData.metersPerRepeat, strength);
-    n.repeat.copy(tex.repeat);
-    return n;
-  };
   const N = (s) => new THREE.Vector2(s, s);
   // Putz: feines Rauschen, 1,5 m kachelbar
   const plaster = normalFromCanvas(noiseCanvas(256, 21, 10, 4), 1.5, 3, 256);
   plaster.repeat.set(1 / 1.5, 1 / 1.5);
-  const gravel = speckleTexture([166, 157, 140], 0.6, 5, 0.45);
-  gravel.repeat.set(1 / 0.6, 1 / 0.6);
-  const soil = speckleTexture([74, 54, 38], 0.8, 9, 0.35);
-  soil.repeat.set(1 / 0.8, 1 / 0.8);
-  const roofTex = speckleTexture([78, 80, 84], 0.7, 13, 0.25);
-  roofTex.repeat.set(1 / 0.7, 1 / 0.7);
-  const tilesRoof = roofTileTexture();
-  tilesRoof.repeat.set(1 / 1.2, 1 / 1.2);
-  const flag = flagstoneTexture();
-  flag.repeat.set(1 / 1.6, 1 / 1.6);
-  const siding = sidingTexture();
-  siding.repeat.set(1 / 1.2, 1 / 1.2);
-  const bricks = brickTexture();
-  bricks.repeat.set(1 / 1.2, 1 / 1.2);
-  const slabs = slabTexture();
-  slabs.repeat.set(1 / 1.2, 1 / 1.2);
-  const stone = stoneTexture();
-  stone.repeat.set(1 / 1.2, 1 / 1.2);
 
-  const mat = {
-    // Bodenbeläge und Oberflächen (`surface` im Modell, docs/DATA_MODEL.md)
-    parquet: withRoomLight(new THREE.MeshStandardMaterial({ map: parquet, normalMap: relief(parquet, 3), normalScale: N(0.35), roughness: 0.5, metalness: 0 }), { floorAO: true }),
-    tiles: withRoomLight(new THREE.MeshStandardMaterial({ map: tiles, normalMap: relief(tiles, 6), normalScale: N(0.6), roughness: 0.3, metalness: 0 }), { floorAO: true }),
-    // Würfelparkett: 35-cm-Quadrate aus je 4 Eichenstäben, Richtung wechselt
-    planks: withRoomLight(new THREE.MeshStandardMaterial({ map: planks, normalMap: relief(planks, 3), normalScale: N(0.35), roughness: 0.5, metalness: 0 }), { floorAO: true }),
-    parquet_cube: lit({ map: cubes, normalMap: relief(cubes, 3), normalScale: N(0.35), roughness: 0.4, metalness: 0 }, { floorAO: true }),
-    concrete: lit({ color: 0x9a968f, normalMap: plaster, normalScale: N(0.5), roughness: 0.9 }, { floorAO: true }),
-    // Flächen im Freien: nass bei Regen, weiß bei Schnee (weather)
-    lawn: lit({ map: lawn, normalMap: relief(lawn, 4), normalScale: N(0.6), roughness: 1 }, { weather: true }),
-    paving: lit({ map: paving, normalMap: relief(paving, 6), normalScale: N(0.8), roughness: 0.85 }, { weather: true }),
-    gravel: lit({ map: gravel, normalMap: relief(gravel, 8), normalScale: N(1), roughness: 1 }, { weather: true }),
-    soil: lit({ map: soil, normalMap: relief(soil, 5), normalScale: N(0.8), roughness: 1 }, { weather: true }),
-    // Flachdach: dunkle Dachbahn; Dachrand/Attika in hellem Metall
-    roof: lit({ map: roofTex, normalMap: relief(roofTex, 4), normalScale: N(0.6), roughness: 0.95 }, { weather: true }),
+  // Bauteile der Engine (Rahmen, Zargen, Beschläge …); Farben je Bauteil über `surface('pvc', farbe)`
+  const fixed = {
     roof_edge: lit({ color: 0xa9adb1, roughness: 0.5, metalness: 0.3 }, { weather: true }),
-    // Steildach: Ziegel (Farbe je Dach über `color`, Standard Ziegelrot)
-    roof_tiles: lit({ map: tilesRoof, normalMap: relief(tilesRoof, 6), normalScale: N(0.9), color: 0xa4553b, roughness: 0.8 }, { weather: true }),
-    // Fassaden (buildings[].facade): Holzschalung (Standard Schwedenrot), Ziegel, Putz = wall
-    wood_siding: lit({ map: siding, normalMap: relief(siding, 5), normalScale: N(0.8), color: 0x8e2f22, roughness: 0.75 }, { weather: true }),
-    brick: lit({ map: bricks, normalMap: relief(bricks, 6), normalScale: N(0.8), color: 0xb05a3c, roughness: 0.85 }, { weather: true }),
-    slabs: lit({ map: slabs, normalMap: relief(slabs, 8), normalScale: N(0.7), roughness: 0.75 }, { weather: true }),
-    stone: lit({ map: stone, normalMap: relief(stone, 10), normalScale: N(1.2), roughness: 0.95 }, { weather: true }),
-    wood: lit({ color: 0x8a6440, roughness: 0.7 }, { weather: true }),
-    // Polygonalplatten: innen (Bodenverdeckung an Wänden) und außen (Regen, Schnee) – gleiche Textur
-    flagstone: lit({ map: flag, normalMap: relief(flag, 7), normalScale: N(0.8), roughness: 0.7 }, { floorAO: true }),
-    flagstone_out: lit({ map: flag, normalMap: relief(flag, 7), normalScale: N(0.8), roughness: 0.8 }, { weather: true }),
-    water: lit({ color: 0x2f5468, roughness: 0.15, metalness: 0.1 }),
     pvc: lit({ color: 0xf1f0eb, roughness: 0.45 }),
     board: lit({ color: 0xb48650, roughness: 0.5 }),
     doorDark: lit({ color: 0x3a2a1e, roughness: 0.7 }),
@@ -681,25 +621,43 @@ export function createSharedMaterials() {
     // Lichtschein vor erleuchteten Fenstern (schwächer als eine Außenleuchte)
     windowPool: lampMaterial({ map: glowTexture(), strength: 0.06, additive: true }),
   };
-  // Oberfläche mit eigener Farbe (z. B. Dachziegel anthrazit): Kopie des Materials, einmal je Farbe
-  const surface = (kind, color) => {
-    if (!mat[kind]) kind = 'parquet';
-    if (color == null) return kind;
-    const key = `${kind}:${color}`;
-    if (!mat[key]) {
-      const m = mat[kind].clone();
-      m.color = new THREE.Color(color);
-      mat[key] = withRoomLight(m, mat[kind].userData.roomLightOpts || {});
+  // Schlüssel -> Material: Bauteil, Oberfläche (id, id_out, id:farbe, id_out:farbe) oder Bauteil mit Farbe (pvc:#…)
+  const store = { ...fixed };
+  const make = (key) => {
+    const [name, color] = key.split(':');
+    const outdoor = name.endsWith('_out') && !isSurface(name);
+    const id = outdoor ? name.slice(0, -4) : name;
+    if (isSurface(id)) {
+      // im Freien nur eine eigene Variante, wenn der Belag nicht ohnehin für draußen ist
+      if (outdoor && surfaceDef(id).outdoor) return (store[key] = make(color ? `${id}:${color}` : id));
+      return (store[key] = surfaceMaterial(id, { color, outdoor, lit }));
     }
-    return key;
+    if (color && fixed[id]) {
+      const m = fixed[id].clone();
+      m.color = new THREE.Color(color);
+      return (store[key] = withRoomLight(m, fixed[id].userData.roomLightOpts || {}));
+    }
+    return undefined;
   };
-  // Fassade -> Material-Schlüssel: plaster (Putz, Farbe), wood_siding, brick, stone
+  const mat = new Proxy(store, {
+    get: (t, k) => (typeof k !== 'string' || k in t ? t[k] : make(k)),
+    has: (t, k) => k in t || (typeof k === 'string' && isSurface(k.split(':')[0].replace(/_out$/, ''))),
+  });
+  // Oberfläche mit eigener Farbe (z. B. Dachziegel anthrazit): eigener Schlüssel je Farbe; unbekannt -> Standard
+  const surface = (kind, color) => {
+    if (!isSurface(kind.replace(/_out$/, '')) && !fixed[kind]) kind = isSurface('parquet') ? 'parquet' : surfaceIds()[0];
+    return color == null ? kind : `${kind}:${color}`;
+  };
+  // Fassade -> Material-Schlüssel: plaster (Putz = Wandmaterial mit Farbe) oder eine Oberfläche (im Freien)
   const facadeKey = (f) => {
     const type = f.type || 'plaster';
-    return surface(type === 'plaster' ? 'wall' : mat[type] ? type : 'wall', f.color);
+    if (type === 'plaster' || !isSurface(type)) return surface('wall', f.color);
+    return surface(`${type}_out`, f.color);
   };
+  /** Oberfläche im Freien (Außenbereich, Dach): Variante mit Regen/Schnee */
+  const outName = (name) => (isSurface(name) && !surfaceDef(name).outdoor ? `${name}_out` : name);
   const hitMaterial = new THREE.MeshBasicMaterial({ visible: false });
   const lampHitGeometry = new THREE.SphereGeometry(0.35, 8, 6);
-  return { mat, surface, facadeKey, hitMaterial, lampHitGeometry };
+  return { mat, surface, facadeKey, outName, hitMaterial, lampHitGeometry };
 }
 

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FloorModel, createSharedMaterials } from './house.js';
+import { setSurfaceAssets } from './surfaces.js';
 import { FurnishingLayer } from './furnishing.js';
 import { LightTable, lightUniforms, withRoomLight, LIGHT_TABLE_MAX, MAX_LAMPS_PER_ROOM } from './roomlight.js';
 import { pointInPoly, heightAt, Builder } from './geometry.js';
@@ -181,6 +182,8 @@ export class HouseScene {
     this.scene.background = new THREE.Color(0x0a0d13);
     this.scene.fog = new THREE.Fog(0x0a0d13, 45, 95);
 
+    // Bilder eigener Oberflächen (surfaces → image) aus dem Datenordner; nach dem Laden neu zeichnen
+    setSurfaceAssets(assetBase, () => this.requestRender());
     this.shared = createSharedMaterials();
     // scharfe Böden auch bei flachem Blickwinkel (anisotrope Filterung, kostet kaum etwas)
     const aniso = Math.min(8, r.capabilities.getMaxAnisotropy());
@@ -208,7 +211,7 @@ export class HouseScene {
     setupTerrainShading(terrain);
     const aerial = aerialSpec(terrain);
     if (aerial) {
-      const groundMat = this.shared.mat[this.house.ground] || this.shared.mat.lawn;
+      const groundMat = this.shared.mat[this.shared.outName(this.house.ground)] || this.shared.mat.lawn;
       withRoomLight(groundMat, { ...(groundMat.userData.roomLightOpts || {}), aerial: true });
       this.aerialReady = loadAerial(aerial, new URL(aerial.file, assetBase || location.href).href, () => {
         this.renderer.shadowMap.needsUpdate = true;
@@ -546,7 +549,7 @@ export class HouseScene {
     this.center = new THREE.Vector3(cx, 0, cz);
 
     // Boden außerhalb aller Außenbereiche (site.ground), etwas unter den Flächen (kein Flackern)
-    const groundMat = this.shared.mat[this.house.ground] || this.shared.mat.lawn;
+    const groundMat = this.shared.mat[this.shared.outName(this.house.ground)] || this.shared.mat.lawn;
     const ground = new THREE.Mesh(this._groundGeometry(cx, cz), groundMat);
     ground.receiveShadow = true;
     this.scene.add(ground);

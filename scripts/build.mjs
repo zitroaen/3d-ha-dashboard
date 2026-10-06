@@ -32,6 +32,8 @@ const options = {
   sourcemap: watch ? 'inline' : false,
   outfile: 'dist/ha-3d-dashboard.js',
   legalComments: 'none',
+  // Beispiel-Bibliothek (library/*.yaml) als Text im Bundle
+  loader: { '.yaml': 'text' },
   define: { __HA3D_VERSION__: JSON.stringify(version) },
   logLevel: 'info',
 };
