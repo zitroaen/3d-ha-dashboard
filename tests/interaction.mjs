@@ -614,6 +614,24 @@ try {
     'Standardansicht: festlegen, Doppeltippen auf den Kompass und Inaktivität bringen Ebene, Blickwinkel und Zoom zurück (auch ohne Bildtakt)',
     `Standardansicht: ${JSON.stringify(home)} Doppeltippen=${backByTap} Inaktivität=${backByIdle} jetzt=${JSON.stringify(idleState)}`);
 
+  // ---------------- Hineinzoomen: weiter als früher (5), Richtung Mauszeiger ----------------
+  const zoomStart = await page.evaluate(() => {
+    const v = window.panel.view;
+    v.resetView();
+    return { max: v.controls.maxZoom, target: v.controls.target.toArray() };
+  });
+  await steady(page);
+  const vp = page.viewportSize();
+  await page.mouse.move(vp.width * 0.7, vp.height * 0.5);
+  for (let i = 0; i < 40; i++) await page.mouse.wheel(0, -300);
+  await steady(page);
+  const zoomEnd = await page.evaluate(() => ({ zoom: window.panel.view.camera.zoom, target: window.panel.view.controls.target.toArray() }));
+  const zoomMoved = Math.hypot(zoomEnd.target[0] - zoomStart.target[0], zoomEnd.target[2] - zoomStart.target[2]);
+  ok(zoomStart.max > 8 && zoomEnd.zoom > 6 && zoomMoved > 1,
+    'Zoom: bis über das Fünffache hinein (Grenze aus dem Bildausschnitt), auf die Stelle unter dem Mauszeiger',
+    `Zoom: Grenze ${zoomStart.max.toFixed(1)}, erreicht ${zoomEnd.zoom.toFixed(1)}, Drehpunkt verschoben ${zoomMoved.toFixed(2)} m`);
+  await page.evaluate(() => window.panel.view.resetView());
+
   // ---------------- Leistungsanzeige ----------------
   await page.evaluate(() => window.panel._applyPrefs({ ...window.panel.prefs, fps: 'on' }));
   await page.evaluate(() => window.panel.view.requestRender());
