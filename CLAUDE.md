@@ -330,3 +330,5 @@ nur bei Änderungen neu berechnet. Außenleuchten: Pseudo-Raum `aussen`.
   (ohne three.js, getestet); `ha.badge` bleibt als Kurzform true/false gültig. Der Player ist ein HTML-Element in der
   Schild-Ebene (`.player`, eigene pointer-events, stoppt Zeiger-Ereignisse, damit die Kamera nicht dreht) und ersetzt
   das Schild, solange seine Bedingung gilt (Standard: playing). Keine Laufzeit-Animation, keine externen Bilder.
+- Fischgrätparkett (0.31.0): Gitter (W, W) und (L, −L) mit L = 7 W kachelt lückenlos; Kachel 4 L = 2 m ist ein
+  Gitterpunkt, also nahtlos (Stäbe am Rand dreifach gezeichnet). Die alten Dielen heißen `planks`.

@@ -486,7 +486,8 @@ Bedingung. Einstellbar im Editor (Objekt → Einstellungen).
 
 | Wert | Darstellung |
 |---|---|
-| `parquet` | Fischgrätparkett |
+| `parquet` | Fischgrätparkett (Stäbe 7 × 50 cm im Zickzack) |
+| `planks` | Dielen im Versatz (bis 0.30 hieß das `parquet`) |
 | `parquet_cube` | Würfelparkett |
 | `tiles` | Fliesen |
 | `concrete` | Beton/Estrich |
@@ -781,6 +782,9 @@ Datei migriert; beim nächsten Speichern steht es in der aktuellen Version im Sp
 
 ## Änderungen
 
+- **Version 2, Ergänzung (0.31.0):** `surface: parquet` ist jetzt echtes Fischgrätparkett (vorher sahen die Böden wie
+  Dielen im Versatz aus); die bisherigen Dielen heißen `planks` – wer sie behalten will, stellt `parquet` auf `planks`
+  um. Kein Formatwechsel (die Daten bleiben gültig).
 - **Version 2, Ergänzung (0.30.0, abwärtskompatibel):** `ha.badge` auch als `{ show, entities, when }` (Werte
   auswählen, Bedingung), `ha.player` (Mini-Medienplayer über media_player-Objekten).
 - **0.29.0 (Werkzeuge):** `views.json` mit `view.tilt` (Kameraneigung) und ohne `view.at`; eingebaute Ansicht `schraeg`.

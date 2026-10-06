@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.31.0
+
+- **Fischgrätparkett (Fehler):** `surface: parquet` zeichnet jetzt echtes Fischgrätmuster – Stäbe 7 × 50 cm, um 90°
+  versetzt im Zickzack, je Stab leicht anderer Farbton, Maserung entlang des Stabs, feine Fugen (Normalen-Karte daraus
+  wie bisher). Vorher waren es Dielen im Versatz; die gibt es weiter als `surface: planks` – wer sie behalten will,
+  stellt um.
+
 ## 0.30.0
 
 - **Zustandsanzeige wählbar:** Je Objekt lässt sich im Editor festlegen, welche verknüpften Werte über dem Objekt

@@ -30,7 +30,57 @@ function toTexture(c, metersPerRepeat, srgb = true) {
 }
 
 // Eichenparkett, Landhausdielen 1,2 m × 0,2 m (12 Reihen × 2 Dielen -> nahtlos kachelbar)
+/**
+ * Fischgrätparkett: Stäbe 7 × 50 cm, abwechselnd waagrecht und senkrecht im Zickzack (Gitter (W, W) und (L, −L) mit
+ * L = 7 W); Kachel 2 × 2 m, nahtlos. Je Stab eigener Farbton, Maserung entlang des Stabs, feine Fugen.
+ */
 export function parquetTexture() {
+  const W = 0.5 / 7, L = 0.5, meters = 4 * L; // 2 m = 28 W: Gitterpunkt, also nahtlos
+  const size = 1024, px = size / meters;
+  const c = canvas(size, size);
+  const g = c.getContext('2d');
+  const r = rng(7);
+  const stave = (x, y, w, h, along) => {
+    const base = 0.86 + r() * 0.28, hue = 31 + r() * 6;
+    const fill = `hsl(${hue}, ${26 + r() * 9}%, ${48 * base}%)`;
+    const grains = Array.from({ length: 6 }, () => [r(), 0.04 + r() * 0.09, 0.5 + r() * 1.2, r() * 6]);
+    // an allen Kanten der Kachel wiederholen (nahtlos)
+    for (const dx of [-size, 0, size]) for (const dy of [-size, 0, size]) {
+      const X = x * px + dx, Y = y * px + dy, Wp = w * px, Hp = h * px;
+      if (X > size || Y > size || X + Wp < 0 || Y + Hp < 0) continue;
+      g.fillStyle = fill;
+      g.fillRect(X, Y, Wp, Hp);
+      for (const [o, a, lw, ph] of grains) {
+        g.strokeStyle = `rgba(60,35,15,${a})`;
+        g.lineWidth = lw;
+        g.beginPath();
+        for (let k = 0; k <= 8; k++) {
+          const t = k / 8, wob = Math.sin(t * 7 + ph) * 1.2;
+          if (along === 'x') (k ? g.lineTo : g.moveTo).call(g, X + Wp * t, Y + Hp * o + wob);
+          else (k ? g.lineTo : g.moveTo).call(g, X + Wp * o + wob, Y + Hp * t);
+        }
+        g.stroke();
+      }
+      // feine Fugen
+      g.strokeStyle = 'rgba(30,18,8,0.6)';
+      g.lineWidth = 1.2;
+      g.strokeRect(X + 0.5, Y + 0.5, Wp - 1, Hp - 1);
+    }
+  };
+  for (let m = -3; m <= 5; m++) {
+    for (let n = -30; n <= 60; n++) {
+      const ox = n * W + m * L, oy = n * W - m * L;
+      if (ox > meters + L || oy > meters + L || ox + 2 * L < 0 || oy + 2 * L < 0) continue;
+      const wx = ((ox % meters) + meters) % meters, wy = ((oy % meters) + meters) % meters;
+      stave(wx, wy, L, W, 'x'); // waagrecht
+      stave(wx + L, wy + W - L, W, L, 'y'); // senkrecht, im Zickzack daneben
+    }
+  }
+  return toTexture(c, meters);
+}
+
+/** Dielen im Versatz (früher „parquet“): 20 × 120 cm, Maserung, Fugen */
+export function plankTexture() {
   const size = 1024, meters = 2.4;
   const px = size / meters;
   const c = canvas(size, size);
